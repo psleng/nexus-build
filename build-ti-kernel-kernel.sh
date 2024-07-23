@@ -46,9 +46,12 @@ mkdir -p build
 find vyos-build/packages/linux-kernel/ -type f | grep '\.deb$' | xargs -I {} cp {} build/
 mv vyos-build vyos-build-tik
 
+rm -rf debian-repos
+git clone https://github.com/johnlfeeney/debian-repos
 cd debian-repos
-rm -rf build
+#rm -rf build
 ./run.sh ti-linux-firmware
 cd ${ROOTDIR}
+# I still need to clean this up
 find debian-repos/build/bookworm/ti-linux-firmware/ -type f | grep '\.deb$' | xargs -I {} cp {} build/
 
