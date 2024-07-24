@@ -52,6 +52,5 @@ cd debian-repos
 #rm -rf build
 ./run.sh ti-linux-firmware
 cd ${ROOTDIR}
-# I still need to clean this up
-find debian-repos/build/bookworm/ti-linux-firmware/ -type f | grep '\.deb$' | xargs -I {} cp {} build/
-
+#find debian-repos/build/bookworm/ti-linux-firmware/ -type f | grep '\.deb$' | xargs -I {} cp {} build/
+cp -rf debian-repos/build/bookworm/ti-linux-firmware/*64*.deb build/
