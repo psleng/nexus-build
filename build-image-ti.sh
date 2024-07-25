@@ -63,11 +63,13 @@ git clone https://github.com/johnlfeeney/vyos-1x -b current
 cd vyos-1x
 dpkg-buildpackage -uc -us -tc -b
 
+cd $ROOTDIR/vyos-build/packages
+
 git clone https://github.com/johnlfeeney/vyos-user-utils -b current
 cd vyos-user-utils
 dpkg-buildpackage -uc -us -tc -b
 
-cd ..
+cd $ROOTDIR/vyos-build
 
 
 #cp ${ROOTDIR}/defaults.toml data/defaults.toml
@@ -107,7 +109,7 @@ cp -R build/fs/usr/lib/linux-image*/ti build/fs/boot/dtb
 cat build/fs/boot/vmlinuz* | gunzip -d > build/fs/boot/Image
 
 echo "Copy new default configuration to the vyos image"
-cp -rf ${ROOTDIR}/config.boot.default ${ROOTDIR}/fs/usr/share/vyos/config.boot.default
+cp -rf ${ROOTDIR}/config.boot.default ${ROOTDIR}/build/fs/usr/share/vyos/config.boot.default
 
 umount -d build/tmp/
 #losetup -d ${ISOLOOP}
