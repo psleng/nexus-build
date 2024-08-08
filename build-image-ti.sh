@@ -40,8 +40,32 @@ for a in $(find build -type f -name "*.deb" | grep -v -e "-dbgsym_" -e "libnetfi
 	cp $a vyos-build/packages/
 done
 
+#frr and Dependencies
+export EMAIL="johnlfeeney@gmail.com"
+cd $ROOTDIR/vyos-build/packages/frr
+git clone https://github.com/rtrlib/rtrlib.git
+cd rtrlib
+git checkout v0.8.0
+mk-build-deps --install --tool "apt-get --yes --no-install-recommends"
+dpkg-buildpackage -uc -us -tc -b
+#dpkg -i ../librtr0*_${ARCH}.deb ../librtr-dev*_${ARCH}.deb ../rtr-tools*_${ARCH}.deb
+cd $ROOTDIR/vyos-build/packages/frr
+git clone https://github.com/CESNET/libyang.git
+cd libyang
+git checkout v2.1.148
+pipx run apkg build -i && find pkg/pkgs -type f -name *.deb -exec mv -t .. {} +
+cd ..
+dpkg -i *.deb
+#dpkg -i ../libyang*.deb
+cd $ROOTDIR/vyos-build/packages/frr
+git clone https://github.com/FRRouting/frr.git
+cd frr
+git checkout stable/9.1
+dpkg -i ../*.deb; mk-build-deps --install --tool "apt-get --yes --no-install-recommends"; cd ..; ./build-frr.sh
+cp -rf *.deb ..
+# frr end
 
-cd vyos-build/packages/strongswan
+cd $ROOTDIR/vyos-build/packages/strongswan
 git clone https://github.com/johnlfeeney/vyos-strongswan.git -b current strongswan
 
 # this patch is to solve a newer compiler error, it is fixed in newer versions of strongswan

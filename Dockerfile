@@ -358,6 +358,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
       libnl-genl-3-dev \
       libxtables-dev
+
 # Packages needed for OWAMP - JF
 RUN apt-get update && apt-get install -y \
 	dh-apparmor \
@@ -384,14 +385,12 @@ RUN apt-get update && apt-get install -y \
 	libpam0g-dev \
 	libsqlite3-dev \
 	libssl-dev \
-	libsystemd-dev \
 	libtool \
 	libtss2-dev \
 	libxml2-dev \
 	pkg-config \
 	po-debconf \
 	systemd \
-	libsystemd-dev \
 	tzdata \
 	libcurl4-openssl-dev \
 	libgmp3-dev \
@@ -405,6 +404,51 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
 	kpartx
 	
+# Packages needed for frr - JF
+# And for building libyan2-dev https://docs.frrouting.org/projects/dev-guide/en/latest/building-frr-for-debian12.html#install-required-packages -JF
+RUN apt-get update && apt-get install -y \
+	chrpath \
+	gawk \
+	install-info \
+	libcap-dev \
+	libjson-c-dev \
+	librtr-dev \
+	libpam-dev \libprotobuf-c-dev \
+	libpython3-dev:native \
+	python3-sphinx:native \
+	libsnmp-dev \
+	protobuf-c-compiler \
+	python3-dev:native \
+	texinfo \
+	lua5.3 \
+	autoconf \
+	automake \
+	make \
+	libreadline-dev \
+	gdb \
+	libgrpc-dev \
+	libpcre2-dev \
+	libgrpc++-dev \
+	libsqlite3-dev \
+	libzmq5 \
+	libzmq3-dev
+	
+# Clone the libyang2 repository
+#RUN git clone https://github.com/CESNET/libyang.git /libyang
+# Build and install libyang2
+#WORKDIR /libyang
+#RUN git checkout v2.1.148
+#RUN pipx run apkg build -i && find pkg/pkgs -type f -name *.deb -exec mv -t .. {} +
+
+# Clean up
+#RUN apt-get clean && \
+#    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*	
+# And end of for building libyang2-dev	
+	
+# Environment variables needed - JF
+ENV DEBEMAIL="jfeeney@perle.com"
+ENV EMAIL="jfeeney@perle.com.com"
+
 # Packages needed for nftables
 RUN apt-get update && apt-get install -y \
       asciidoc-base

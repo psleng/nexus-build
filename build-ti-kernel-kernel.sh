@@ -50,7 +50,7 @@ rm -rf debian-repos
 git clone https://github.com/johnlfeeney/debian-repos
 cd debian-repos
 #rm -rf build
-./run.sh ti-linux-firmware
+DEB_SUITE=bookworm ./run.sh ti-linux-firmware
 cd ${ROOTDIR}
 #find debian-repos/build/bookworm/ti-linux-firmware/ -type f | grep '\.deb$' | xargs -I {} cp {} build/
 cp -rf debian-repos/build/bookworm/ti-linux-firmware/*64*.deb build/

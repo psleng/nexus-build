@@ -15,13 +15,13 @@
 Property=vendor=1b4b device=2b43
 
 [Link]
-keep
+NamePolicy=keep
 
 [Match]
 Property=vendor=1b4b device=2b44
 
 [Link]
-keep
+NamePolicy=keep
 
 [Match]
 OriginalName=*

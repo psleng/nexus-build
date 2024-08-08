@@ -30,5 +30,10 @@ cp -rf drivers/mwifiex/lf-6.6.3_1.0.0/nxp/wifi_mod_para.conf $ROOTDIR/build/fs/l
 cp -rf 99-default.link $ROOTDIR/build/fs/etc/systemd/network/99-default.link
 cp -rf 60-Perle-pcie-card-nxp9098.rules $ROOTDIR/build/fs/etc/udev/rules.d/60-Perle-pcie-card-nxp9098.rules
 
-# TI firmware we shoulld do these as deb later just picking the ones we need
-#cp -rf $ROOTDIR/vyos-build-tik/packages/linux-kernel/linux-firmware/ti* $ROOTDIR/build/fs/lib/firmware/ti-ipc/am64xx/
+
+cd $ROOTDIR/drivers
+wget https://files.waveshare.com/upload/4/46/Simcom_wwan.zip
+unzip Simcom_wwan.zip
+cd simcom_wwan
+make -C $ROOTDIR/vyos-build-tik/packages/linux-kernel/linux M=$PWD
+mkdir -p $ROOTDIR/build/fs/lib/firmware/Simcom
