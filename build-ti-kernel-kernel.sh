@@ -26,7 +26,7 @@ cp ${ROOTDIR}/patches/ti_evm_vyos_defconfig arch/arm64/configs/vyos_defconfig
 
 #cp ${ROOTDIR}/build-kernel-arm.sh build-kernel-arm.sh
 #./build-kernel-arm.sh
-./build-kernel.sh 
+./build-kernel.sh
 
 #git clone ${FW_REPO} -b ${FW_BRANCH_NAME} linux-firmware
 #./build-linux-firmware.sh

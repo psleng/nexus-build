@@ -55,7 +55,7 @@ cd libyang
 git checkout v2.1.148
 pipx run apkg build -i && find pkg/pkgs -type f -name *.deb -exec mv -t .. {} +
 cd ..
-dpkg -i *.deb
+#dpkg -i *.deb
 #dpkg -i ../libyang*.deb
 cd $ROOTDIR/vyos-build/packages/frr
 git clone https://github.com/FRRouting/frr.git
@@ -91,6 +91,12 @@ cd $ROOTDIR/vyos-build/packages
 
 git clone https://github.com/johnlfeeney/vyos-user-utils -b current
 cd vyos-user-utils
+dpkg-buildpackage -uc -us -tc -b
+
+cd $ROOTDIR/vyos-build/packages
+
+git clone https://github.com/johnlfeeney/vyatta-bash -b current
+cd vyatta-bash
 dpkg-buildpackage -uc -us -tc -b
 
 cd $ROOTDIR/vyos-build
