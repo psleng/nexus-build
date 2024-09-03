@@ -31,9 +31,9 @@ cp -rf 99-default.link $ROOTDIR/build/fs/etc/systemd/network/99-default.link
 cp -rf 60-Perle-pcie-card-nxp9098.rules $ROOTDIR/build/fs/etc/udev/rules.d/60-Perle-pcie-card-nxp9098.rules
 
 
-cd $ROOTDIR/drivers
-wget https://files.waveshare.com/upload/4/46/Simcom_wwan.zip
-unzip Simcom_wwan.zip
-cd simcom_wwan
-make -C $ROOTDIR/vyos-build-tik/packages/linux-kernel/linux M=$PWD
-mkdir -p $ROOTDIR/build/fs/lib/firmware/Simcom
+#cd $ROOTDIR/drivers
+#wget https://files.waveshare.com/upload/4/46/Simcom_wwan.zip
+#unzip Simcom_wwan.zip
+#cd simcom_wwan
+#make -C $ROOTDIR/vyos-build-tik/packages/linux-kernel/linux M=$PWD
+#mkdir -p $ROOTDIR/build/fs/lib/firmware/Simcom

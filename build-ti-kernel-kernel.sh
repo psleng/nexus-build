@@ -14,9 +14,9 @@ git clone -b current --single-branch https://github.com/johnlfeeney/vyos-build
 KERNEL_BRANCH_NAME=v$(sed -n -e 's/^kernel_version = "\([^"]*\).*/\1/p' vyos-build/data/defaults.toml)
 KERNEL_REPO=https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
 #KERNEL_REPO="https://git.ti.com/git/ti-linux-kernel/ti-linux-kernel.git"
-FW_REPO=https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+#FW_REPO=https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
 #FW_REPO=https://git.ti.com/git/processor-firmware/ti-linux-firmware.git
-FW_BRANCH_NAME=ti-linux-firmware
+#FW_BRANCH_NAME=ti-linux-firmware
 cd vyos-build/packages/linux-kernel/
 
 echo "Build kernel for ti (${KERNEL_BRANCH_NAME})"
@@ -29,14 +29,27 @@ cp ${ROOTDIR}/patches/ti_evm_vyos_defconfig arch/arm64/configs/vyos_defconfig
 ./build-kernel.sh
 
 #git clone ${FW_REPO} -b ${FW_BRANCH_NAME} linux-firmware
-#./build-linux-firmware.sh
+#  20240610 from Jenkins file
+git clone https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git -b 20240610
+./build-linux-firmware.sh
 
+# 1.13.0 from Jenkins file
 git clone https://github.com/accel-ppp/accel-ppp.git
+cd accel-ppp
+git checkout 1.13.0
+cd ..
 ./build-accel-ppp.sh
 
 # v0.2.20231117 from Jenkins file
 git clone --depth=1 https://github.com/OpenVPN/ovpn-dco -b v0.2.20231117
 ./build-openvpn-dco.sh
+
+# 475af0a  from Jenkins file
+git clone https://github.com/maru-sama/rtsp-linux.git nat-rtsp
+cd nat-rtsp
+git checkout 475af0a
+cd ..
+./build-nat-rtsp.sh
 
 ./build-jool.py
 

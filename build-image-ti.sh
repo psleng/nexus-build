@@ -84,6 +84,10 @@ cd $ROOTDIR/vyos-build/packages
 cp -rf strongswan/strongswan/src/libcharon/plugins/vici/python/deb_dist/python3-vici_5.7.2-1_all.deb python3-vici_5.7.2-1_all.deb
 
 git clone https://github.com/johnlfeeney/vyos-1x -b current
+# Fix to make console start
+cp -rf $ROOTDIR/system_console.py $ROOTDIR/vyos-build/packages/vyos-1x/src/conf_mode/system_console.py
+# Temporary fix for DUID until a more complete solution is thought about
+cp -rf $ROOTDIR/vyos-router $ROOTDIR/vyos-build/packages/vyos-1x/src/init/vyos-router
 cd vyos-1x
 dpkg-buildpackage -uc -us -tc -b
 
@@ -138,8 +142,8 @@ cp -R build/fs/usr/lib/linux-image*/ti build/fs/boot/dtb
 #rm -rf build/fs/boot/Image
 cat build/fs/boot/vmlinuz* | gunzip -d > build/fs/boot/Image
 
-echo "Copy new default configuration to the vyos image"
-cp -rf ${ROOTDIR}/config.boot.default ${ROOTDIR}/build/fs/usr/share/vyos/config.boot.default
+#echo "Copy new default configuration to the vyos image"
+#cp -rf ${ROOTDIR}/config.boot.default ${ROOTDIR}/build/fs/usr/share/vyos/config.boot.default
 
 umount -d build/tmp/
 #losetup -d ${ISOLOOP}
