@@ -1,0 +1,5 @@
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x1b4b" ,ATTR{device}=="0x2b4[34]", RUN+="/usr/lib/modules/nxp/wifi.sh"
+ACTION=="add",KERNEL=="uap0", NAME="wlan0"
+ACTION=="add",KERNEL=="muap0", NAME="wlan1"
+ACTION=="add",KERNEL=="mlan0", NAME="wlan2"
+ACTION=="add",KERNEL=="mmlan0", NAME="wlan3"
