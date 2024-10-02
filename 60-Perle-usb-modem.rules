@@ -1,0 +1,1 @@
+ACTION=="add", SUBSYSTEM=="net", ATTR{ID_VENDOR_ID}=="0x1e0e",ATTR{ID_MODEL_ID}=="0x9001", NAME="wwan0"
