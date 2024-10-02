@@ -23,7 +23,9 @@ echo "Build kernel for ti (${KERNEL_BRANCH_NAME})"
 git clone ${KERNEL_REPO} -b ${KERNEL_BRANCH_NAME} --single-branch --depth=1 linux
 cp ${ROOTDIR}/patches/ti_evm_vyos_defconfig arch/arm64/configs/vyos_defconfig
 #patch -t -u arch/arm64/configs/vyos_defconfig < ${ROOTDIR}/patches/0001_bcm2711_defconfig.patch
-
+# substitute ti-linux-kernel definitions
+rm -rf ${ROOTDIR}/vyos-build/packages/linux-kernel/linux/arch/arm64/boot/dts/ti
+cp -rf ${ROOTDIR}/ti ${ROOTDIR}/vyos-build/packages/linux-kernel/linux/arch/arm64/boot/dts/ti
 #cp ${ROOTDIR}/build-kernel-arm.sh build-kernel-arm.sh
 #./build-kernel-arm.sh
 ./build-kernel.sh
