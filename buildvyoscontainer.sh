@@ -11,9 +11,10 @@ mkdir -p ${ROOTDIR}/vyos-build-container
 
 cd vyos-build-container
 
-git clone -b current --single-branch https://github.com/johnlfeeney/vyos-build
+git clone -b current --single-branch https://github.com/psleng/vyos-build
 
 cd vyos-build
+git remote set-url origin gitt@github.com:psleng/vyos-build
 
 cp ${ROOTDIR}/Dockerfile docker/Dockerfile
 

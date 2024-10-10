@@ -6,6 +6,9 @@
 
 #set -x
 
+# start time output
+date > vyos-ti-build.out
+
 export topdir=$(git rev-parse --show-toplevel)
 
 source ${topdir}/scripts/setup.sh
@@ -55,4 +58,7 @@ do
     package_and_clean ${build}
 
 done
+
+# end time output
+date >> vyos-ti-build.out
 

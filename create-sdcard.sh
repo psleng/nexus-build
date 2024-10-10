@@ -36,6 +36,9 @@
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# start time output
+date > sdcard-build.out
+
 # Force locale language to be set to English. This avoids issues when doing
 # text and string processing.
 export LANG=C
@@ -736,3 +739,7 @@ sudo rm -rf $PATH_TO_SDBOOT
 echo " "
 echo "Operation Finished"
 echo " "
+
+# end time output
+date >> sdcard-build.out
+

@@ -4,6 +4,9 @@ set -x
 set -e
 ROOTDIR=$(pwd)
 
+# start time output
+date > drivers-build.out
+
 rm -rf drivers
 mkdir drivers
 
@@ -11,12 +14,16 @@ mkdir drivers
 echo "Build/Install NXP 88Q9098/88W9098"
 
 cd drivers
-git clone https://github.com/johnlfeeney/mwifiex.git -b lf-6.6.3_1.0.0
+git clone https://github.com/psleng/mwifiex.git -b lf-6.6.3_1.0.0
 
 cd mwifiex
-git clone https://github.com/johnlfeeney/imx-firmware.git lf-6.6.3_1.0.0
+git remote set-url origin git@github.com:psleng/mwifiex
+
+git clone https://github.com/psleng/imx-firmware.git lf-6.6.3_1.0.0
 
 cd mxm_wifiex/wlan_src
+git remote set-url origin git@github.com:psleng/imx-firmware
+
 make -C $ROOTDIR/vyos-build-tik/packages/linux-kernel/linux M=$PWD
 
 cd $ROOTDIR
@@ -39,3 +46,7 @@ cp -rf 60-Perle-pcie-card-nxp9098.rules $ROOTDIR/build/fs/etc/udev/rules.d/60-Pe
 #mkdir -p $ROOTDIR/build/fs/lib/firmware/Simcom
 
 cp -rf 60-Perle-usb-modem.rules $ROOTDIR/build/fs/etc/udev/rules.d/60-Perle-usb-modem.rules.rules
+
+#  end time output
+date >> drivers-build.out
+

@@ -7,7 +7,7 @@ ROOTDIR=$(pwd)
 # Clean out the build-repo and copy all custom packages
 rm -rf vyos-build-tik
 rm -rf vyos-build
-git clone -b current --single-branch https://github.com/johnlfeeney/vyos-build
+git clone -b current --single-branch https://github.com/psleng/vyos-build
 #git clone -b sagitta --single-branch https://github.com/johnlfeeney/vyos-build
 
 #KERNEL_BRANCH_NAME=v$(sed -n 's/^kernel_version = "\(.*\)"$/\1/p' vyos-build/data/defaults.toml)
