@@ -64,7 +64,7 @@ cd ..
 # 475af0a  from Jenkins file
 git clone https://github.com/psleng/rtsp-linux.git nat-rtsp
 cd nat-rtsp
-git remote set-url origin git@github.com;psleng/rtsp-linux
+git remote set-url origin git@github.com:psleng/rtsp-linux
 git checkout 475af0a
 cd ..
 ./build-nat-rtsp.sh
