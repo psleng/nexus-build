@@ -1,7 +1,15 @@
 #!/bin/bash
+if test $(hostname) != 'vyos-build'; then
+    echo 'This script must be run from within the vyos-build container:'
+    echo '	./rundocker.sh'
+    exit 1
+fi
+if test $(id -u) != 0; then
+    echo 'This script must be run via sudo'
+    exit 1
+fi
 
-set -x
-set -e
+set -xe
 ROOTDIR=$(pwd)
 
 # start time output
