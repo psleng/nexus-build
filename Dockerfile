@@ -50,7 +50,7 @@ LABEL authors="VyOS Maintainers <maintainers@vyos.io>" \
       org.opencontainers.image.title="vyos-build" \
       org.opencontainers.image.description="Container to build VyOS ISO" \
       org.opencontainers.image.base.name="docker.io/debian/debian:bookworm"
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN /bin/echo -e 'APT::Install-Recommends "0";\nAPT::Install-Suggests "0";' > /etc/apt/apt.conf.d/01norecommends
 
@@ -60,9 +60,9 @@ RUN apt-get update && apt-get install -y \
       locales
 
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
-ENV LANG en_US.utf8
+ENV LANG=en_US.utf8
 
-ENV OCAML_VERSION 4.14.2
+ENV OCAML_VERSION=4.14.2
 
 # Base packaged needed to build packages and their package dependencies
 RUN apt-get update && apt-get install -y \
@@ -87,7 +87,8 @@ RUN apt-get update && apt-get install -y \
       gosu \
       po4a \
       openssh-client \
-      jq
+      jq \
+      socat
 
 # Packages needed for vyos-build
 RUN apt-get update && apt-get install -y \
@@ -153,7 +154,7 @@ RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
 
 # Build VyConf which is required to build libvyosconfig
 RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add vyos1x-config https://github.com/vyos/vyos1x-config.git#fc327ecd76 -y
+    opam pin add vyos1x-config https://github.com/vyos/vyos1x-config.git#d7260e772e39bc6a3a2d76d629567e03bbad16b5 -y
 
 # Packages needed for libvyosconfig
 RUN apt-get update && apt-get install -y \
@@ -164,7 +165,7 @@ RUN apt-get update && apt-get install -y \
 # Build libvyosconfig
 RUN eval $(opam env --root=/opt/opam --set-root) && \
     git clone https://github.com/vyos/libvyosconfig.git /tmp/libvyosconfig && \
-    cd /tmp/libvyosconfig && git checkout c6141d97 && \
+    cd /tmp/libvyosconfig && git checkout 3a021a0964882cdd1873de6cf2bb3b4acb9043e0 && \
     dpkg-buildpackage -uc -us -tc -b && \
     dpkg -i /tmp/libvyosconfig0_*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
 
@@ -177,6 +178,18 @@ RUN wget -O /tmp/open-vmdk-master.zip https://github.com/vmware/open-vmdk/archiv
     unzip -d /tmp/ /tmp/open-vmdk-master.zip && \
     cd /tmp/open-vmdk-master/ && make && make install
 
+# Packages need for build live-build
+RUN apt-get update && apt-get install -y \
+      cpio
+
+COPY patches/live-build/0001-save-package-info.patch /tmp/0001-save-package-info.patch
+
+RUN git clone https://salsa.debian.org/live-team/live-build.git /tmp/live-build && \
+    cd /tmp/live-build && git checkout debian/1%20240810 && \
+    patch -p1 < /tmp/0001-save-package-info.patch && \
+    dch -n "Applying fix for save package info" && \
+    dpkg-buildpackage -us -uc && \
+    dpkg -i ../live-build*.deb
 #
 # live-build: building in docker fails with mounting /proc | /sys
 #
@@ -263,6 +276,7 @@ RUN GO_VERSION_INSTALL="1.21.3" ; \
     tar -C /opt -xzf /tmp/go*.tar.gz && \
     rm /tmp/go*.tar.gz
 RUN echo "export PATH=/opt/go/bin:$PATH" >> /etc/bash.bashrc
+
 
 # Packages needed for opennhrp
 RUN apt-get update && apt-get install -y \
@@ -358,7 +372,6 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
       libnl-genl-3-dev \
       libxtables-dev
-
 # Packages needed for OWAMP - JF
 RUN apt-get update && apt-get install -y \
 	dh-apparmor \
@@ -432,6 +445,7 @@ RUN apt-get update && apt-get install -y \
 	libsqlite3-dev \
 	libzmq5 \
 	libzmq3-dev
+
 	
 # Clone the libyang2 repository
 #RUN git clone https://github.com/CESNET/libyang.git /libyang
@@ -461,6 +475,12 @@ RUN sed "s/^%sudo.*/%sudo\tALL=(ALL) NOPASSWD:ALL/g" -i /etc/sudoers && \
 # Ensure sure all users have access to our OCAM and Go installation
 RUN echo "$(opam env --root=/opt/opam --set-root)" >> /etc/skel/.bashrc && \
     echo "export PATH=/opt/go/bin:\$PATH" >> /etc/skel/.bashrc
+
+
+# Rise upper limit for UID when working in an Active Direcotry integrated
+# environment. This solves the warning: vyos_bld's uid 1632000007 outside of the
+# UID_MIN 1000 and UID_MAX 60000 range.
+RUN sed -i 's/UID_MAX\t\t\t60000/UID_MAX\t\t\t2000000000/g' /etc/login.defs
 
 # Cleanup
 RUN rm -rf /tmp/*
