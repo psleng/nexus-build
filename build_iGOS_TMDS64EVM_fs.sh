@@ -10,6 +10,7 @@ if [ "$#" -lt 2 ] || [ "$1" != "--repo" ]; then
 fi
 
 REPPREFIX_URL="$2/"
+REPO_URL_TI_DEB="$2/debian-repos"""
 REPO_URL="$2/vyos-build"
 REPO_NAME="vyos-build"
 ROOTDIR=$(pwd)
@@ -48,10 +49,10 @@ cp -rf $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/arm6
 #frr build fix need to be fixed up later on it the build process
 export EMAIL="johnlfeeney@gmail.com"
 
-./package-build.py --dir package-build --include telegraf owamp frr strongswan openvpn-otp opennhrp aws-gwlbtun node_exporter
+./package-build.py --dir package-build --include telegraf owamp frr strongswan openvpn-otp opennhrp aws-gwlbtun node_exporter podman
 
 ./package-build.py --dir package-build-iGOS --include vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname libvyosconfig \
-vyatta-cfg vyos-http-api-tools vyos-utils ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance podman
+vyatta-cfg vyos-http-api-tools vyos-utils ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance
 
 
 # copy everything to the build directory
@@ -62,7 +63,7 @@ done
 
 # this setion needs some rework to clean up how this ti firmware is pulled.
 rm -rf debian-repos
-git clone https://github.com/johnlfeeney/debian-repos
+git clone $REPO_URL_TI_DEB
 cd debian-repos
 
 DEB_SUITE=bookworm ./run.sh ti-linux-firmware
@@ -73,7 +74,7 @@ cp -rf debian-repos/build/bookworm/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-buil
 
 cd $ROOTDIR/vyos-build
 
-./build-vyos-image arm64fs --architecture arm64 --build-by "jfeeney@perle.com"
+sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "jfeeney@perle.com"
 
 cd $ROOTDIR
 

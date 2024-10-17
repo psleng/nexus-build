@@ -26,13 +26,10 @@ KERNEL_SUFFIX=-$(awk -F "= " '/kernel_flavor/ {print $2}' ../../../../data/defau
 # Check if the machine is ARM
 if [[ $(uname -m) == "aarch64" ]]; then
     KERNEL_CONFIG=arch/arm64/configs/vyos_defconfig
-    DIR_NAME_DTS=$(ls -d ${CWD}/arm_dts/*/)
-    rm -rf ${CWD}/linux/arch/arm64/boot/dts/$(basename $DIR_NAME_DTS)
-    cp -r $DIR_NAME_DTS ${CWD}/linux/arch/arm64/boot/dts/$(basename $DIR_NAME_DTS)
 else
     KERNEL_CONFIG=arch/x86/configs/vyos_defconfig
 fi
-
+echo "$KERNEL_CONFIG"
 # VyOS requires some small Kernel Patches - apply them here
 # It's easier to habe them here and make use of the upstream
 # repository instead of maintaining a full Kernel Fork.
