@@ -42,9 +42,9 @@ RUN grep "VERSION_ID" /etc/os-release || (echo 'VERSION_ID="12"' >> /etc/os-rele
 # `docker run --rm --privileged multiarch/qemu-user-static:register --reset`
 LABEL authors="VyOS Maintainers <maintainers@vyos.io>" \
       org.opencontainers.image.authors="VyOS Maintainers <maintainers@vyos.io>" \
-      org.opencontainers.image.url="https://github.com/vyos/vyos-build" \
+      org.opencontainers.image.url="https://github.com/psleng/vyos-build" \
       org.opencontainers.image.documentation="https://docs.vyos.io/en/latest/contributing/build-vyos.html" \
-      org.opencontainers.image.source="https://github.com/vyos/vyos-build" \
+      org.opencontainers.image.source="https://github.com/psleng/vyos-build" \
       org.opencontainers.image.vendor="Sentrium S.L." \
       org.opencontainers.image.licenses="GNU" \
       org.opencontainers.image.title="vyos-build" \
@@ -154,7 +154,7 @@ RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
 
 # Build VyConf which is required to build libvyosconfig
 RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add vyos1x-config https://github.com/vyos/vyos1x-config.git#d7260e772e39bc6a3a2d76d629567e03bbad16b5 -y
+    opam pin add vyos1x-config https://github.com/psleng/vyos1x-config.git#d7260e772e39bc6a3a2d76d629567e03bbad16b5 -y
 
 # Packages needed for libvyosconfig
 RUN apt-get update && apt-get install -y \
@@ -164,7 +164,7 @@ RUN apt-get update && apt-get install -y \
 
 # Build libvyosconfig
 RUN eval $(opam env --root=/opt/opam --set-root) && \
-    git clone https://github.com/vyos/libvyosconfig.git /tmp/libvyosconfig && \
+    git clone https://github.com/psleng/libvyosconfig.git /tmp/libvyosconfig && \
     cd /tmp/libvyosconfig && git checkout 3a021a0964882cdd1873de6cf2bb3b4acb9043e0 && \
     dpkg-buildpackage -uc -us -tc -b && \
     dpkg -i /tmp/libvyosconfig0_*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
