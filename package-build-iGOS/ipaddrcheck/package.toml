@@ -1,6 +1,6 @@
 [[packages]]
 name = "libvyosconfig"
 commit_id = "current"
-scm_url = "https://github.com/johnlfeeney/ipaddrcheck"
+scm_url = "https://github.com/psleng/ipaddrcheck"
 build_cmd = "autoreconf -i; ./configure; dpkg-buildpackage -uc -us -tc -b"
 

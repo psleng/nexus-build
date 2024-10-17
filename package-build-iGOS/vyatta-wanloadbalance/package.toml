@@ -1,5 +1,5 @@
 [[packages]]
 name = "vyatta-wanloadbalance"
 commit_id = "current"
-scm_url = "https://github.com/johnlfeeney/vyatta-wanloadbalance"
+scm_url = "https://github.com/psleng/vyatta-wanloadbalance"
 build_cmd = "dpkg-buildpackage -uc -us -tc -b"

@@ -1,5 +1,5 @@
 [[packages]]
 name = "vyos-utils"
 commit_id = "master"
-scm_url = "https://github.com/johnlfeeney/vyos-utils"
+scm_url = "https://github.com/psleng/vyos-utils"
 build_cmd = "eval $(opam env --root=/opt/opam --set-root);dpkg-buildpackage -uc -us -tc -b"

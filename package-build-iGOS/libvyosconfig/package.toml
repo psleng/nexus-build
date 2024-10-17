@@ -1,6 +1,6 @@
 [[packages]]
 name = "libvyosconfig"
-commit_id = "master"
-scm_url = "https://github.com/johnlfeeney/libvyosconfig"
+commit_id = "current"
+scm_url = "https://github.com/psleng/libvyosconfig"
 build_cmd = "eval $(opam env --root=/opt/opam --set-root); dpkg-buildpackage -uc -us -tc -b"
 

@@ -1,5 +1,5 @@
 [[packages]]
 name = "udp-broadcast-relay"
 commit_id = "current"
-scm_url = "https://github.com/johnlfeeney/udp-broadcast-relay"
+scm_url = "https://github.com/psleng/udp-broadcast-relay"
 build_cmd = "dpkg-buildpackage -uc -us -tc -b"

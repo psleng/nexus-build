@@ -1,5 +1,5 @@
 [[packages]]
 name = "vyos-user-utils"
 commit_id = "current"
-scm_url = "https://github.com/johnlfeeney/vyos-user-utils.git"
+scm_url = "https://github.com/psleng/vyos-user-utils.git"
 build_cmd = "dpkg-buildpackage -uc -us -tc -b"

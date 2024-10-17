@@ -47,7 +47,7 @@ cp -rf $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/arm6
 
 
 #frr build fix need to be fixed up later on it the build process
-export EMAIL="johnlfeeney@gmail.com"
+export EMAIL="psleng@perle.com"
 
 ./package-build.py --dir package-build --include telegraf owamp frr strongswan openvpn-otp opennhrp aws-gwlbtun node_exporter podman
 
@@ -74,7 +74,7 @@ cp -rf debian-repos/build/bookworm/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-buil
 
 cd $ROOTDIR/vyos-build
 
-sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "jfeeney@perle.com"
+sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
 
 cd $ROOTDIR
 

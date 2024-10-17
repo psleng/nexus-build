@@ -1,5 +1,5 @@
 [[packages]]
 name = "vyatta-bash"
 commit_id = "current"
-scm_url = "https://github.com/johnlfeeney/vyatta-bash.git"
+scm_url = "https://github.com/psleng/vyatta-bash.git"
 build_cmd = "dpkg-buildpackage -uc -us -tc -b"

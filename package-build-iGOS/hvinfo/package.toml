@@ -1,5 +1,5 @@
 [[packages]]
 name = "hvinfo"
 commit_id = "current"
-scm_url = "https://github.com/johnlfeeney/hvinfo"
+scm_url = "https://github.com/psleng/hvinfo"
 build_cmd = "dpkg-buildpackage -uc -us -tc -b"
