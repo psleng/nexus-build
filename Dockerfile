@@ -460,8 +460,8 @@ RUN apt-get update && apt-get install -y \
 # And end of for building libyang2-dev	
 	
 # Environment variables needed - JF
-ENV DEBEMAIL="jfeeney@perle.com"
-ENV EMAIL="jfeeney@perle.com.com"
+ENV DEBEMAIL="psleng@perle.com"
+ENV EMAIL="psleng@perle.com.com"
 
 # Packages needed for nftables
 RUN apt-get update && apt-get install -y \
