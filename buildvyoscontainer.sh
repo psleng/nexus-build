@@ -11,7 +11,7 @@ mkdir -p ${ROOTDIR}/vyos-build-container
 
 cd vyos-build-container
 
-git clone -b current --single-branch https://github.com/psleng/vyos-build
+git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
 
 cd vyos-build
 
