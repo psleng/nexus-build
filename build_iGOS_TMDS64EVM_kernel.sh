@@ -32,7 +32,7 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b current --single-branch "$REPO_URL"
+    git clone -b psl-master --single-branch "$REPO_URL"
 fi
 
 
