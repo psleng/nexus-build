@@ -461,7 +461,7 @@ RUN apt-get update && apt-get install -y \
 	
 # Environment variables needed - JF
 ENV DEBEMAIL="psleng@perle.com"
-ENV EMAIL="psleng@perle.com.com"
+ENV EMAIL="psleng@perle.com"
 
 # Packages needed for nftables
 RUN apt-get update && apt-get install -y \
