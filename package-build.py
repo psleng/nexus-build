@@ -51,11 +51,13 @@ for item in directories_to_process:
         # Check if build.py exists in the directory
         if os.path.isfile(build_script):
             # Run build.py and handle errors
+            logging.info(f"Running build.py in {item_path}")
             try:
                 subprocess.run(['python3', build_script], check=True)
                 logging.info(f"Successfully ran build.py in {item_path}")
             except subprocess.CalledProcessError as e:
                 logging.error(f"Error running build.py in {item_path}: {e}")
+                exit(2)
         else:
             logging.warning(f"No build.py found in {item_path}")
         
