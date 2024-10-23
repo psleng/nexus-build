@@ -36,7 +36,8 @@ if [ ! -d "$REPO_NAME" ]; then
     git clone -b current --single-branch "$REPO_URL"
 fi
 
-# Install package scripts
+# Install package scripts ... clean up before, otherwise a duplicate subdir will be created
+rm -rf vyos-build/scripts/package-build-iGOS 
 cp -rf package-build-iGOS vyos-build/scripts/package-build-iGOS
 
 # Find all .toml files in the package-build-iGOS directory and replace the URL
