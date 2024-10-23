@@ -490,4 +490,11 @@ RUN printf "set mouse=\nset ttymouse=\n" > /etc/vim/vimrc.local
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
+# PSL: Extend secure_path for sudo
+RUN sudo sed -i 's|Defaults\s\+secure_path=\"\(.*\)\"|Defaults secure_path=\"\1:/opt/go/bin\"|' /etc/sudoers
+
+# PSL: Modify entrypoint.sh to use sudo instead of gosu, since gosu has
+# issues of randomly hanging when run with qemu in a VM.
+RUN sed -i 's/exec gosu/exec sudo -u/' /usr/local/bin/entrypoint.sh
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

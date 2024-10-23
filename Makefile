@@ -38,8 +38,8 @@ endef
 
 # Build the arm64 VyOS building container image
 vyos-build-container:
-	@echo '### Making build container image ($@)'
-	docker image inspect vyos/vyos-build:current-arm64v8 > /dev/null 2>&1 || ./buildvyoscontainer.sh
+	@docker image inspect vyos/vyos-build:current-arm64v8 > /dev/null 2>&1 || \
+	  { echo '### Making build container image ($@)'; ./buildvyoscontainer.sh; }
 
 # Build the kernel
 $(KERNEL_TARG): vyos-build-container

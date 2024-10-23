@@ -1,0 +1,4 @@
+.*.built
+*.ERR
+vyos-build
+vyos-build-container
