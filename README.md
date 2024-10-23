@@ -14,3 +14,5 @@ sudo ./buildiGOSti.sh am64x_bookworm_09.00.00.006
 
 sudo ./create-sdcard.sh am64x_bookworm_09.00.00.006
 
+// to re-create the psleng.github.io apt binary repository:
+./build-psleng-github-io.py --repo https://github.com/psleng
