@@ -75,7 +75,7 @@ def prepare_package(repo_dir: Path, install_data: str) -> None:
         raise
 
 
-def build_package(package: list, dependencies: list, patch_dir: Path) -> None:
+def build_package(package: dict, dependencies: list, patch_dir: Path) -> None:
     """Build a package from the repository
 
     Args:
@@ -125,6 +125,7 @@ def build_package(package: list, dependencies: list, patch_dir: Path) -> None:
 
     except CalledProcessError as e:
         print(f"Failed to build package {repo_name}: {e}")
+        exit(e.returncode)  # Really fail
     finally:
         # Clean up repository directory
         # shutil.rmtree(repo_dir, ignore_errors=True)
