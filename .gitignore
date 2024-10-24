@@ -1,4 +1,5 @@
-.*.built
-*.ERR
-vyos-build
-vyos-build-container
+/.*.built
+/*.ERR
+/vyos-build
+/vyos-build-container
+/debian-repos
