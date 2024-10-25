@@ -113,6 +113,20 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
     cd $ROOTDIR/vyos-build
     sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
+
+    echo "=== I: $0: $TSK: Almost done; performing fs fixups"
+    FS=$ROOTDIR/build/fs
+
+    # replace console ttyS0 with ours at ttyS2
+    sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
+
+    # journald fixups
+    sed -i \
+        -e 's/#Storage=persistent/Storage=volatile/' \
+        -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
+        -e 's/MaxLevelSyslog=debug/MaxLevelsyslog=info/' \
+            $FS/etc/systemd/journald.conf
+
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP $TSK ($BLT exists)"

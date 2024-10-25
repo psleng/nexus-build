@@ -6,8 +6,6 @@ sudo ./build_iGOS_TMDS64EVM_kernel.sh --repo https://github.com/psleng --clean
 
 sudo ./build_iGOS_TMDS64EVM_fs.sh --repo https://github.com/psleng
 
-sudo ./build_iGOS_TMDS64EVM_fs_updates.sh
-
 sudo ./build_iGOS_drivers.sh --repo https://github.com/psleng
 
 exit
