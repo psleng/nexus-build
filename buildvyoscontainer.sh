@@ -3,6 +3,15 @@
 #set -x
 #set -e
 
+IMGNAME=vyos/vyos-build:current-arm64v8
+if docker image inspect $IMGNAME > /dev/null 2>&1; then
+    P=$(basename $0)
+    echo "$P: $IMGNAME exists; not building again."
+    echo "$P: To force a rebuild type:"
+    echo "    docker image rm $IMGNAME"
+    exit 0
+fi
+
 ROOTDIR=$(pwd)
 
 rm -rf vyos-build-container
@@ -21,5 +30,5 @@ cp ${ROOTDIR}/Dockerfile docker/Dockerfile
 cp ${ROOTDIR}/updates/psleng.key docker/psleng.key
 
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
-docker build -t vyos/vyos-build:current-arm64v8 docker --build-arg ARCH=arm64v8/ --platform linux/arm64v8 --no-cache
+docker build -t $IMGNAME docker --build-arg ARCH=arm64v8/ --platform linux/arm64v8 --no-cache
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes

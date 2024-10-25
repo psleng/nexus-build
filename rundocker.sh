@@ -6,8 +6,17 @@ if test $# = 0; then
     DFLAGS='-it'
 fi
 
+GITCONFIG=$HOME/.gitconfig
+if [ -f $GITCONFIG ]; then
+    GITMNT="-v $GITCONFIG:/etc/gitconfig"
+else
+    echo "$0: WARNING: \"$GITCONFIG\" does not exist." >&2
+    echo "$0: Copy your personal ~/.gitconfig to that location" >&2
+    GITMNT=''
+fi
+
 docker run --rm $DFLAGS --privileged --sysctl net.ipv6.conf.lo.disable_ipv6=0 \
   -h vyos-build \
   -v $(pwd):/vyos -v /dev:/dev -v /etc/fstab:/etc/fstab \
-  -v "$HOME/.gitconfig":/etc/gitconfig -w /vyos \
+  $GITMNT -w /vyos \
   vyos/vyos-build:current-arm64v8 "$@"
