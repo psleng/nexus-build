@@ -114,6 +114,9 @@ if [ ! -f "$BLT" ]; then
     cd $ROOTDIR/vyos-build
     sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
 
+    # TODO too late the ISO has been built at this point:
+    #   config.boot.default from vyos-1x (https://github.com/psleng/vyos-1x)
+    #   journald.conf       from systemd
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
     FS=$ROOTDIR/build/fs
 
