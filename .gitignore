@@ -5,6 +5,7 @@
 /debian-repos
 /drivers
 /logs
+/nohup.out
 /tools
 /typescript
 /vyos-build

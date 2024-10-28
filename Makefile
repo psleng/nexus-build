@@ -58,6 +58,8 @@ $(DRIVERS_TARG): $(FS_TARG)
 # Create a uSDcard image
 $(IMAGE_TARG): $(DRIVERS_TARG)
 	@echo '### Making uSDcard image'
+	# This invalid directory often appears breaking build TODO investigate
+	test -d ~root/.gitconfig && sudo rm -rf ~root/.gitconfig
 	sudo ./buildiGOSti.sh $(BUILDTYPE)
 	@echo '### Making uSDcard image COMPLETED'
 	@touch $@

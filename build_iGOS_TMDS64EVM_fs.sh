@@ -117,18 +117,18 @@ if [ ! -f "$BLT" ]; then
     # TODO too late the ISO has been built at this point:
     #   config.boot.default from vyos-1x (https://github.com/psleng/vyos-1x)
     #   journald.conf       from systemd
-    echo "=== I: $0: $TSK: Almost done; performing fs fixups"
-    FS=$ROOTDIR/build/fs
-
-    # replace console ttyS0 with ours at ttyS2
-    sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
-
-    # journald fixups
-    sed -i \
-        -e 's/#Storage=persistent/Storage=volatile/' \
-        -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
-        -e 's/MaxLevelSyslog=debug/MaxLevelsyslog=info/' \
-            $FS/etc/systemd/journald.conf
+#    echo "=== I: $0: $TSK: Almost done; performing fs fixups"
+#    FS=$ROOTDIR/build/fs
+#
+#    # replace console ttyS0 with ours at ttyS2
+#    sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
+#
+#    # journald fixups
+#    sed -i \
+#        -e 's/#Storage=persistent/Storage=volatile/' \
+#        -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
+#        -e 's/MaxLevelSyslog=debug/MaxLevelsyslog=info/' \
+#            $FS/etc/systemd/journald.conf
 
     touch "$BLT" # build success
 else
