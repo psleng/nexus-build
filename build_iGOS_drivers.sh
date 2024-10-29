@@ -41,13 +41,13 @@ make -C $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/linux M=$PWD
 cd $ROOTDIR
 mkdir -p $ROOTDIR/build/fs/lib/modules/nxp
 cp -rf drivers/mwifiex/mxm_wifiex/wlan_src/*.ko $ROOTDIR/build/fs/lib/modules/nxp/
-cp -rfp wifi.sh $ROOTDIR/build/fs/lib/modules/nxp/wifi.sh
+cp -fp wifi.sh $ROOTDIR/build/fs/lib/modules/nxp/
 
 mkdir -p $ROOTDIR/build/fs/lib/firmware/nxp
-cp -rf drivers/mwifiex/lf-6.6.3_1.0.0/nxp/FwImage_9098_PCIE/*.bin $ROOTDIR/build/fs/lib/firmware/nxp/
-cp -rf drivers/mwifiex/lf-6.6.3_1.0.0/nxp/wifi_mod_para.conf $ROOTDIR/build/fs/lib/firmware/nxp/wifi_mod_para.conf
-cp -rf 99-default.link $ROOTDIR/build/fs/etc/systemd/network/99-default.link
-cp -rf 60-Perle-pcie-card-nxp9098.rules $ROOTDIR/build/fs/etc/udev/rules.d/60-Perle-pcie-card-nxp9098.rules
+cp -f drivers/mwifiex/lf-6.6.3_1.0.0/nxp/FwImage_9098_PCIE/*.bin $ROOTDIR/build/fs/lib/firmware/nxp/
+cp -f drivers/mwifiex/lf-6.6.3_1.0.0/nxp/wifi_mod_para.conf $ROOTDIR/build/fs/lib/firmware/nxp/
+cp -f 99-default.link $ROOTDIR/build/fs/etc/systemd/network/
+cp -f 60-Perle-pcie-card-nxp9098.rules $ROOTDIR/build/fs/etc/udev/rules.d/
 
 #cd $ROOTDIR/drivers
 #wget https://files.waveshare.com/upload/4/46/Simcom_wwan.zip
@@ -56,4 +56,4 @@ cp -rf 60-Perle-pcie-card-nxp9098.rules $ROOTDIR/build/fs/etc/udev/rules.d/60-Pe
 #make -C $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/linux M=$PWD
 #mkdir -p $ROOTDIR/build/fs/lib/firmware/Simcom
 
-cp -rf 60-Perle-usb-modem.rules $ROOTDIR/build/fs/etc/udev/rules.d/60-Perle-usb-modem.rules.rules
+cp -f 60-Perle-usb-modem.rules $ROOTDIR/build/fs/etc/udev/rules.d/

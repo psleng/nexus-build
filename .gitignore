@@ -1,5 +1,12 @@
-/.*.built
 /*.ERR
+/.*.built
+/.mypy_cache
+/build
+/debian-repos
+/drivers
+/logs
+/nohup.out
+/tools
+/typescript
 /vyos-build
 /vyos-build-container
-/debian-repos
