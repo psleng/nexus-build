@@ -12,7 +12,7 @@ if [ "$#" -lt 2 ] || [ "$1" != "--repo" ]; then
 fi
 
 REPPREFIX_URL="$2/"
-REPO_URL_TI_DEB="$2/debian-repos"""
+REPO_URL_TI_DEB="$2/debian-repos"
 REPO_NAME="vyos-build"
 REPO_URL="$2/$REPO_NAME"
 ROOTDIR=$(pwd)
@@ -52,7 +52,6 @@ cp -f $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/
 
 #frr build fix need to be fixed up later on it the build process
 export EMAIL="psleng@perle.com"
-
 
 ############## package-build
 TSK=package-build
@@ -114,22 +113,6 @@ if [ ! -f "$BLT" ]; then
     cd $ROOTDIR/vyos-build
     sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
 
-    # TODO too late the ISO has been built at this point:
-    #   config.boot.default from vyos-1x (https://github.com/psleng/vyos-1x)
-    #   journald.conf       from systemd
-#    echo "=== I: $0: $TSK: Almost done; performing fs fixups"
-#    FS=$ROOTDIR/build/fs
-#
-#    # replace console ttyS0 with ours at ttyS2
-#    sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
-#
-#    # journald fixups
-#    sed -i \
-#        -e 's/#Storage=persistent/Storage=volatile/' \
-#        -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
-#        -e 's/MaxLevelSyslog=debug/MaxLevelsyslog=info/' \
-#            $FS/etc/systemd/journald.conf
-
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP $TSK ($BLT exists)"
@@ -167,10 +150,23 @@ if [ ! -f "$BLT" ]; then
 
     cp -R build/fs/usr/lib/linux-image*/ti build/fs/boot/dtb
 
+    echo "=== I: $0: $TSK: Almost done; performing fs fixups"
+    FS=$ROOTDIR/build/fs
+
     # Temporary fix for DUID in vyos-1x until a more complete solution is thought about
-    cp -f $ROOTDIR/updates/vyos-router $ROOTDIR/build/fs/usr/libexec/vyos/init/
+    cp -f $ROOTDIR/updates/vyos-router $FS/usr/libexec/vyos/init/
     # Temporary fix for console support until a more complete solution is thought about
-    cp -f $ROOTDIR/updates/system_console.py /$ROOTDIR/build/fs/usr/libexec/vyos/conf_mode/
+    cp -f $ROOTDIR/updates/system_console.py $FS/usr/libexec/vyos/conf_mode/
+
+    # replace console ttyS0 with ours at ttyS2
+    sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
+
+    # journald fixups
+    sed -i \
+        -e 's/#Storage=persistent/Storage=volatile/' \
+        -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
+        -e 's/MaxLevelSyslog=debug/MaxLevelsyslog=info/' \
+            $FS/etc/systemd/journald.conf
 
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < build/fs/boot/vmlinuz > build/fs/boot/Image
