@@ -1,0 +1,5 @@
+[[packages]]
+name = "vyos-world`"
+commit_id = "current"
+scm_url = "https://github.com/psleng/vyos-world"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
