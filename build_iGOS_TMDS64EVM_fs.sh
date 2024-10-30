@@ -54,6 +54,7 @@ cp -f $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/
 export EMAIL="psleng@perle.com"
 
 ############## package-build
+# This will populate ./vyos-build/scripts/package-build/
 TSK=package-build
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
@@ -66,6 +67,7 @@ fi
 
 
 ############## package-build-iGOS
+# This will populate ./vyos-build/scripts/package-build-iGOS/
 TSK=package-build-iGOS
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
@@ -79,6 +81,7 @@ fi
 
 
 ############## ti-linux-firmware
+# This will populate ./debian-repos/
 TSK=ti-linux-firmware
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
@@ -106,6 +109,7 @@ cd ${ROOTDIR}
 
 
 ############## build-vyos-image
+# This will populate ./vyos-build/build/
 TSK=build-vyos-image
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
@@ -113,6 +117,7 @@ if [ ! -f "$BLT" ]; then
     cd $ROOTDIR/vyos-build
     sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
 
+    cd -
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP $TSK ($BLT exists)"
@@ -121,6 +126,7 @@ cd $ROOTDIR
 
 
 ############## ISO2image-build
+# This will populate ./build/fs/
 TSK=ISO2image-build
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then

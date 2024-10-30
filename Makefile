@@ -9,7 +9,6 @@
 CONT_TARG     = .cont.built
 KERNEL_TARG   = .kernel.built
 FS_TARG       = .filesystem.built
-DRIVERS_TARG  = .drivers.built
 IMAGE_TARG    = .image.built
 
 # A valid builds entry from builds.toml
@@ -51,12 +50,8 @@ $(KERNEL_TARG): $(CONT_TARG)
 $(FS_TARG): $(KERNEL_TARG)
 	@$(call DOCKRUN,filesystem,./build_iGOS_TMDS64EVM_fs.sh)
 
-# Build drivers
-$(DRIVERS_TARG): $(FS_TARG)
-	@$(call DOCKRUN,drivers,./build_iGOS_drivers.sh)
-
 # Create a uSDcard image
-$(IMAGE_TARG): $(DRIVERS_TARG)
+$(IMAGE_TARG): $(FS_TARG)
 	@echo '### Making uSDcard image'
 	# This invalid directory often appears breaking build TODO investigate
 	test -d ~root/.gitconfig && sudo rm -rf ~root/.gitconfig
