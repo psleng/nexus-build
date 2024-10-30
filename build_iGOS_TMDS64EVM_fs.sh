@@ -36,7 +36,7 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b current --single-branch "$REPO_URL"
+    git clone -b psl-master --single-branch "$REPO_URL"
 fi
 
 # Install package scripts directory
@@ -94,7 +94,7 @@ if [ ! -f "$BLT" ]; then
     
     # this setion needs some rework to clean up how this ti firmware is pulled.
     rm -rf debian-repos
-    git clone $REPO_URL_TI_DEB
+    git clone -b psl-master $REPO_URL_TI_DEB
     cd debian-repos
     
     DEB_SUITE=bookworm ./run.sh ti-linux-firmware
@@ -116,7 +116,6 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
     cd $ROOTDIR/vyos-build
     sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
-
     cd -
     touch "$BLT" # build success
 else
