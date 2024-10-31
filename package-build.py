@@ -37,7 +37,10 @@ if args.include:
 else:
     directories_to_process = {item for item in items if os.path.isdir(os.path.join(current_dir, item)) and item not in exclude_list}
 
-for item in directories_to_process:
+# Process in alphabetical order.  Technically the order should not matter,
+# but if we do not sort they run in a different random order every build
+# which makes debugging confusing.
+for item in sorted(directories_to_process):
     item_path = os.path.join(current_dir, item)
     
     # Check if the item is a directory
