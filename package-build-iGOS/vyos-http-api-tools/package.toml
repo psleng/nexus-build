@@ -2,4 +2,4 @@
 name = "vyos-http-api-tools"
 commit_id = "current"
 scm_url = "https://github.com/psleng/vyos-http-api-tools"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b; pip install pip-tools --break-system-packages; pip-compile requirements.in > requirements.txt"
+build_cmd = 'pip install pip-tools --break-system-packages; PATH="$HOME/.local/bin:$PATH" pip-compile requirements.in > requirements.txt; dpkg-buildpackage -uc -us -tc -b'
