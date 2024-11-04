@@ -165,7 +165,7 @@ RUN apt-get update && apt-get install -y \
 # Build libvyosconfig
 RUN eval $(opam env --root=/opt/opam --set-root) && \
     git clone https://github.com/psleng/libvyosconfig.git /tmp/libvyosconfig && \
-    cd /tmp/libvyosconfig && git checkout 3a021a0964882cdd1873de6cf2bb3b4acb9043e0 && \
+    cd /tmp/libvyosconfig && git checkout 9e4f6c1494fcff64ad22503b704dbdd43347b0a6 && \
     dpkg-buildpackage -uc -us -tc -b && \
     dpkg -i /tmp/libvyosconfig0_*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
 
@@ -270,8 +270,9 @@ RUN pip install --break-system-packages \
       quilt \
       whois
 
-# Go required for validators and vyos-xe-guest-utilities
-RUN GO_VERSION_INSTALL="1.21.3" ; \
+# Go required for telegraf and prometheus exporters build.
+# NOTE: 1.23.1 does NOT work under qemu.
+RUN GO_VERSION_INSTALL="1.22.8" ; \
     wget -O /tmp/go${GO_VERSION_INSTALL}.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION_INSTALL}.linux-$(dpkg-architecture -qDEB_HOST_ARCH).tar.gz ; \
     tar -C /opt -xzf /tmp/go*.tar.gz && \
     rm /tmp/go*.tar.gz
@@ -446,18 +447,6 @@ RUN apt-get update && apt-get install -y \
 	libzmq5 \
 	libzmq3-dev
 
-	
-# Clone the libyang2 repository
-#RUN git clone https://github.com/CESNET/libyang.git /libyang
-# Build and install libyang2
-#WORKDIR /libyang
-#RUN git checkout v2.1.148
-#RUN pipx run apkg build -i && find pkg/pkgs -type f -name *.deb -exec mv -t .. {} +
-
-# Clean up
-#RUN apt-get clean && \
-#    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*	
-# And end of for building libyang2-dev	
 	
 # Environment variables needed - JF
 ENV DEBEMAIL="psleng@perle.com"
