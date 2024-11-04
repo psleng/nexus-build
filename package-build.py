@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
+import sys
 import os
 import subprocess
 import argparse
 import logging
 
 # Set up logging
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Set up argument parser
@@ -34,7 +35,7 @@ basedir = os.getcwd()
 # Determine directories to process
 if args.include:
     # Only these (in listed order)
-    directories_to_process = args.include
+    directories_to_process = list(dict.fromkeys(args.include))
 else:
     # Use all items in the current directory, alphabetically
     directories_to_process = sorted(os.listdir(basedir))
@@ -61,7 +62,8 @@ for item in directories_to_process:
         # Run build.py and handle errors
         logging.info(f"Running {buildpy} in {item_path}")
         try:
-            subprocess.run(['python3', build_script], check=True)
+            subprocess.run(f'python3 {build_script} 2>&1',
+                           check=True, shell=True)
             logging.info(f"Successfully ran {buildpy} in {item_path}")
         except subprocess.CalledProcessError as e:
             logging.error(f"Error running {buildpy} in {item_path}: {e}")
