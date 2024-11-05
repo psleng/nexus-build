@@ -419,6 +419,7 @@ RUN apt-get update && apt-get install -y \
 	kpartx
 	
 # Packages needed for frr - JF
+# DK	libsnmp-dev removed, it  will be installed when net-snmp is installed BEFORE frr is built - order dependency
 # And for building libyan2-dev https://docs.frrouting.org/projects/dev-guide/en/latest/building-frr-for-debian12.html#install-required-packages -JF
 RUN apt-get update && apt-get install -y \
 	chrpath \
@@ -430,7 +431,6 @@ RUN apt-get update && apt-get install -y \
 	libpam-dev \libprotobuf-c-dev \
 	libpython3-dev:native \
 	python3-sphinx:native \
-	libsnmp-dev \
 	protobuf-c-compiler \
 	python3-dev:native \
 	texinfo \
@@ -447,6 +447,10 @@ RUN apt-get update && apt-get install -y \
 	libzmq5 \
 	libzmq3-dev
 
+# Packages needed for net-snmp - DK
+RUN apt-get update && apt-get install -y \
+	perl-xs-dev \
+	default-libmysqlclient-dev
 	
 # Environment variables needed - JF
 ENV DEBEMAIL="psleng@perle.com"

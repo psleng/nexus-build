@@ -59,7 +59,9 @@ TSK=package-build
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
-    ./package-build.py --dir $TSK --include telegraf owamp frr strongswan openvpn-otp opennhrp aws-gwlbtun node_exporter podman
+    ./package-build.py --dir $TSK --include ethtool telegraf owamp net-snmp frr frr_exporter strongswan openvpn-otp opennhrp \
+    aws-gwlbtun node_exporter podman ddclient dropbear hostap kea keepalived netfilter pam_tacplus pmacct radvd 
+    
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
@@ -73,7 +75,8 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir $TSK --include vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname libvyosconfig \
-    vyatta-cfg vyos-http-api-tools vyos-utils ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance
+    vyatta-cfg vyos-http-api-tools vyos-utils ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
+    libmnl libpam-radius-auth initramfs-tools vyos-world igmpproxy
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
