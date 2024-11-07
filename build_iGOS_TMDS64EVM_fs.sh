@@ -173,7 +173,7 @@ if [ ! -f "$BLT" ]; then
     sed -i \
         -e 's/#Storage=persistent/Storage=volatile/' \
         -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
-        -e 's/MaxLevelSyslog=debug/MaxLevelsyslog=info/' \
+        -e 's/MaxLevelSyslog=debug/MaxLevelSyslog=info/' \
             $FS/etc/systemd/journald.conf
 
     # NXP driver additions to fs
