@@ -1,0 +1,5 @@
+[[packages]]
+name = "libtacplus-map"
+commit_id = "master"
+scm_url = "https://github.com/psleng/libtacplus-map"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"

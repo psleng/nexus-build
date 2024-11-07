@@ -1,0 +1,5 @@
+[[packages]]
+name = "libnss-mapuser"
+commit_id = "current"
+scm_url = "https://github.com/psleng/libnss-mapuser"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
