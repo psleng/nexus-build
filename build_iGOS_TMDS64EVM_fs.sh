@@ -177,7 +177,7 @@ if [ ! -f "$BLT" ]; then
             $FS/etc/systemd/journald.conf
 
     # NXP driver additions to fs
-    tar -C $FS -zxf $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/build_iGOS_drivers/fs.tar.gz
+    tar -C $FS --keep-directory-symlink -zxf $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/build_iGOS_drivers/fs.tar.gz
 
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < build/fs/boot/vmlinuz > build/fs/boot/Image
