@@ -30,9 +30,9 @@ all: $(IMAGE_TARG)
 
 # Run a docker session.
 define DOCKRUN
-	@echo '### Making $(1) using $(2) for target $@. Check $(1).ERR for status.'
-	./rundocker.sh /bin/sh -c 'sudo $(2) --repo $(REPO)' > $(1).ERR 2>&1
-	@echo '### Making $(1) using $(2) for target $@ COMPLETED'
+	@echo "### $$(date --iso-8601=s): Making $(1) using $(2) for target $@. Check $(1).ERR for status."
+	./rundocker.sh /bin/sh -c '$(2) --repo $(REPO)' > $(1).ERR 2>&1
+	@echo "### $$(date --iso-8601=s): Making $(1) using $(2) for target $@ COMPLETED"
 	@touch $@
 endef
 
@@ -53,9 +53,10 @@ $(FS_TARG): $(KERNEL_TARG)
 # Create a uSDcard image
 $(IMAGE_TARG): $(FS_TARG)
 	@echo '### Making uSDcard image'
-	# This invalid directory often appears breaking build TODO investigate
-	@-test -d ~root/.gitconfig && sudo rm -rf ~root/.gitconfig
+# This invalid directory sometimes appears breaking git ops on build
+	@if [ -d ~root/.gitconfig ]; then sudo rm -rf ~root/.gitconfig; fi
 	sudo ./buildiGOSti.sh $(BUILDTYPE)
+	@ls -l build/$(BUILDTYPE)/tisdk*.tar.xz
 	@echo '### Making uSDcard image COMPLETED'
 	@touch $@
 

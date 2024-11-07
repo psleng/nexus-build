@@ -1,9 +1,5 @@
 #!/bin/bash
-# TODO only a few things need to run as root; these should be sudo's instead
-test $(id -u) = 0 || { echo "$0: This must be run as root"; exit 1; }
-
-set -x
-set -e
+set -ex
 
 # Check if the --repo parameter is provided
 if [ "$#" -lt 2 ] || [ "$1" != "--repo" ]; then
@@ -27,7 +23,7 @@ fi
 if [ -d "$REPO_NAME" ]; then
     if [ "$CLEAN" = true ]; then
         echo "Cleaning up existing repository $REPO_NAME."
-        rm -rf "$REPO_NAME"
+        sudo rm -rf "$REPO_NAME"
         rm -f .filesystem.* # Also remove all intermediate targets
     else
         echo "Repository $REPO_NAME already exists. Skipping clone."
@@ -96,13 +92,20 @@ if [ ! -f "$BLT" ]; then
     done
     
     # this setion needs some rework to clean up how this ti firmware is pulled.
-    rm -rf debian-repos
+    sudo rm -rf debian-repos
     git clone -b psl-master $REPO_URL_TI_DEB
     cd debian-repos
-    
-    DEB_SUITE=bookworm ./run.sh ti-linux-firmware
+
+    # Determine the Debian distro to use
+    DEB_SUITE=$(python3 -c "import toml; print(toml.load('$ROOTDIR/vyos-build/data/defaults.toml').get('debian_distribution', ''))")
+    if test -z "$DEB_SUITE"; then
+        echo "=== E: $0: Cannot determine debian_distribution"
+        exit 1
+    fi
+
+    sudo DEB_SUITE=$DEB_SUITE ./run.sh ti-linux-firmware
     cd ${ROOTDIR}
-    ln -vrfs debian-repos/build/bookworm/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
+    ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
     # end of section for rework
     touch "$BLT" # build success
 else
@@ -142,47 +145,47 @@ if [ ! -f "$BLT" ]; then
       exit -1
     fi
 
-    ISOLOOP=$(losetup --show -f ${LIVE_IMAGE_ISO})
+    ISOLOOP=$(sudo losetup --show -f ${LIVE_IMAGE_ISO})
     echo "Mounting iso on loopback: ${ISOLOOP}"
 
-    rm -rf build
-    mkdir build
-    mkdir build/tmp/
+    sudo rm -rf build
+    sudo mkdir -p build/tmp/
 
-    mount -o ro ${ISOLOOP} build/tmp/
+    sudo mount -o ro ${ISOLOOP} build/tmp/
 
-    unsquashfs -d build/fs build/tmp/live/filesystem.squashfs
+    sudo unsquashfs -d build/fs build/tmp/live/filesystem.squashfs
 
     #rm -rf build/fs/boot/grub
-    mkdir build/fs/boot/dtb
+    sudo mkdir build/fs/boot/dtb
 
-    cp -R build/fs/usr/lib/linux-image*/ti build/fs/boot/dtb
+    sudo cp -R build/fs/usr/lib/linux-image*/ti build/fs/boot/dtb
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
     FS=$ROOTDIR/build/fs
 
     # Temporary fix for DUID in vyos-1x until a more complete solution is thought about
-    cp -f $ROOTDIR/updates/vyos-router $FS/usr/libexec/vyos/init/
+    sudo cp -f $ROOTDIR/updates/vyos-router $FS/usr/libexec/vyos/init/
     # Temporary fix for console support until a more complete solution is thought about
-    cp -f $ROOTDIR/updates/system_console.py $FS/usr/libexec/vyos/conf_mode/
+    sudo cp -f $ROOTDIR/updates/system_console.py $FS/usr/libexec/vyos/conf_mode/
 
     # replace console ttyS0 with ours at ttyS2
-    sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
+    sudo sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
 
     # journald fixups
-    sed -i \
+    sudo sed -i \
         -e 's/#Storage=persistent/Storage=volatile/' \
         -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
         -e 's/MaxLevelSyslog=debug/MaxLevelSyslog=info/' \
             $FS/etc/systemd/journald.conf
 
-    # NXP driver additions to fs
-    tar -C $FS --keep-directory-symlink -zxf $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/build_iGOS_drivers/fs.tar.gz
+    # NXP driver additions
+    sudo tar -C $FS --keep-directory-symlink -zxf $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/build_iGOS_drivers/fs.tar.gz
 
     # Decompress the vmlinuz (symlink to the real thing) into Image
-    gunzip < build/fs/boot/vmlinuz > build/fs/boot/Image
+    gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"
 
-    umount -d build/tmp/
+    sudo umount -d build/tmp/
+    sudo rm -rf build/tmp/
 
     touch "$BLT" # build success
 else

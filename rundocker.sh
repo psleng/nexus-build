@@ -15,7 +15,8 @@ else
     GITMNT=''
 fi
 
-docker run --rm $DFLAGS --privileged --sysctl net.ipv6.conf.lo.disable_ipv6=0 \
+docker run --rm $DFLAGS --platform linux/arm64v8 \
+  --privileged --sysctl net.ipv6.conf.lo.disable_ipv6=0 \
   -h vyos-build \
   -v $(pwd):/vyos -v /dev:/dev -v /etc/fstab:/etc/fstab \
   $GITMNT -w /vyos \
