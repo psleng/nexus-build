@@ -1,16 +1,56 @@
-./buildvyoscontainer.sh
+# BUILDING VyOS
 
-./rundocker.sh
+The PSL VyOS image can either be built manually or via an
+automated top level Makefile.  The two methods are presented below.
 
-./build_iGOS_TMDS64EVM_kernel.sh --repo https://github.com/psleng --clean
+Both ways have to be done inside a suitably prepared Debian12 VM.
 
-./build_iGOS_TMDS64EVM_fs.sh --repo https://github.com/psleng
+### MANUALLY
 
-exit
+Do the following steps in order.  Note that two of the steps
+are done inside a Docker container (via `rundocker.sh`) which
+you must then exit to do the remaining steps.
 
-sudo ./buildiGOSti.sh am64x_bookworm_09.00.00.006
+```sh
+	./buildvyoscontainer.sh
 
-sudo ./create-sdcard.sh am64x_bookworm_09.00.00.006
+	./rundocker.sh
 
-// to re-create the psleng.github.io apt binary repository:
-./build-psleng-github-io.sh --repo https://github.com/psleng
+	./build_iGOS_TMDS64EVM_kernel.sh --repo https://github.com/psleng --clean
+
+	./build_iGOS_TMDS64EVM_fs.sh --repo https://github.com/psleng
+
+	exit
+
+	sudo ./buildiGOSti.sh am64x_bookworm_09.00.00.006
+
+	sudo ./create-sdcard.sh am64x_bookworm_09.00.00.006
+
+	# To re-create the psleng.github.io apt binary repository:
+	./build-psleng-github-io.sh --repo https://github.com/psleng
+```
+
+### AUTOMATICALLY
+
+In a suitably prepared Debian12 VM, type `make all`.
+This will effectively run all of the the above steps in order
+except for the `create-sdcard.sh` since that is interactive.
+and `./build-psleng-github-io.sh` since most people do not need that.
+
+Do *not* run it in the background, as there are occasional programs that
+may poll stdin leading to your make to get a SIGSTOP signal and stop running.
+
+The Makefile will create checkpoint files so that if something goes
+wrong it will try to pick up after the last successful step.
+For reference these checkpoint files are:
+
+- `.cont.built` after `./buildvyoscontainer.sh`
+- `.kernel.built` after `./build_iGOS_TMDS64EVM_kernel.sh`
+  with stdout/stderr stored to `kernel.ERR`
+- `.filesystem.built` after `build_iGOS_TMDS64EVM_fs.sh`
+  with stdout/stderr output stored to `filesystem.ERR`
+- `.image.built` after `./buildiGOSti.sh`
+
+Also, `build_iGOS_TMDS64EVM_fs.sh` creates its own checkpoints with
+names of the form `.filesystem.*.built` so that it can too can
+attempt to restart after an unexpected failure.
