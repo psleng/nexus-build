@@ -23,6 +23,7 @@ parser.add_argument('--dir', required=True,
 args = parser.parse_args()
 
 # Change directory to the specified directory
+rootdir = os.getcwd()
 try:
     os.chdir(f'vyos-build/scripts/{args.dir}')
 except FileNotFoundError:
@@ -43,11 +44,21 @@ else:
 # Process
 for item in directories_to_process:
     if item in args.exclude:
+        logging.info(f"Skipping {item} because of --exclude")
         continue
 
     os.chdir(basedir)
     item_path = os.path.join(basedir, item)
     if not os.path.isdir(item_path):
+        logging.warning(f"Skipping {item} because {item_path} missing")
+        # It might be that is was added to git recently but the source
+        # directory has not been copied by build_iGOS_TMDS64EVM_fs.sh
+        # TODO: that copy/toml rewrite should probably be moved to here.
+        # For now we will print a warning.
+        igosdir = os.path.join(rootdir, 'package-build-iGOS', item)
+        if os.access(igosdir, os.F_OK):
+            logging.warning(igosdir + ' source directory exists though;'
+                            ' try copying from there.')
         continue
 
     # Change to the subdirectory
