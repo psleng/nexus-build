@@ -1,5 +1,5 @@
 [[packages]]
 name = "libtacplus-map"
-commit_id = "psl-master"
+commit_id = "master"
 scm_url = "https://github.com/psleng/libtacplus-map"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"
+build_cmd = "../build-fixup-warning.sh; dpkg-buildpackage -uc -us -tc -b"
