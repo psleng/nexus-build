@@ -1,0 +1,5 @@
+[[packages]]
+name = "libnss-tacplus"
+commit_id = "psl-master"
+scm_url = "https://github.com/psleng/libnss-tacplus"
+build_cmd = "../build-fixup-warning.sh; dpkg-buildpackage -uc -us -tc -b"
