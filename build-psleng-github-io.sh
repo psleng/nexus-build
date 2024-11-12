@@ -33,8 +33,9 @@ fi
 # Clone the repository if it doesn't exist or was cleaned, and remove the existing repo binaries for adding new ones
 if [ ! -d "$REPO_NAME" ]; then
     git clone -b main --single-branch "$REPO_URL"
-    rm -rf $REPO_NAME/db; rm -rf $REPO_NAME/dists; rm -rf $REPO_NAME/pool
 fi
+
+rm -rf $REPO_NAME/db; rm -rf $REPO_NAME/dists; rm -rf $REPO_NAME/pool
 
 # not needed because another script already moved to vyos-build/packages: copy everything to the package directory
 #for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb" | grep -v -e "-dbgsym_" -e "libnetfilter-conntrack3-dbg"); do
@@ -42,7 +43,7 @@ fi
 #done
 
 # copy everything to the package directory
-for b in $(find $ROOTDIR/vyos-build/packages -type f -name "*.deb"); do
+for b in $(find $ROOTDIR/vyos-build/packages -name "*.deb"); do
     echo "Adding package: $b to apt repo $REPO_NAME"
     reprepro -b $REPO_NAME includedeb bookworm $b
 done
