@@ -38,7 +38,10 @@ PATCH_DIR=${CWD}/patches/kernel
 for patch in $(ls ${PATCH_DIR})
 do
     echo "I: Apply Kernel patch: ${PATCH_DIR}/${patch}"
-    patch -p1 < ${PATCH_DIR}/${patch}
+    # If this is a second run, some of the patches might fail because they
+    # had already been applied earlier. Just log this and continue
+    # instead of silently failing (set -e).
+    patch -p1 < ${PATCH_DIR}/${patch} || { echo "E: patch $patch FAILED"; }
 done
 
 # Change name of Signing Cert
