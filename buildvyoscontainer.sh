@@ -30,5 +30,5 @@ cp ${ROOTDIR}/Dockerfile docker/Dockerfile
 cp ${ROOTDIR}/updates/psleng.key docker/psleng.key
 
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
-docker build -t $IMGNAME docker --build-arg ARCH=arm64v8/ --platform linux/arm64v8 --no-cache
+docker build -t $IMGNAME docker --build-arg ARCH=arm64v8/ --platform linux/arm64 --no-cache
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
