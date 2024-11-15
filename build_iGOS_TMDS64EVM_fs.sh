@@ -85,12 +85,20 @@ TSK=ti-linux-firmware
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
+
     # symlink everything to the build directory
-    for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb" | grep -v -e "-dbgsym_" -e "libnetfilter-conntrack3-dbg"); do
-        echo "Symlinking package: $a"
-        ln -vrfs $a $ROOTDIR/vyos-build/packages/
+    for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")
+    do
+        case "$a" in
+        *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted
+            continue
+            ;;
+        *)  echo "Symlinking package: $a"
+            ln -vrfs $a $ROOTDIR/vyos-build/packages/
+            ;;
+        esac
     done
-    
+
     # this setion needs some rework to clean up how this ti firmware is pulled.
     sudo rm -rf debian-repos
     git clone -b psl-master $REPO_URL_TI_DEB
