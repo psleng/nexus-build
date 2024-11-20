@@ -56,7 +56,8 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir $TSK --include ethtool telegraf owamp net-snmp frr frr_exporter strongswan openvpn-otp opennhrp \
-    aws-gwlbtun node_exporter podman ddclient dropbear hostap kea keepalived netfilter pam_tacplus pmacct radvd isc-dhcp ndppd
+    aws-gwlbtun node_exporter podman ddclient dropbear hostap kea keepalived netfilter pam_tacplus pmacct radvd isc-dhcp ndppd \
+    hsflowd pyhumps
     
     touch "$BLT" # build success
 else

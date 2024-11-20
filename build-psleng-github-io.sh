@@ -32,7 +32,7 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned, and remove the existing repo binaries for adding new ones
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b main --single-branch "$REPO_URL"
+    git clone -b b3727f79deb00eed2caf43cc14677b705be76d50 "$REPO_URL"
 fi
 
 rm -rf $REPO_NAME/db; rm -rf $REPO_NAME/dists; rm -rf $REPO_NAME/pool
@@ -45,6 +45,6 @@ rm -rf $REPO_NAME/db; rm -rf $REPO_NAME/dists; rm -rf $REPO_NAME/pool
 # copy everything to the package directory
 for b in $(find $ROOTDIR/vyos-build/packages -name "*.deb"); do
     echo "Adding package: $b to apt repo $REPO_NAME"
-    reprepro -b $REPO_NAME includedeb bookworm $b
+    reprepro -b $REPO_NAME includedeb current $b
 done
 
