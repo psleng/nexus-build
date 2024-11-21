@@ -484,7 +484,7 @@ RUN printf "set mouse=\nset ttymouse=\n" > /etc/vim/vimrc.local
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Install apt pubkey and sources.list.d file for psleng.github.io
-RUN echo "deb [signed-by=/etc/apt/keyrings/psleng.key] https://psleng.github.io bookworm main" >> /etc/apt/sources.list.d/psleng.list
+RUN echo "deb [signed-by=/etc/apt/keyrings/psleng.key] https://psleng.github.io current main" >> /etc/apt/sources.list.d/psleng.list
 COPY psleng.key /etc/apt/keyrings/
 
 # PSL: Extend secure_path for sudo
