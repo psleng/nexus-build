@@ -73,7 +73,8 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir $TSK --include vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname libvyosconfig \
     vyatta-cfg vyos-http-api-tools vyos-utils ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
-    libmnl libpam-radius-auth initramfs-tools igmpproxy libnss-mapuser libtacplus-map libpam-tacplus libnss-tacplus
+    libmnl libpam-radius-auth initramfs-tools igmpproxy libnss-mapuser libtacplus-map libpam-tacplus libnss-tacplus \
+    salt-minion
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
@@ -95,6 +96,9 @@ if [ ! -f "$BLT" ]; then
             continue
             ;;
         *libtac2-bin_*)  # Unwanted
+            continue
+            ;;
+        */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
         *)  echo "Symlinking package: $a"
