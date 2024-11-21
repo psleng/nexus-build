@@ -1,0 +1,6 @@
+[[packages]]
+name = "salt-minion"
+commit_id = "psl-master"
+scm_url = "https://github.com/psleng/salt-minion"
+# "DEB_BUILD_OPTIONS=nocheck" suppresses unit tests that fail in docker.
+build_cmd = "DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -uc -us -tc -b"
