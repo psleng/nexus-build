@@ -66,8 +66,15 @@ sdcard: $(IMAGE_TARG)
 	sudo ./create-sdcard.sh $(BUILDTYPE)
 	@echo '### Making $@ COMPLETED'
 
-# clean. TODO should also make a distclean target.
-clean:
-	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools
+# View state of build
+status:
+	@ls -ltr .*built
+
+# Clean everything
+clean: buildclean
 	rm -f *.ERR .*.built
 	docker image rm vyos/vyos-build:current-arm64v8 || true
+
+# Clean build artifacts only
+buildclean:
+	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools
