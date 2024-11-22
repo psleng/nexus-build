@@ -137,6 +137,13 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
     cd $ROOTDIR/vyos-build
+
+    # PSL related keys needed within the chroot within the build container.
+    # They get copied from here into the chroot.
+    LB_ARCH=data/live-build-config/archives
+    cp -f ../updates/psleng.key $LB_ARCH/psleng.key.chroot
+    cp -f $LB_ARCH/vyos-dev.pref.chroot $LB_ARCH/psleng.pref.chroot
+
     sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
     cd -
     touch "$BLT" # build success
