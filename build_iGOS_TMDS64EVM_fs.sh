@@ -92,10 +92,10 @@ if [ ! -f "$BLT" ]; then
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")
     do
         case "$a" in
-        *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted
+        *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;
-        *libtac2-bin_*)  # Unwanted
+        *libtac2-bin_*|*libpam-tacplus_1.4.3*)  # Unwanted packages
             continue
             ;;
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
