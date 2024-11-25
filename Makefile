@@ -31,7 +31,7 @@ all: $(IMAGE_TARG)
 # Run a docker session.
 define DOCKRUN
 	@echo "### $$(date --iso-8601=s): Making $(1) using $(2) for target $@. Check $(1).ERR for status."
-	./rundocker.sh /bin/sh -c '$(2) --repo $(REPO)' > $(1).ERR 2>&1
+	./rundocker.sh script -c '$(2) --repo $(REPO)' $(1).ERR
 	@echo "### $$(date --iso-8601=s): Making $(1) using $(2) for target $@ COMPLETED"
 	@touch $@
 endef
