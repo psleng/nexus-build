@@ -92,6 +92,8 @@ if [ ! -f "$BLT" ]; then
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")
     do
         case "$a" in
+        *libsnmp-dev_*64.deb)  # Needed for frr (despite -dev_ pattern)
+            ;;
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;
@@ -101,10 +103,10 @@ if [ ! -f "$BLT" ]; then
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
-        *)  echo "Symlinking package: $a"
-            ln -vrfs $a $ROOTDIR/vyos-build/packages/
-            ;;
         esac
+
+        echo "Symlinking package: $a"
+        ln -vrfs $a $ROOTDIR/vyos-build/packages/
     done
 
     # this setion needs some rework to clean up how this ti firmware is pulled.
