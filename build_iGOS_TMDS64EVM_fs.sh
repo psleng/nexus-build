@@ -100,6 +100,9 @@ if [ ! -f "$BLT" ]; then
         *libtac2-bin_*|*libpam-tacplus_1.4.3*)  # Unwanted packages
             continue
             ;;
+        */accel-ppp.deb)  # Duplicates
+            continue
+            ;;
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
