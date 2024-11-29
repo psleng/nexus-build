@@ -41,7 +41,7 @@ do
     # If this is a second run, some of the patches might fail because they
     # had already been applied earlier. Just log this and continue
     # instead of silently failing (set -e).
-    patch -p1 < ${PATCH_DIR}/${patch} || { echo "E: patch $patch FAILED"; }
+    patch -f -p1 < ${PATCH_DIR}/${patch} || { echo "E: patch $patch FAILED"; }
 done
 
 # Change name of Signing Cert
