@@ -451,7 +451,11 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
 	perl-xs-dev \
 	default-libmysqlclient-dev
-	
+
+# Packages needed for keepalived
+RUN apt-get install -y \
+    libipset-dev libnfnetlink-dev libnftnl-dev libnl-nf-3-dev libpopt-dev
+
 # Environment variables needed - JF
 ENV DEBEMAIL="psleng@perle.com"
 ENV EMAIL="psleng@perle.com"

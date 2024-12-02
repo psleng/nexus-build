@@ -463,6 +463,9 @@ RUN apt-get update && apt-get install -y \
 	perl-xs-dev \
 	default-libmysqlclient-dev
 
+# Packages needed for keepalived
+RUN apt-get install -y \
+    libipset-dev libnfnetlink-dev libnftnl-dev libnl-nf-3-dev libpopt-dev
 
 #Packages needed for TI Boot Environment
 RUN apt-get update && apt-get install -y \
