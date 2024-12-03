@@ -79,4 +79,4 @@ clean: buildclean
 
 # Clean build artifacts only
 buildclean:
-	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools
+	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools configs scripts builds.toml create-sdcard.sh

@@ -6,9 +6,11 @@
 TI=ti-bdebstrap
 if [ ! -d $TI ]; then
     echo "I: Cloning $TI"
-    set -e
     git clone https://github.com/psleng/$TI.git
-    set +e
+    if [ $? != 0 ]; then
+        echo "E: Cloning failed!"
+        exit 1
+    fi
 fi
 
 # Set up links to TI files and do some modifications

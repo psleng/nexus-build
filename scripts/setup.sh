@@ -1,1 +1,0 @@
-../ti-bdebstrap/scripts/setup.sh

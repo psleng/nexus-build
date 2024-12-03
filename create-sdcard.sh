@@ -1,1 +1,0 @@
-ti-bdebstrap/create-sdcard.sh
