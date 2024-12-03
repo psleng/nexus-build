@@ -51,12 +51,12 @@ $(FS_TARG): $(KERNEL_TARG)
 	@$(call DOCKRUN,filesystem,./build_iGOS_TMDS64EVM_fs.sh)
 
 # Create a uSDcard image
-# TODO update so this can be run in container instead
 $(IMAGE_TARG): $(FS_TARG)
 	@echo '### Making uSDcard image'
 # This invalid directory sometimes appears breaking git ops on build
 	@if [ -d ~root/.gitconfig ]; then sudo rm -rf ~root/.gitconfig; fi
-	script -e -c './buildiGOSti.sh $(BUILDTYPE)' buildiGOSti.ERR
+	@$(call DOCKRUN,image,./buildiGOSti.sh $(BUILDTYPE))
+	#script -e -c './buildiGOSti.sh $(BUILDTYPE)' buildiGOSti.ERR
 	@ls -l build/$(BUILDTYPE)/tisdk*.tar.xz
 	@echo '### Making uSDcard image COMPLETED'
 	@echo '### Type "make sdcard" to write to an uSD card'
