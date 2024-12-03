@@ -2,10 +2,15 @@
 /.*.built
 /.mypy_cache
 /build
+/builds.toml
+/configs
+/create-sdcard.sh
 /debian-repos
 /drivers
 /logs
 /nohup.out
+/scripts
+/ti-bdebstrap
 /tools
 /typescript
 /vyos-build

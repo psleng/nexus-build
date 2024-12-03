@@ -36,7 +36,10 @@ Note. You *must* use the psleng account for this so that signing works:
 
 ### AUTOMATICALLY
 
-In a suitably prepared Debian12 VM, type `make all`.
+In a suitably prepared Debian12 VM or equivalent, type `make all`.
+If you get an error "`make: command not found`" install make via
+`sudo apt install make`
+
 This will effectively run all of the the above steps in order
 except for the `create-sdcard.sh` since that is interactive.
 and `./build-psleng-github-io.sh` since most people do not need that.
