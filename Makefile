@@ -17,6 +17,14 @@ BUILDTYPE = bookworm-am64xx-evm
 # Base repository to use for all container build recipies.
 REPO := https://github.com/psleng
 
+ARCH := $(shell arch)
+# Different image tag for docker vyos/vyos-build image
+ifeq ($(ARCH),aarch64)
+	IMGTAG := current-arm64
+else
+	IMGTAG := current-arm64v8
+endif
+
 .PHONY: help all sdcard clean
 
 help:
@@ -56,7 +64,6 @@ $(IMAGE_TARG): $(FS_TARG)
 # This invalid directory sometimes appears breaking git ops on build
 	@if [ -d ~root/.gitconfig ]; then sudo rm -rf ~root/.gitconfig; fi
 	@$(call DOCKRUN,image,./buildiGOSti.sh $(BUILDTYPE))
-	#script -e -c './buildiGOSti.sh $(BUILDTYPE)' buildiGOSti.ERR
 	@ls -l build/$(BUILDTYPE)/tisdk*.tar.xz
 	@echo '### Making uSDcard image COMPLETED'
 	@echo '### Type "make sdcard" to write to an uSD card'
@@ -75,7 +82,7 @@ status:
 # Clean everything
 clean: buildclean
 	rm -f *.ERR .*.built
-	docker image rm vyos/vyos-build:current-arm64v8 || true
+	docker image rm vyos/vyos-build:$(IMGTAG) || true
 
 # Clean build artifacts only
 buildclean:
