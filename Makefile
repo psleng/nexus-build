@@ -65,7 +65,7 @@ $(IMAGE_TARG): $(FS_TARG)
 # Write to a uSDcard.
 sdcard: $(IMAGE_TARG)
 	@echo '### Making $@'
-	sudo ./create-sdcard.sh $(BUILDTYPE)
+	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE)
 	@echo '### Making $@ COMPLETED'
 
 # View state of build
@@ -79,4 +79,4 @@ clean: buildclean
 
 # Clean build artifacts only
 buildclean:
-	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools configs scripts builds.toml create-sdcard.sh
+	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools configs scripts builds.toml

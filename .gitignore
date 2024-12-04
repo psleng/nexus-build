@@ -4,7 +4,7 @@
 /build
 /builds.toml
 /configs
-/create-sdcard.sh
+/create-sdcardiGOS.sh
 /debian-repos
 /drivers
 /logs
@@ -14,4 +14,3 @@
 /tools
 /typescript
 /vyos-build
-/vyos-build-container
