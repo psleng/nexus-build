@@ -22,7 +22,7 @@ fi
 
 if [ ! -d vyos-build ]; then
     echo "I: Cloning vyos-build"
-    git clone -b psl-master --single-branch vyos-build
+    git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
 fi
 cd vyos-build
 
