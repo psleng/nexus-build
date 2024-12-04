@@ -23,8 +23,7 @@ ROOTDIR=$(pwd)
 rm -rf vyos-build-container
 git clone -b psl-master --single-branch \
     https://github.com/psleng/vyos-build vyos-build-container
-
-cd vyos-build
+cd vyos-build-container
 
 DF=${ROOTDIR}/Dockerfile-$ARCH
 if [ ! -f $DF ]; then
