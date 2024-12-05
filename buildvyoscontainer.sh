@@ -48,4 +48,6 @@ resetqemu() {
 
 resetqemu
 docker build -t $IMGNAME docker --build-arg ARCH=arm64v8/ --platform linux/arm64 --no-cache
+st=$?
 resetqemu
+exit $st
