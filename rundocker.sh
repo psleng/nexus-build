@@ -3,9 +3,14 @@ ARCH=$(arch)
 
 if test $# = 0; then
     # No args so run interactive shell by default.
-    # Else, run supplied command(s) noninteractively.
     set -- /bin/bash -i
     DFLAGS='-it'
+else
+    # Else run supplied command(s).
+    if tty -s; then
+        # stdin is valid so make it interactive.
+        DFLAGS='-it'
+    fi
 fi
 
 GITCONFIG=$HOME/.gitconfig
