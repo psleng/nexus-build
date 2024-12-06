@@ -199,6 +199,10 @@ if [ ! -f "$BLT" ]; then
     # replace console ttyS0 with ours at ttyS2
     sudo sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
 
+    # start modem manager service early
+    sudo ln -s /lib/systemd/system/ModemManager.service $FS/etc/systemd/system/dbus-org.freedesktop.ModemManager1.service
+    sudo ln -s /lib/systemd/system/ModemManager.service $FS/etc/systemd/system/multi-user.target.wants/ModemManager.service
+
     # journald fixups
     sudo sed -i \
         -e 's/#Storage=persistent/Storage=volatile/' \

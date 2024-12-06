@@ -1,9 +1,11 @@
 #!/bin/bash
+#
+# Build docker image for VyOS building
+#
 
-#set -x
-#set -e
-
+ROOTDIR=$(pwd)
 ARCH=$(arch)
+
 IMGNAME=vyos/vyos-build:current-arm64
 if [ $ARCH != 'aarch64' ]; then
     # Different name for non-ARM.  This will hopefully go away.
@@ -18,12 +20,11 @@ if docker image inspect $IMGNAME > /dev/null 2>&1; then
     exit 0
 fi
 
-ROOTDIR=$(pwd)
-
-rm -rf vyos-build-container
-git clone -b psl-master --single-branch \
-    https://github.com/psleng/vyos-build vyos-build-container
-cd vyos-build-container
+if [ ! -d vyos-build ]; then
+    echo "I: Cloning vyos-build"
+    git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
+fi
+cd vyos-build
 
 DF=${ROOTDIR}/Dockerfile-$ARCH
 if [ ! -f $DF ]; then
@@ -47,4 +48,6 @@ resetqemu() {
 
 resetqemu
 docker build -t $IMGNAME docker --build-arg ARCH=arm64v8/ --platform linux/arm64 --no-cache
+st=$?
 resetqemu
+exit $st

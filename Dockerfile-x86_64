@@ -103,6 +103,7 @@ RUN apt-get update && apt-get install -y \
       python3-flake8 \
       python3-autopep8 \
       python3-tomli \
+      python3-tomli-w \
       yq \
       debootstrap \
       live-build \
@@ -276,6 +277,7 @@ RUN GO_VERSION_INSTALL="1.22.8" ; \
     wget -O /tmp/go${GO_VERSION_INSTALL}.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION_INSTALL}.linux-$(dpkg-architecture -qDEB_HOST_ARCH).tar.gz ; \
     tar -C /opt -xzf /tmp/go*.tar.gz && \
     rm /tmp/go*.tar.gz
+
 RUN echo "export PATH=/opt/go/bin:$PATH" >> /etc/bash.bashrc
 
 
@@ -428,7 +430,8 @@ RUN apt-get update && apt-get install -y \
 	libcap-dev \
 	libjson-c-dev \
 	librtr-dev \
-	libpam-dev \libprotobuf-c-dev \
+	libpam-dev \
+    libprotobuf-c-dev \
 	libpython3-dev:native \
 	python3-sphinx:native \
 	protobuf-c-compiler \
@@ -456,6 +459,23 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get install -y \
     libipset-dev libnfnetlink-dev libnftnl-dev libnl-nf-3-dev libpopt-dev
 
+#Packages needed for TI Boot Environment
+RUN apt-get update && apt-get install -y \
+	pigz \
+	expect \
+	pv \
+	binfmtc \
+	binfmt-support \
+	debian-archive-keyring \
+	bdebstrap \
+	wget \
+	swig \
+	python3-pyelftools \
+	python3-cryptography
+
+RUN pip install --break-system-packages \
+	toml-cli \
+	yamllint
 # Environment variables needed - JF
 ENV DEBEMAIL="psleng@perle.com"
 ENV EMAIL="psleng@perle.com"

@@ -12,10 +12,18 @@ FS_TARG       = .filesystem.built
 IMAGE_TARG    = .image.built
 
 # A valid builds entry from builds.toml
-BUILDTYPE = am64x_bookworm_09.00.00.006
+BUILDTYPE = bookworm-am64xx-evm
 
 # Base repository to use for all container build recipies.
 REPO := https://github.com/psleng
+
+ARCH := $(shell arch)
+# Different image tag for docker vyos/vyos-build image
+ifeq ($(ARCH),aarch64)
+	IMGTAG := current-arm64
+else
+	IMGTAG := current-arm64v8
+endif
 
 .PHONY: help all sdcard clean
 
@@ -55,15 +63,16 @@ $(IMAGE_TARG): $(FS_TARG)
 	@echo '### Making uSDcard image'
 # This invalid directory sometimes appears breaking git ops on build
 	@if [ -d ~root/.gitconfig ]; then sudo rm -rf ~root/.gitconfig; fi
-	sudo ./buildiGOSti.sh $(BUILDTYPE)
+	@$(call DOCKRUN,image,./buildiGOSti.sh $(BUILDTYPE))
 	@ls -l build/$(BUILDTYPE)/tisdk*.tar.xz
 	@echo '### Making uSDcard image COMPLETED'
+	@echo '### Type "make sdcard" to write to an uSD card'
 	@touch $@
 
 # Write to a uSDcard.
 sdcard: $(IMAGE_TARG)
 	@echo '### Making $@'
-	sudo ./create-sdcard.sh $(BUILDTYPE)
+	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE)
 	@echo '### Making $@ COMPLETED'
 
 # View state of build
@@ -73,8 +82,8 @@ status:
 # Clean everything
 clean: buildclean
 	rm -f *.ERR .*.built
-	docker image rm vyos/vyos-build:current-arm64v8 || true
+	docker image rm vyos/vyos-build:$(IMGTAG) || true
 
 # Clean build artifacts only
 buildclean:
-	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools
+	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools configs scripts builds.toml
