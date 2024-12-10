@@ -210,9 +210,6 @@ if [ ! -f "$BLT" ]; then
         -e 's/MaxLevelSyslog=debug/MaxLevelSyslog=info/' \
             $FS/etc/systemd/journald.conf
 
-    # NXP driver additions
-    sudo tar -C $FS --keep-directory-symlink -zxf $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/build_iGOS_drivers/fs.tar.gz
-
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"
 
