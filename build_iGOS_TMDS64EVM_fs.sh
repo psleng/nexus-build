@@ -149,7 +149,8 @@ if [ ! -f "$BLT" ]; then
     cp -f ../updates/psleng.key $LB_ARCH/psleng.key.chroot
     cp -f $LB_ARCH/vyos-dev.pref.chroot $LB_ARCH/psleng.pref.chroot
 
-    sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
+    export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
+    sudo --preserve-env=VYOS1X_REPO_URL ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
     cd -
     touch "$BLT" # build success
 else

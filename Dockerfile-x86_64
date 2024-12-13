@@ -88,6 +88,7 @@ RUN apt-get update && apt-get install -y \
       po4a \
       openssh-client \
       jq \
+      less \
       socat
 
 # Packages needed for vyos-build
@@ -448,7 +449,9 @@ RUN apt-get update && apt-get install -y \
 	libgrpc++-dev \
 	libsqlite3-dev \
 	libzmq5 \
-	libzmq3-dev
+	libzmq3-dev \
+	lsof \
+	logrotate
 
 # Packages needed for net-snmp - DK
 RUN apt-get update && apt-get install -y \
