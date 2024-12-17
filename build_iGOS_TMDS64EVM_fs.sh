@@ -197,8 +197,9 @@ if [ ! -f "$BLT" ]; then
     # Temporary fix for console support until a more complete solution is thought about
     sudo cp -f $ROOTDIR/updates/system_console.py $FS/usr/libexec/vyos/conf_mode/
 
-    # replace console ttyS0 with ours at ttyS2
-    sudo sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
+    # replace console ttyS0 with ours at ttyS3 and add one more device ttyS2
+    sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
+    sudo sed -i '/console.*$/a \        device ttyS2 {\n\t    speed \"115200\"\n\t}' $FS/usr/share/vyos/config.boot.default
 
     # start modem manager service early
     sudo ln -s /lib/systemd/system/ModemManager.service $FS/etc/systemd/system/dbus-org.freedesktop.ModemManager1.service
