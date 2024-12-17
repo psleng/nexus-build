@@ -212,6 +212,12 @@ if [ ! -f "$BLT" ]; then
         -e 's/MaxLevelSyslog=debug/MaxLevelSyslog=info/' \
             $FS/etc/systemd/journald.conf
 
+    # Generate a default locale (stops warnings from perl)
+    if [ ! -f $FS/usr/lib/locale/locale-archive ]; then
+        echo "en_US.UTF-8 UTF-8" | sudo tee -a $FS/etc/locale.gen > /dev/null
+        sudo chroot $FS locale-gen
+    fi
+
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"
 
