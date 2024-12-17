@@ -83,7 +83,9 @@ status:
 clean: buildclean
 	rm -f *.ERR .*.built
 	docker image rm vyos/vyos-build:$(IMGTAG) || true
+	@echo 'Cleaning up docker garbage. This could take several minutes.'
+	docker system prune -f
 
 # Clean build artifacts only
 buildclean:
-	sudo rm -rf vyos-build vyos-build-container build debian-repos drivers logs tools configs scripts builds.toml
+	sudo rm -rf vyos-build build debian-repos drivers logs tools configs scripts builds.toml
