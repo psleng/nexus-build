@@ -22,9 +22,9 @@ you must then exit to do the remaining steps.
 
 	exit
 
-	sudo ./buildiGOSti.sh am64x_bookworm_09.00.00.006
+	sudo ./buildiGOSti.sh bookworm-am64xx-evm
 
-	sudo ./create-sdcard.sh am64x_bookworm_09.00.00.006
+	sudo ./create-sdcard.sh bookworm-am64xx-evm
 ```
 
 To re-create the psleng.github.io apt binary repository do this.
