@@ -6,10 +6,14 @@
 ROOTDIR=$(pwd)
 ARCH=$(arch)
 
-IMGNAME=vyos/vyos-build:current-arm64
-if [ $ARCH != 'aarch64' ]; then
-    # Different name for non-ARM.  This will hopefully go away.
-    IMGNAME=${IMGNAME}v8
+IMGNAME=vyos/vyos-build
+. $ROOTDIR/.defs.mk
+if [ "$BUILDTARG" != "x86_64" ]; then
+    IMGNAME=$IMGNAME:current-arm64
+    if [ $ARCH != 'aarch64' ]; then
+        # Different name for non-ARM.  This will hopefully go away.
+        IMGNAME=${IMGNAME}v8
+    fi
 fi
 
 if docker image inspect $IMGNAME > /dev/null 2>&1; then
@@ -39,7 +43,7 @@ cp -p $DF docker/Dockerfile
 cp ${ROOTDIR}/updates/psleng.key docker/psleng.key
 
 resetqemu() {
-    if [ $ARCH != aarch64 ]; then
+    if [ $ARCH != aarch64 -a "$BUILDTARG" != "x86_64" ]; then
         # When qemu is involved, resetting seems to be needed sometimes.
         echo "I: Resetting qemu"
         docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
@@ -47,7 +51,11 @@ resetqemu() {
 }
 
 resetqemu
-docker build -t $IMGNAME docker --build-arg ARCH=arm64v8/ --platform linux/arm64 --no-cache
+if [ "$BUILDTARG" != "x86_64" ]; then
+    DARGS='--build-arg ARCH=arm64v8/ --platform linux/arm64'
+fi
+
+docker build -t $IMGNAME docker $DARGS --no-cache
 st=$?
 resetqemu
 exit $st

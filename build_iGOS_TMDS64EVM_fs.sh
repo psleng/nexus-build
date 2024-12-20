@@ -7,6 +7,8 @@ if [ "$#" -lt 2 ] || [ "$1" != "--repo" ]; then
     exit 1
 fi
 
+ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
+
 REPPREFIX_URL="$2/"
 REPO_URL_TI_DEB="$2/debian-repos"
 REPO_NAME="vyos-build"
@@ -137,10 +139,12 @@ cd ${ROOTDIR}
 
 ############## build-vyos-image
 # This will populate ./vyos-build/build/
+# The psleng.github.io git repo must be populated for this to work.
 TSK=build-vyos-image
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
+    . $ROOTDIR/.defs.mk
     cd $ROOTDIR/vyos-build
 
     # PSL related keys needed within the chroot within the build container.
@@ -149,8 +153,13 @@ if [ ! -f "$BLT" ]; then
     cp -f ../updates/psleng.key $LB_ARCH/psleng.key.chroot
     cp -f $LB_ARCH/vyos-dev.pref.chroot $LB_ARCH/psleng.pref.chroot
 
+    if [ "$BUILDTARG" = "x86_64" ]; then
+        BUILDFLAVOUR=generic
+    else
+        BUILDFLAVOUR=${ARCH}fs
+    fi
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
-    sudo --preserve-env=VYOS1X_REPO_URL ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
+    sudo --preserve-env=VYOS1X_REPO_URL ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
     cd -
     touch "$BLT" # build success
 else
@@ -167,7 +176,7 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
     # Check ISO file
-    LIVE_IMAGE_ISO=vyos-build/build/live-image-arm64.hybrid.iso
+    LIVE_IMAGE_ISO=vyos-build/build/live-image-$ARCH.hybrid.iso
 
     if [ ! -e ${LIVE_IMAGE_ISO} ]; then
       echo "File ${LIVE_IMAGE_ISO} not exists."

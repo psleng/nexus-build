@@ -1,5 +1,6 @@
 /*.ERR
 /.*.built
+/.defs.mk
 /.mypy_cache
 /build
 /builds.toml

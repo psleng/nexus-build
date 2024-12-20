@@ -5,16 +5,46 @@
 # except for the final writing to uSDcard.
 #
 
+# Do not use implicit rules or variables to reduce confusion
+MAKEFLAGS += -rR
+
+# Build definitions.  Contents should be VAR=val format
+# so that it can also be sourced by shell scripts.
+DEFS := .defs.mk
+-include $(DEFS)
+
 # Quasi targets
 CONT_TARG     = .cont.built
 KERNEL_TARG   = .kernel.built
 FS_TARG       = .filesystem.built
 IMAGE_TARG    = .image.built
 
-# A valid builds entry from builds.toml
-BUILDTYPE = bookworm-am64xx-evm
+help:
+	@echo First select a build type.  Valid types are:
+	@echo
+	@echo '    make targ-ti-evm # TI evaluation module (default)'
+	@echo '    make targ-x86    # x86'
+	@echo
+	@echo Then type "make all".  Type "make clean" for a clean start.
+	@echo You will have to reselect the build type after doing that.
+	@echo
+	@if [ -s "$(DEFS)" ]; then \
+	    echo "The current build settings ($(DEFS)) are:"; \
+	    cat $(DEFS); \
+	fi
 
-# Base repository to use for all container build recipies.
+# target build: TI eval board (default)
+# BUILDTYPE is a builds entry from ti-bdebstrap/builds.toml
+$(DEFS) targ-ti-evm:
+	@echo BUILDTARG=ti-evm > $(DEFS)
+	@echo BUILDTYPE=bookworm-am64xx-evm >> $(DEFS)
+
+# target build: x86_64
+targ-x86:
+	@echo BUILDTARG=x86_64 > $(DEFS)
+
+
+# Base repository to use for all container build recipes.
 REPO := https://github.com/psleng
 
 ARCH := $(shell arch)
@@ -25,16 +55,9 @@ else
 	IMGTAG := current-arm64v8
 endif
 
-.PHONY: help all sdcard clean
+.PHONY: help all sdcard clean targ-ti-evm targ-x86
 
-help:
-	@echo 'Type "make all" to build an image.  This takes a very long time.'
-	@echo 'You might want to do it in a "script" session to save output.'
-	@echo 'Once complete, type "make sdcard" write to an sdcard.'
-	@echo
-	@echo 'Type "make clean" for a fresh start.'
-
-all: $(IMAGE_TARG)
+all: $(DEFS) $(IMAGE_TARG)
 
 # Run a docker session.
 define DOCKRUN
@@ -60,6 +83,9 @@ $(FS_TARG): $(KERNEL_TARG)
 
 # Create a uSDcard image
 $(IMAGE_TARG): $(FS_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+else
 	@echo '### Making uSDcard image'
 # This invalid directory sometimes appears breaking git ops on build
 	@if [ -d ~root/.gitconfig ]; then sudo rm -rf ~root/.gitconfig; fi
@@ -68,12 +94,17 @@ $(IMAGE_TARG): $(FS_TARG)
 	@echo '### Making uSDcard image COMPLETED'
 	@echo '### Type "make sdcard" to write to an uSD card'
 	@touch $@
+endif
 
 # Write to a uSDcard.
 sdcard: $(IMAGE_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+else
 	@echo '### Making $@'
 	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE)
 	@echo '### Making $@ COMPLETED'
+endif
 
 # View state of build
 status:
@@ -81,7 +112,7 @@ status:
 
 # Clean everything
 clean: buildclean
-	rm -f *.ERR .*.built
+	rm -f *.ERR .*.built $(DEFS)
 	docker image rm vyos/vyos-build:$(IMGTAG) || true
 	@echo 'Cleaning up docker garbage. This could take several minutes.'
 	docker system prune -f

@@ -22,13 +22,19 @@ else
     GITMNT=''
 fi
 
-TAG=current-arm64
-if [ $ARCH != 'aarch64' ]; then
-    # Different tag for non-ARM.  This will hopefully go away.
-    TAG=${TAG}v8
+. ./.defs.mk
+if [ "$BUILDTARG" = "x86_64" ]; then
+    TAG=latest
+else
+    TAG=current-arm64
+    DFLAGS="$DFLAGS --platform linux/arm64"
+    if [ $ARCH != 'aarch64' ]; then
+        # Different tag for non-ARM.  This will hopefully go away.
+        TAG=${TAG}v8
+    fi
 fi
 
-docker run --rm $DFLAGS --platform linux/arm64 \
+docker run --rm $DFLAGS \
   --privileged --sysctl net.ipv6.conf.lo.disable_ipv6=0 \
   -h vyos-build \
   -v $(pwd):/vyos -v /dev:/dev -v /etc/fstab:/etc/fstab \
