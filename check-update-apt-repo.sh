@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -x
+set -x
 set -e
 
 # Check if the --repo parameter is provided
@@ -46,6 +46,7 @@ fi
 # Directories to compare
 dir1="$ROOTDIR/vyos-build/packages"
 dir2="$ROOTDIR/psleng.github.io/pool/main"
+archname=`dpkg-architecture -qDEB_HOST_ARCH`
 
 # Variable to track if a difference is found
 files_differ=false
@@ -59,6 +60,8 @@ for file1 in $(find $dir1 -name "*.deb"); do
     if [[ "$file1" ]]; then
         # Extract filename from the full path
         filename=$(basename "$file1")
+        # Extract deb package name from the file
+        pkgname=`dpkg-deb -f $file1 Package`
         echo source file: $file1
         # Search for the file in dir2 and its subdirectories
         found=false
@@ -68,14 +71,20 @@ for file1 in $(find $dir1 -name "*.deb"); do
                 # If the files differ, set the flag to true and stop further searching
                 files_differ=true
                 echo "Files $file1 and $file2 differ"
-                break 2  # Break out of both loops
+                echo "Removing package: $file1 from apt repo $REPO_NAME"
+                reprepro -A $archname -b $REPO_NAME remove current $pkgname
+                echo "Adding package: $file1 to apt repo $REPO_NAME"
+                reprepro -b $REPO_NAME includedeb current $file1
+#               break 2  # Break out of both loops
             fi
             found=true
         done
 
         # If the file from dir1 is not found in dir2, we can skip comparison
         if ! $found; then
-            echo "File $filename not found in $dir2.  Mark as a difference to update the repository."
+            echo "File $filename not found in $dir2... "
+            echo "Adding package: $file1 to apt repo $REPO_NAME"
+            reprepro -b $REPO_NAME includedeb current $file1
 	    files_differ=true
         fi
     fi
@@ -83,34 +92,27 @@ done
 
 # Output the result
 if $files_differ; then
-    echo "Files differ."
+    echo "Files differ. Local iGOS apt repository $REPO_NAME was updated."
 else
-    echo "No differences found. Skip updating apt repository"
+    echo "No differences found. $REPO_NAME repository was not updated"
     touch "$REPO_NO_DIFF"       # apt repo has not been updated
     exit 0
 fi
 
 # usage of psleng.github.io may change to a jfrog account in which the git commands below need to be removed
+# create a temp dir to hold the local repo changes/updates, reset the locla repo to just bare config, then
+# copy back the updates, git add, git commit, git push --force the repo to the remote repo
+rm -rf _psleng.github.io|true
+mkdir _psleng.github.io
 cd psleng.github.io
+cp -rf db ../_psleng.github.io
+cp -rf dists ../_psleng.github.io
+cp -rf pool ../_psleng.github.io
 git reset --hard base
-cd -
-
-echo "Removing current binary deb packages from local repository..."
-rm -rf $REPO_NAME/db; rm -rf $REPO_NAME/dists; rm -rf $REPO_NAME/pool
-
-# not needed because another script already moved to vyos-build/packages: copy everything to the package directory
-#for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb" | grep -v -e "-dbgsym_" -e "libnetfilter-conntrack3-dbg"); do
-#    sudo cp -f $a $ROOTDIR/vyos-build/packages/
-#done
-
-# copy everything to the package directory
-for b in $(find $ROOTDIR/vyos-build/packages -name "*.deb"); do
-    echo "Adding package: $b to apt repo $REPO_NAME"
-    echo "RenfrewDrive@60" | reprepro -b $REPO_NAME includedeb current $b
-done
-
-# usage of psleng.github.io may change to a jfrog account in which the git commands below need to be replacced with jfrog curl commands
-cd psleng.github.io
+rm -rf db dists pool
+cp -rf ../_psleng.github.io/db .
+cp -rf ../_psleng.github.io/dists .
+cp -rf ../_psleng.github.io/pool .
 git add .
 git commit -a -m "Updating the Perle iGOS debian binary packages"
 git push --force
