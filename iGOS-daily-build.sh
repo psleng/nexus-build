@@ -3,6 +3,7 @@ echo 'Starting daily iGOS build...' > iGOS-build.out
 date >> iGOS-build.out
 git pull
 make clean
+make targ-ti-evm
 make all
 ls -l .*built >>  iGOS-build.out
 date >> iGOS-build.out
