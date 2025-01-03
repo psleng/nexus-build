@@ -7,6 +7,8 @@ if [ "$#" -lt 2 ] || [ "$1" != "--repo" ]; then
     exit 1
 fi
 
+ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
+
 REPPREFIX_URL="$2/"
 REPO_URL_TI_DEB="$2/debian-repos"
 REPO_NAME="vyos-build"
@@ -92,19 +94,24 @@ if [ ! -f "$BLT" ]; then
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")
     do
         case "$a" in
-        *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted
+        *libsnmp-dev_*64.deb)  # Needed for frr (despite -dev_ pattern)
+            ;;
+        *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;
-        *libtac2-bin_*)  # Unwanted
+        *libtac2-bin_*|*libpam-tacplus_1.4.3*)  # Unwanted packages
+            continue
+            ;;
+        */accel-ppp.deb)  # Duplicates
             continue
             ;;
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
-        *)  echo "Symlinking package: $a"
-            ln -vrfs $a $ROOTDIR/vyos-build/packages/
-            ;;
         esac
+
+        echo "Symlinking package: $a"
+        ln -vrfs $a $ROOTDIR/vyos-build/packages/
     done
 
     # this setion needs some rework to clean up how this ti firmware is pulled.
@@ -132,10 +139,12 @@ cd ${ROOTDIR}
 
 ############## build-vyos-image
 # This will populate ./vyos-build/build/
+# The psleng.github.io git repo must be populated for this to work.
 TSK=build-vyos-image
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
+    . $ROOTDIR/.defs.mk
     cd $ROOTDIR/vyos-build
 
     # PSL related keys needed within the chroot within the build container.
@@ -144,7 +153,13 @@ if [ ! -f "$BLT" ]; then
     cp -f ../updates/psleng.key $LB_ARCH/psleng.key.chroot
     cp -f $LB_ARCH/vyos-dev.pref.chroot $LB_ARCH/psleng.pref.chroot
 
-    sudo ./build-vyos-image arm64fs --architecture arm64 --build-by "psleng@perle.com"
+    if [ "$BUILDTARG" = "x86_64" ]; then
+        BUILDFLAVOUR=generic
+    else
+        BUILDFLAVOUR=${ARCH}fs
+    fi
+    export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
+    sudo --preserve-env=VYOS1X_REPO_URL ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
     cd -
     touch "$BLT" # build success
 else
@@ -161,7 +176,7 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
     # Check ISO file
-    LIVE_IMAGE_ISO=vyos-build/build/live-image-arm64.hybrid.iso
+    LIVE_IMAGE_ISO=vyos-build/build/live-image-$ARCH.hybrid.iso
 
     if [ ! -e ${LIVE_IMAGE_ISO} ]; then
       echo "File ${LIVE_IMAGE_ISO} not exists."
@@ -191,8 +206,13 @@ if [ ! -f "$BLT" ]; then
     # Temporary fix for console support until a more complete solution is thought about
     sudo cp -f $ROOTDIR/updates/system_console.py $FS/usr/libexec/vyos/conf_mode/
 
-    # replace console ttyS0 with ours at ttyS2
-    sudo sed -i 's/ttyS0/ttyS2/' $FS/usr/share/vyos/config.boot.default
+    # replace console ttyS0 with ours at ttyS3 and add one more device ttyS2
+    sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
+    sudo sed -i '/console.*$/a \        device ttyS2 {\n\t    speed \"115200\"\n\t}' $FS/usr/share/vyos/config.boot.default
+
+    # start modem manager service early
+    sudo ln -s /lib/systemd/system/ModemManager.service $FS/etc/systemd/system/dbus-org.freedesktop.ModemManager1.service
+    sudo ln -s /lib/systemd/system/ModemManager.service $FS/etc/systemd/system/multi-user.target.wants/ModemManager.service
 
     # journald fixups
     sudo sed -i \
@@ -201,8 +221,11 @@ if [ ! -f "$BLT" ]; then
         -e 's/MaxLevelSyslog=debug/MaxLevelSyslog=info/' \
             $FS/etc/systemd/journald.conf
 
-    # NXP driver additions
-    sudo tar -C $FS --keep-directory-symlink -zxf $ROOTDIR/vyos-build/scripts/package-build/linux-kernel/build_iGOS_drivers/fs.tar.gz
+    # Generate a default locale (stops warnings from perl)
+    if [ ! -f $FS/usr/lib/locale/locale-archive ]; then
+        echo "en_US.UTF-8 UTF-8" | sudo tee -a $FS/etc/locale.gen > /dev/null
+        sudo chroot $FS locale-gen
+    fi
 
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"

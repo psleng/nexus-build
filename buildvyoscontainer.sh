@@ -1,9 +1,21 @@
 #!/bin/bash
+#
+# Build docker image for VyOS building
+#
 
-#set -x
-#set -e
+ROOTDIR=$(pwd)
+ARCH=$(arch)
 
-IMGNAME=vyos/vyos-build:current-arm64v8
+IMGNAME=vyos/vyos-build
+. $ROOTDIR/.defs.mk
+if [ "$BUILDTARG" != "x86_64" ]; then
+    IMGNAME=$IMGNAME:current-arm64
+    if [ $ARCH != 'aarch64' ]; then
+        # Different name for non-ARM.  This will hopefully go away.
+        IMGNAME=${IMGNAME}v8
+    fi
+fi
+
 if docker image inspect $IMGNAME > /dev/null 2>&1; then
     P=$(basename $0)
     echo "$P: $IMGNAME exists; not building again."
@@ -12,23 +24,38 @@ if docker image inspect $IMGNAME > /dev/null 2>&1; then
     exit 0
 fi
 
-ROOTDIR=$(pwd)
-
-rm -rf vyos-build-container
-
-mkdir -p ${ROOTDIR}/vyos-build-container
-
-cd vyos-build-container
-
-git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
-
+if [ ! -d vyos-build ]; then
+    echo "I: Cloning vyos-build"
+    git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
+fi
 cd vyos-build
 
-cp ${ROOTDIR}/Dockerfile docker/Dockerfile
+DF=${ROOTDIR}/Dockerfile-$ARCH
+if [ ! -f $DF ]; then
+    echo "E: Need a $DF for this machine" >&2
+    exit 1
+fi
+echo "I: ARCH=$ARCH so using $DF"
+rm -f docker/Dockerfile
+cp -p $DF docker/Dockerfile
 
 # copy the psleng.github.io public key to container area for use in Dockerfile
 cp ${ROOTDIR}/updates/psleng.key docker/psleng.key
 
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
-docker build -t $IMGNAME docker --build-arg ARCH=arm64v8/ --platform linux/arm64 --no-cache
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
+resetqemu() {
+    if [ $ARCH != aarch64 -a "$BUILDTARG" != "x86_64" ]; then
+        # When qemu is involved, resetting seems to be needed sometimes.
+        echo "I: Resetting qemu"
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
+    fi
+}
+
+resetqemu
+if [ "$BUILDTARG" != "x86_64" ]; then
+    DARGS='--build-arg ARCH=arm64v8/ --platform linux/arm64'
+fi
+
+docker build -t $IMGNAME docker $DARGS --no-cache
+st=$?
+resetqemu
+exit $st

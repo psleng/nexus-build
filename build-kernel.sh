@@ -29,7 +29,7 @@ if [[ $(uname -m) == "aarch64" ]]; then
 else
     KERNEL_CONFIG=arch/x86/configs/vyos_defconfig
 fi
-echo "$KERNEL_CONFIG"
+echo "I: $0 using KERNEL_CONFIG=$KERNEL_CONFIG"
 # VyOS requires some small Kernel Patches - apply them here
 # It's easier to habe them here and make use of the upstream
 # repository instead of maintaining a full Kernel Fork.
@@ -41,7 +41,7 @@ do
     # If this is a second run, some of the patches might fail because they
     # had already been applied earlier. Just log this and continue
     # instead of silently failing (set -e).
-    patch -p1 < ${PATCH_DIR}/${patch} || { echo "E: patch $patch FAILED"; }
+    patch -f -p1 < ${PATCH_DIR}/${patch} || { echo "E: patch $patch FAILED"; }
 done
 
 # Change name of Signing Cert

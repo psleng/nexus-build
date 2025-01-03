@@ -1,5 +1,5 @@
 [[packages]]
 name = "vyos-1x"
-commit_id = "current"
+commit_id = "psl-master"
 scm_url = "https://github.com/psleng/vyos-1x.git"
 build_cmd = "dpkg-buildpackage -uc -us -tc -b"

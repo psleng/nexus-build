@@ -22,17 +22,24 @@ you must then exit to do the remaining steps.
 
 	exit
 
-	sudo ./buildiGOSti.sh am64x_bookworm_09.00.00.006
+	sudo ./buildiGOSti.sh bookworm-am64xx-evm
 
-	sudo ./create-sdcard.sh am64x_bookworm_09.00.00.006
-
-	# To re-create the psleng.github.io apt binary repository:
-	./build-psleng-github-io.sh --repo https://github.com/psleng
+	sudo ./create-sdcard.sh bookworm-am64xx-evm
 ```
+
+To re-create the psleng.github.io apt binary repository do this.
+Note. You *must* use the psleng account for this so that signing works:
+
+	./build-psleng-github-io.sh --repo https://github.com/psleng
+
+
 
 ### AUTOMATICALLY
 
-In a suitably prepared Debian12 VM, type `make all`.
+In a suitably prepared Debian12 VM or equivalent, type `make all`.
+If you get an error "`make: command not found`" install make via
+`sudo apt install make`
+
 This will effectively run all of the the above steps in order
 except for the `create-sdcard.sh` since that is interactive.
 and `./build-psleng-github-io.sh` since most people do not need that.

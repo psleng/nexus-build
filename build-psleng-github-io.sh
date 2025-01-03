@@ -32,7 +32,7 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned, and remove the existing repo binaries for adding new ones
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b b3727f79deb00eed2caf43cc14677b705be76d50 "$REPO_URL"
+    git clone -b base "$REPO_URL"
 fi
 
 rm -rf $REPO_NAME/db; rm -rf $REPO_NAME/dists; rm -rf $REPO_NAME/pool

@@ -5,10 +5,17 @@ import os
 import subprocess
 import argparse
 import logging
+import shutil
+import socket
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format='%(asctime)s - %(levelname)s - %(message)s')
+
+if socket.gethostname() != 'vyos-build':
+    logging.error(f'{sys.argv[0]}: This program must be run within'
+                   ' the docker build container (./rundocker.sh)')
+    exit(1)
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run build.py in subdirectories,'
@@ -50,16 +57,20 @@ for item in directories_to_process:
     os.chdir(basedir)
     item_path = os.path.join(basedir, item)
     if not os.path.isdir(item_path):
-        logging.warning(f"Skipping {item} because {item_path} missing")
-        # It might be that is was added to git recently but the source
-        # directory has not been copied by build_iGOS_TMDS64EVM_fs.sh
-        # TODO: that copy/toml rewrite should probably be moved to here.
-        # For now we will print a warning.
-        igosdir = os.path.join(rootdir, 'package-build-iGOS', item)
-        if os.access(igosdir, os.F_OK):
-            logging.warning(igosdir + ' source directory exists though;'
-                            ' try copying from there.')
-        continue
+        if args.dir != 'package-build-iGOS':
+            logging.error(f'Skipping {item} because {item_path} missing')
+            continue
+        else:
+            # Might have been recently added to git and so
+            # build_iGOS_TMDS64EVM_fs.sh did not have a chance to copy it in.
+            # Copy it from the source or give up.
+            srcpath = os.path.join(rootdir, args.dir, item)
+            if not os.access(srcpath, os.F_OK):
+                logging.error(f'Cannot build {item} because {item_path} missing'
+                              f' and source {srcpath} does not exist either')
+                exit(3)
+            logging.info(f'Copying source {srcpath} to {item_path}')
+            shutil.copytree(srcpath, item_path, symlinks=True)
 
     # Change to the subdirectory
     os.chdir(item_path)
