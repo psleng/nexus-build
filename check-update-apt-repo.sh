@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+# set -x
 set -e
 
 # Check if the --repo parameter is provided
