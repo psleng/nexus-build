@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# set -x
+set -x
 set -e
 
 # Check if the --repo parameter is provided
@@ -46,7 +46,7 @@ fi
 # Directories to compare
 dir1="$ROOTDIR/vyos-build/packages"
 dir2="$ROOTDIR/psleng.github.io/pool/main"
-archname=`dpkg-architecture -qDEB_HOST_ARCH`
+# archname=`dpkg-architecture -qDEB_HOST_ARCH`
 
 # Variable to track if a difference is found
 files_differ=false
@@ -63,6 +63,8 @@ for file1 in $(find $dir1 -name "*.deb"); do
         # Extract deb package name from the file
         pkgname=`dpkg-deb -f $file1 Package`
         echo source file: $file1
+        archname=`dpkg-deb -I $file1 | grep "Architecture:" | awk '{print $2}'`
+        echo architecture: $archname
         # Search for the file in dir2 and its subdirectories
         found=false
         for file2 in $(find "$dir2" -name "$filename"); do
@@ -72,7 +74,11 @@ for file1 in $(find $dir1 -name "*.deb"); do
                 files_differ=true
                 echo "Files $file1 and $file2 differ"
                 echo "Removing package: $file1 from apt repo $REPO_NAME"
-                reprepro -A $archname -b $REPO_NAME remove current $pkgname
+                if [ "$archname" = "all" ]; then
+                    reprepro -b $REPO_NAME remove current $pkgname
+                else
+                    reprepro -A $archname -b $REPO_NAME remove current $pkgname
+                fi
                 echo "Adding package: $file1 to apt repo $REPO_NAME"
                 reprepro -b $REPO_NAME includedeb current $file1
 #               break 2  # Break out of both loops
