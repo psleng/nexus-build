@@ -69,7 +69,7 @@ for file1 in $(find $dir1 -name "*.deb"); do
         found=false
         for file2 in $(find "$dir2" -name "$filename"); do
             # Compare the files
-            if ! cmp -s "$file1" "$file2"; then
+            if ! ./debcmp "$file1" "$file2"; then
                 # If the files differ, set the flag to true and stop further searching
                 files_differ=true
                 echo "Files $file1 and $file2 differ"
@@ -81,7 +81,6 @@ for file1 in $(find $dir1 -name "*.deb"); do
                 fi
                 echo "Adding package: $file1 to apt repo $REPO_NAME"
                 reprepro -b $REPO_NAME includedeb current $file1
-#               break 2  # Break out of both loops
             fi
             found=true
         done
