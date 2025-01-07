@@ -1,0 +1,41 @@
+#!/bin/bash
+
+set -x
+set -e
+
+# Ensure we have exactly two arguments (the files to compare)
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <deb-file-1> <deb-file-2>"
+  exit 1
+fi
+
+# Store the input Debian package file names
+deb_file_1="$1"
+deb_file_2="$2"
+
+# Create directories for extracting the files
+pkg1_dir="debs/pkg1"
+pkg2_dir="debs/pkg2"
+
+# Function to clean up directories
+cleanup() {
+#  rm -rf "$pkg1_dir" "$pkg2_dir"
+  rm -rf debs || true
+}
+
+# Ensure cleanup on exit
+trap cleanup EXIT
+
+# Extract the contents of the Debian package files into directories pkg1 and pkg2
+mkdir -p debs
+dpkg-deb -x "$deb_file_1" "$pkg1_dir" || { echo "Failed to extract $deb_file_1"; exit 1; }
+dpkg-deb -x "$deb_file_2" "$pkg2_dir" || { echo "Failed to extract $deb_file_2"; exit 1; }
+
+# Perform a recursive diff on the extracted directories
+if diff -r "$pkg1_dir" "$pkg2_dir" > /dev/null; then
+  echo "No differences found."
+  exit 0
+else
+  echo "Differences found."
+  exit 1
+fi
