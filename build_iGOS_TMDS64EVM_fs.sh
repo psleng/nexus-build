@@ -99,9 +99,6 @@ if [ ! -f "$BLT" ]; then
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;
-        *libtac2-bin_*|*libpam-tacplus_1.4.3*)  # Unwanted packages
-            continue
-            ;;
         */accel-ppp.deb)  # Duplicates
             continue
             ;;
