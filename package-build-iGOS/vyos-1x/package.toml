@@ -1,7 +1,7 @@
 [[packages]]
 name = "vyos-1x"
-#commit_id = "psl-master"
+# commit_id = "psl-master"
 # 20250110 TODO use older for now since the a46bb60f8e fails to build
 commit_id = "6ea2b9d139f2f630eec259d1bb027bdcefd476ac"
 scm_url = "https://github.com/psleng/vyos-1x.git"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"
+build_cmd = "sed -i 's/arm64/XXXXX/g' Makefile ; dpkg-buildpackage -uc -us -tc -b"
