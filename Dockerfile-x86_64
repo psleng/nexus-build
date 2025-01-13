@@ -155,8 +155,12 @@ RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
       xml-light
 
 # Build VyConf which is required to build libvyosconfig
+# This is derived from the below and must be updated to match:
+#   https://github.com/psleng/libvyosconfig/blob/current/build.sh
 RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add vyos1x-config https://github.com/psleng/vyos1x-config.git#d7260e772e39bc6a3a2d76d629567e03bbad16b5 -y
+    opam pin add vyos1x-config https://github.com/psleng/vyos1x-config.git#acfac8d809d526e9e5af1ab26cbe093e45ff9f11 -y
+RUN eval $(opam env --root=/opt/opam --set-root) && \
+    opam pin add vyconf https://github.com/vyos/vyconf.git#5ae7f4150091efb66c6f9946df81adde3ddc6ace -y
 
 # Packages needed for libvyosconfig
 RUN apt-get update && apt-get install -y \
@@ -165,9 +169,11 @@ RUN apt-get update && apt-get install -y \
       libffi-dev
 
 # Build libvyosconfig
+# The commit hash is normally the HEAD of:
+#   https://github.com/psleng/libvyosconfig
 RUN eval $(opam env --root=/opt/opam --set-root) && \
     git clone https://github.com/psleng/libvyosconfig.git /tmp/libvyosconfig && \
-    cd /tmp/libvyosconfig && git checkout 9e4f6c1494fcff64ad22503b704dbdd43347b0a6 && \
+    cd /tmp/libvyosconfig && git checkout e4bfbf0147f4242b0999a3305fd9a496b49b2caf && \
     dpkg-buildpackage -uc -us -tc -b && \
     dpkg -i /tmp/libvyosconfig0_*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
 
@@ -242,7 +248,7 @@ RUN gem install --no-document fpm
 # Packages needed for vyos-1x
 RUN pip install --break-system-packages \
       git+https://github.com/aristanetworks/j2lint.git@341b5d5db86 \
-      pyhumps==3.8.0; \
+      pyhumps==3.8.0 && \
     apt-get update && apt-get install -y \
       dh-python \
       fakeroot \
@@ -479,9 +485,10 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --break-system-packages \
 	toml-cli \
 	yamllint
+
 # Environment variables needed - JF
 ENV DEBEMAIL="psleng@perle.com"
-ENV EMAIL="psleng@perle.com"
+ENV EMAIL=${DEBEMAIL}
 
 # Packages needed for nftables
 RUN apt-get update && apt-get install -y \
@@ -494,8 +501,11 @@ RUN sed "s/^%sudo.*/%sudo\tALL=(ALL) NOPASSWD:ALL/g" -i /etc/sudoers && \
 
 # Ensure sure all users have access to our OCAM and Go installation
 RUN echo "$(opam env --root=/opt/opam --set-root)" >> /etc/skel/.bashrc && \
-    echo "export PATH=/opt/go/bin:\$PATH" >> /etc/skel/.bashrc
-
+    echo "export DEBEMAIL=${DEBEMAIL}" >> /etc/skel/.bashrc && \
+    echo "export EMAIL=${EMAIL}" >> /etc/skel/.bashrc && \
+    echo "export OCAML_VERSION=${OCAML_VERSION}" >> /etc/skel/.bashrc && \
+    echo "export PATH=/opt/go/bin:\$PATH" >> /etc/skel/.bashrc && \
+    cp -f /etc/skel/.bashrc /root/
 
 # Rise upper limit for UID when working in an Active Direcotry integrated
 # environment. This solves the warning: vyos_bld's uid 1632000007 outside of the
