@@ -57,10 +57,11 @@ TSK=package-build
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
-    ./package-build.py --dir $TSK --include ethtool telegraf owamp net-snmp frr frr_exporter strongswan openvpn-otp opennhrp \
-    aws-gwlbtun node_exporter podman ddclient dropbear hostap kea keepalived netfilter pam_tacplus pmacct radvd isc-dhcp ndppd \
-    hsflowd pyhumps
-    
+    ./package-build.py --dir $TSK --include \
+        ethtool telegraf owamp net-snmp frr frr_exporter strongswan \
+        openvpn-otp opennhrp aws-gwlbtun node_exporter blackbox_exporter \
+        podman ddclient dropbear hostap kea keepalived netfilter pam_tacplus \
+        pmacct radvd isc-dhcp ndppd hsflowd pyhumps
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
@@ -73,10 +74,13 @@ TSK=package-build-iGOS
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
-    ./package-build.py --dir $TSK --include vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname libvyosconfig \
-    vyatta-cfg vyos-http-api-tools vyos-utils ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
-    libmnl libpam-radius-auth initramfs-tools igmpproxy libnss-mapuser libtacplus-map libpam-tacplus libnss-tacplus \
-    salt-minion
+    ./package-build.py --dir $TSK --include \
+        vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname \
+        libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
+        ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
+        libmnl libpam-radius-auth initramfs-tools igmpproxy libnss-mapuser \
+        libtacplus-map libpam-tacplus libnss-tacplus salt-minion
+
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
