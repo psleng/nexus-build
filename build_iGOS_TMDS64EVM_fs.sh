@@ -15,6 +15,8 @@ REPO_NAME="vyos-build"
 REPO_URL="$2/$REPO_NAME"
 ROOTDIR=$(pwd)
 
+. $ROOTDIR/.defs.mk
+
 # Check if the --clean parameter is provided
 CLEAN=false
 if [ "$#" -eq 3 ] && [ "$3" == "--clean" ]; then
@@ -86,15 +88,14 @@ else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
 fi
 
-
-############## ti-linux-firmware
-# This will populate ./debian-repos/
-TSK=ti-linux-firmware
+############## package-symlink-debs
+# This will populate ./vyos-build/packages/ with .deb files
+TSK=package-symlink-debs
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
-    # symlink everything to the build directory
+    # Symlink everything to the vyos-build/packages directory
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")
     do
         case "$a" in
@@ -114,23 +115,37 @@ if [ ! -f "$BLT" ]; then
         echo "Symlinking package: $a"
         ln -vrfs $a $ROOTDIR/vyos-build/packages/
     done
+else
+    echo "=== I: $0: SKIP $TSK ($BLT exists)"
+fi
 
-    # this setion needs some rework to clean up how this ti firmware is pulled.
-    sudo rm -rf debian-repos
-    git clone -b psl-master $REPO_URL_TI_DEB
-    cd debian-repos
+############## ti-linux-firmware
+# This will populate ./debian-repos/ and augment vyos-build/packages/
+TSK=ti-linux-firmware
+BLT=.filesystem.$TSK.built
+if [ ! -f "$BLT" ]; then
+    echo "=== I: $0: $TSK BEGIN"
 
-    # Determine the Debian distro to use
-    DEB_SUITE=$(python3 -c "import toml; print(toml.load('$ROOTDIR/vyos-build/data/defaults.toml').get('debian_distribution', ''))")
-    if test -z "$DEB_SUITE"; then
-        echo "=== E: $0: Cannot determine debian_distribution"
-        exit 1
+    if [ "$BUILDTARG" != "ti-evm" ]; then
+        echo "=== I: $0: SKIP $TSK (target $BUILDTARG != ti-evm)"
+    else
+        # this section needs some rework to clean up how this ti firmware is pulled.
+        sudo rm -rf debian-repos
+        git clone -b psl-master $REPO_URL_TI_DEB
+        cd debian-repos
+
+        # Determine the Debian distro to use
+        DEB_SUITE=$(python3 -c "import toml; print(toml.load('$ROOTDIR/vyos-build/data/defaults.toml').get('debian_distribution', ''))")
+        if test -z "$DEB_SUITE"; then
+            echo "=== E: $0: Cannot determine debian_distribution"
+            exit 1
+        fi
+
+        sudo DEB_SUITE=$DEB_SUITE ./run.sh ti-linux-firmware
+        cd ${ROOTDIR}
+        ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
+        # end of section for rework
     fi
-
-    sudo DEB_SUITE=$DEB_SUITE ./run.sh ti-linux-firmware
-    cd ${ROOTDIR}
-    ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
-    # end of section for rework
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP $TSK ($BLT exists)"
@@ -145,7 +160,6 @@ TSK=build-vyos-image
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
-    . $ROOTDIR/.defs.mk
     cd $ROOTDIR/vyos-build
 
     # PSL related keys needed within the chroot within the build container.
@@ -173,6 +187,13 @@ cd $ROOTDIR
 # This will populate ./build/fs/
 TSK=ISO2image-build
 BLT=.filesystem.$TSK.built
+# TODO: for non-ti, skip this entire section for now.
+# TODO: We do still want some of these fixups in the source .iso
+if [ "$BUILDTARG" != "ti-evm" ]; then
+    echo "=== I: $0: Skipping $TSK because $BUILDTARG != ti-evm"
+    touch $BLT
+fi
+
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
@@ -180,8 +201,8 @@ if [ ! -f "$BLT" ]; then
     LIVE_IMAGE_ISO=vyos-build/build/live-image-$ARCH.hybrid.iso
 
     if [ ! -e ${LIVE_IMAGE_ISO} ]; then
-      echo "File ${LIVE_IMAGE_ISO} not exists."
-      exit -1
+      echo "=== E: $0: File ${LIVE_IMAGE_ISO} does not exist."
+      exit 1
     fi
 
     ISOLOOP=$(sudo losetup --show -f ${LIVE_IMAGE_ISO})

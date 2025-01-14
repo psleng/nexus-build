@@ -47,15 +47,9 @@ targ-x86:
 # Base repository to use for all container build recipes.
 REPO := https://github.com/psleng
 
-ARCH := $(shell arch)
-# Different image tag for docker vyos/vyos-build image
-ifeq ($(ARCH),aarch64)
-	IMGTAG := current-arm64
-else
-	IMGTAG := current-arm64v8
-endif
+ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
-.PHONY: help all sdcard clean targ-ti-evm targ-x86
+.PHONY: help all sdcard status clean buildclean targ-ti-evm targ-x86
 
 all: $(DEFS) $(IMAGE_TARG)
 
@@ -85,6 +79,8 @@ $(FS_TARG): $(KERNEL_TARG)
 $(IMAGE_TARG): $(FS_TARG)
 ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+	@echo "### The final .iso image should be here:"
+	@ISO=vyos-build/build/live-image-$(ARCH).hybrid.iso; if [ -f $$ISO ]; then ls -l `realpath $$ISO`; else echo "Error: $$ISO not found!"; fi
 else
 	@echo '### Making uSDcard image'
 # This invalid directory sometimes appears breaking git ops on build
@@ -113,7 +109,7 @@ status:
 # Clean everything
 clean: buildclean
 	rm -f *.ERR .*.built $(DEFS)
-	docker image rm vyos/vyos-build:$(IMGTAG) || true
+	docker image rm 'vyos/vyos-build:*' || true
 	@echo 'Cleaning up docker garbage. This could take several minutes.'
 	docker system prune -f
 
