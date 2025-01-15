@@ -81,7 +81,7 @@ if [ ! -f "$BLT" ]; then
         libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
         ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
         libmnl libpam-radius-auth initramfs-tools igmpproxy libnss-mapuser \
-        libtacplus-map libpam-tacplus libnss-tacplus
+        libtacplus-map libpam-tacplus libnss-tacplus salt-minion
 
     touch "$BLT" # build success
 else
@@ -224,9 +224,6 @@ if [ ! -f "$BLT" ]; then
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
     FS=$ROOTDIR/build/fs
-
-    # Temporary fix for console support until a more complete solution is thought about
-    sudo cp -f $ROOTDIR/updates/system_console.py $FS/usr/libexec/vyos/conf_mode/
 
     # replace console ttyS0 with ours at ttyS3 and add one more device ttyS2
     sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
