@@ -2,4 +2,4 @@
 name = "vyos-1x"
 commit_id = "psl-master"
 scm_url = "https://github.com/psleng/vyos-1x.git"
-build_cmd = "sed -i 's/arm64/XXXXX/g' Makefile ; dpkg-buildpackage -uc -us -tc -b"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
