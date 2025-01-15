@@ -174,7 +174,9 @@ if [ ! -f "$BLT" ]; then
         BUILDFLAVOUR=${ARCH}fs
     fi
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
-    sudo --preserve-env=VYOS1X_REPO_URL ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
+    export VYOS1X_REPO_BRANCH=psl-master
+    sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
+		./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
     cd -
     touch "$BLT" # build success
 else
@@ -223,8 +225,6 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
     FS=$ROOTDIR/build/fs
 
-    # Temporary fix for DUID in vyos-1x until a more complete solution is thought about
-    sudo cp -f $ROOTDIR/updates/vyos-router $FS/usr/libexec/vyos/init/
     # Temporary fix for console support until a more complete solution is thought about
     sudo cp -f $ROOTDIR/updates/system_console.py $FS/usr/libexec/vyos/conf_mode/
 
