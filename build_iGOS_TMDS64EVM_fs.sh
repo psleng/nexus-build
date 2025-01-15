@@ -81,7 +81,7 @@ if [ ! -f "$BLT" ]; then
         libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
         ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
         libmnl libpam-radius-auth initramfs-tools igmpproxy libnss-mapuser \
-        libtacplus-map libpam-tacplus libnss-tacplus salt-minion
+        libtacplus-map libpam-tacplus libnss-tacplus
 
     touch "$BLT" # build success
 else
