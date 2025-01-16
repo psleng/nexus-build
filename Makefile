@@ -48,6 +48,12 @@ targ-x86:
 REPO := https://github.com/psleng
 
 ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
+# Different image tag for docker vyos/vyos-build image
+ifeq ($(ARCH),arm64)
+	IMGTAG := current-arm64
+else
+	IMGTAG := latest
+endif
 
 .PHONY: help all sdcard status clean buildclean targ-ti-evm targ-x86
 
@@ -109,7 +115,7 @@ status:
 # Clean everything
 clean: buildclean
 	rm -f *.ERR .*.built $(DEFS)
-	docker image rm 'vyos/vyos-build:*' || true
+	docker image rm vyos/vyos-build:$(IMGTAG) || true
 	@echo 'Cleaning up docker garbage. This could take several minutes.'
 	docker system prune -f
 
