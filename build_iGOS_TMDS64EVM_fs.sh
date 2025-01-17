@@ -185,19 +185,24 @@ fi
 cd $ROOTDIR
 
 
-############## ISO2image-build
+############## ti-evm-fs-build
 # This will populate ./build/fs/
-TSK=ISO2image-build
+TSK=ti-evm-fs-build
 BLT=.filesystem.$TSK.built
-# TODO: for non-ti, skip this entire section for now.
-# TODO: We do still want some of these fixups in the source .iso
 if [ "$BUILDTARG" != "ti-evm" ]; then
+    # Not TI.
     echo "=== I: $0: Skipping $TSK because $BUILDTARG != ti-evm"
     touch $BLT
 fi
 
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
+
+    # NOTE: for any non-architecture specific mods, do them here:
+    #
+    #   vyos-build/data/live-build-config/hooks/live/99-PSL-customize.chroot
+    #
+    # Changes made there will end up in the .iso
 
     # Check ISO file
     LIVE_IMAGE_ISO=vyos-build/build/live-image-$ARCH.hybrid.iso
@@ -212,33 +217,19 @@ if [ ! -f "$BLT" ]; then
 
     sudo rm -rf build
     sudo mkdir -p build/tmp/
-
     sudo mount -o ro ${ISOLOOP} build/tmp/
+    FS=$ROOTDIR/build/fs
+    sudo unsquashfs -d $FS build/tmp/live/filesystem.squashfs
 
-    sudo unsquashfs -d build/fs build/tmp/live/filesystem.squashfs
-
-    #rm -rf build/fs/boot/grub
-    sudo mkdir build/fs/boot/dtb
-
-    sudo cp -R build/fs/usr/lib/linux-image*/ti build/fs/boot/dtb
+    #rm -rf $FS/boot/grub
+    sudo mkdir $FS/boot/dtb
+    sudo cp -R $FS/usr/lib/linux-image*/ti $FS/boot/dtb
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
-    FS=$ROOTDIR/build/fs
 
     # replace console ttyS0 with ours at ttyS3 and add one more device ttyS2
     sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
     sudo sed -i '/console.*$/a \        device ttyS2 {\n\t    speed \"115200\"\n\t}' $FS/usr/share/vyos/config.boot.default
-
-    # start modem manager service early
-    sudo ln -s /lib/systemd/system/ModemManager.service $FS/etc/systemd/system/dbus-org.freedesktop.ModemManager1.service
-    sudo ln -s /lib/systemd/system/ModemManager.service $FS/etc/systemd/system/multi-user.target.wants/ModemManager.service
-
-    # journald fixups
-    sudo sed -i \
-        -e 's/#Storage=persistent/Storage=volatile/' \
-        -e 's/#RuntimeMaxUse=/RuntimeMaxUse=256K/' \
-        -e 's/MaxLevelSyslog=debug/MaxLevelSyslog=info/' \
-            $FS/etc/systemd/journald.conf
 
     # Generate a default locale (stops warnings from perl)
     if [ ! -f $FS/usr/lib/locale/locale-archive ]; then
