@@ -1,13 +1,15 @@
 #!/bin/bash
 
-set -x
-set -e
-
 # Check if the --repo parameter is provided
 if [ "$#" -lt 2 ] || [ "$1" != "--repo" ]; then
-    echo "Usage: $0 --repo <repository_url> [--clean]"
+    echo "Usage: $0 --repo <repository_url> [--clean]" >&2
+    echo 'Example:' >&2
+    echo "  $0 --repo git@github.com:psleng" >&2
     exit 1
 fi
+
+set -x
+set -e
 
 REPPREFIX_URL="$2/"
 REPO_NAME="psleng.github.io"
@@ -18,9 +20,9 @@ REPO_NO_DIFF=_REPO_NOT_UPDATED
 REPO_DIFF=_REPO_UPDATED
 REPO_DIFF_FAILED=_REPO_UPDATE_FAILED
 
-rm "$REPO_NO_DIFF"|true       # apt repo has not been updated
-rm "$REPO_DIFF"|true          # apt repo has been updated
-rm "$REPO_DIFF_FAILED"|true   # apt repo update has failed
+rm -f "$REPO_NO_DIFF"       # apt repo has not been updated
+rm -f "$REPO_DIFF"          # apt repo has been updated
+rm -f "$REPO_DIFF_FAILED"   # apt repo update has failed
 
 # Check if the --clean parameter is provided
 CLEAN=false
@@ -90,7 +92,7 @@ for file1 in $(find $dir1 -name "*.deb"); do
             echo "File $filename not found in $dir2... "
             echo "Adding package: $file1 to apt repo $REPO_NAME"
             reprepro -b $REPO_NAME includedeb current $file1
-	    files_differ=true
+            files_differ=true
         fi
     fi
 done
@@ -107,7 +109,7 @@ fi
 # usage of psleng.github.io may change to a jfrog account in which the git commands below need to be removed
 # create a temp dir to hold the local repo changes/updates, reset the locla repo to just bare config, then
 # copy back the updates, git add, git commit, git push --force the repo to the remote repo
-rm -rf _psleng.github.io|true
+rm -rf _psleng.github.io
 mkdir _psleng.github.io
 cd psleng.github.io
 cp -rf db ../_psleng.github.io
