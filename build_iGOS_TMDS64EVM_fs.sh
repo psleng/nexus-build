@@ -228,8 +228,8 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
 
     # replace console ttyS0 with ours at ttyS3 and add one more device ttyS2
-    sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
-    sudo sed -i '/console.*$/a \        device ttyS2 {\n\t    speed \"115200\"\n\t}' $FS/usr/share/vyos/config.boot.default
+    # sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
+    # sudo sed -i '/console.*$/a \        device ttyS2 {\n\t    speed \"115200\"\n\t}' $FS/usr/share/vyos/config.boot.default
 
     # Generate a default locale (stops warnings from perl)
     if [ ! -f $FS/usr/lib/locale/locale-archive ]; then
