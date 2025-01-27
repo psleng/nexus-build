@@ -121,4 +121,4 @@ clean: buildclean
 
 # Clean build artifacts only
 buildclean:
-	sudo rm -rf vyos-build build debian-repos drivers logs tools configs scripts builds.toml
+	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml
