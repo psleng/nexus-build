@@ -1,5 +1,5 @@
 [[packages]]
 name = "vyos-http-api-tools"
-commit_id = "current"
+commit_id = "psl-master"
 scm_url = "https://github.com/psleng/vyos-http-api-tools"
 build_cmd = 'pip install pip-tools --break-system-packages; PATH="$HOME/.local/bin:$PATH" pip-compile requirements.in > requirements.txt; dpkg-buildpackage -uc -us -tc -b'
