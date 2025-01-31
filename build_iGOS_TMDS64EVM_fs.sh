@@ -61,7 +61,7 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir $TSK --include \
         ethtool telegraf owamp net-snmp frr frr_exporter strongswan \
-        openvpn-otp opennhrp aws-gwlbtun node_exporter blackbox_exporter \
+        openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
         podman ddclient dropbear hostap kea keepalived netfilter pam_tacplus \
         pmacct radvd isc-dhcp ndppd hsflowd pyhumps
     touch "$BLT" # build success
@@ -115,6 +115,7 @@ if [ ! -f "$BLT" ]; then
         echo "Symlinking package: $a"
         ln -vrfs $a $ROOTDIR/vyos-build/packages/
     done
+    touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP $TSK ($BLT exists)"
 fi
