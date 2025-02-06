@@ -1,5 +1,0 @@
-[[packages]]
-name = "libpam-tacplus"
-commit_id = "psl-master"
-scm_url = "https://github.com/psleng/libpam-tacplus"
-build_cmd = "../build-install-deps.sh; dpkg-buildpackage -uc -us -tc -b"
