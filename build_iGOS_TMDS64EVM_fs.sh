@@ -9,10 +9,10 @@ fi
 
 ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
 
-REPPREFIX_URL="$2/"
-REPO_URL_TI_DEB="$2/debian-repos"
+REPPREFIX_URL="$2"
+REPO_URL_TI_DEB="$REPPREFIX_URL/debian-repos"
 REPO_NAME="vyos-build"
-REPO_URL="$2/$REPO_NAME"
+REPO_URL="$REPPREFIX_URL/$REPO_NAME"
 ROOTDIR=$(pwd)
 
 . $ROOTDIR/.defs.mk
@@ -40,11 +40,12 @@ if [ ! -d "$REPO_NAME" ]; then
 fi
 
 # Install package scripts directory
-if [ ! -d "vyos-build/scripts/package-build-iGOS" ]; then
-    cp -rf package-build-iGOS vyos-build/scripts/
-    # Find all .toml files in the package-build-iGOS directory and replace the URL
-    echo "=== I: $0: rewriting .toml files BEGIN"
-    find vyos-build/scripts/package-build-iGOS -type f -name "*.toml" -exec sed -i "s|https://github.com/[^/]\+/|$REPPREFIX_URL|g" {} +
+SRCDIR=package-build-iGOS
+DSTDIR=vyos-build/scripts/
+if [ ! -d $DSTDIR/$SRCDIR ]; then
+    echo "=== I: $0: Copying $ROOTDIR/$SRCDIR into $DSTDIR"
+    cp -rf $SRCDIR $DSTDIR
+    echo "These files were copied from $ROOTDIR/$SRCDIR" > $DSTDIR/$SRCDIR/README-PSL
 fi
 
 # Install build_flavor
