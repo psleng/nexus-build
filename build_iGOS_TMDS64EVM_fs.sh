@@ -233,6 +233,11 @@ if [ ! -f "$BLT" ]; then
     # sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
     # sudo sed -i '/console.*$/a \        device ttyS2 {\n\t    speed \"115200\"\n\t}' $FS/usr/share/vyos/config.boot.default
 
+    # copy the perle-init once service that mounts /config to /opt/vyatta.etc.config and installs the snakeoil cert if missing
+    sudo cp updates/perle-init.service $FS/lib/systemd/system
+    sudo ln -s /lib/systemd/system/perle-init.service $FS/etc/systemd/system/multi-user.target.wants/perle-init.service
+    sudo cp updates/perle-init.sh $FS/usr/bin
+
     # Generate a default locale (stops warnings from perl)
     if [ ! -f $FS/usr/lib/locale/locale-archive ]; then
         echo "en_US.UTF-8 UTF-8" | sudo tee -a $FS/etc/locale.gen > /dev/null
