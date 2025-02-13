@@ -35,12 +35,5 @@ if [ ! -d "$REPO_NAME" ]; then
     git clone -b psl-master --single-branch "$REPO_URL"
 fi
 
-
-# Copy all custom packages
-cp -rf ${ROOTDIR}/patches/ti_evm_vyos_defconfig ${ROOTDIR}/${REPO_NAME}/scripts/package-build/linux-kernel/arch/arm64/configs/vyos_defconfig
-cp -rf ${ROOTDIR}/build-kernel.sh ${ROOTDIR}/${REPO_NAME}/scripts/package-build/linux-kernel/build-kernel.sh
-
 # Make Kernel and associated packages
 ./package-build.py --dir package-build --include linux-kernel
-
-
