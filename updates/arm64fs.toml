@@ -5,7 +5,10 @@ image_format = "iso"
 # Include these packages in the image regardless of the architecture
 packages = [
   # QEMU and Xen guest tools exist for multiple architectures
+  # TODO - added python3-XXX pkgs temporarily for flask-react dependencies
   "qemu-guest-agent",
+  "python3-pip",
+  "python3-venv",
   # "vyos-xe-guest-utilities",
 ]
 
