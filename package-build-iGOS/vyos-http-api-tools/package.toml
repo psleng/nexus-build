@@ -2,4 +2,7 @@
 name = "vyos-http-api-tools"
 commit_id = "psl-master"
 scm_url = "https://github.com/psleng/vyos-http-api-tools"
-build_cmd = 'pip install pip-tools --break-system-packages; PATH="$HOME/.local/bin:$PATH" pip-compile requirements.in > requirements.txt; dpkg-buildpackage -uc -us -tc -b'
+### This build command updates requirements.txt to the most recent every
+### time which we typically do not want to do.
+# build_cmd = 'pip install pip-tools --break-system-packages; PATH="$HOME/.local/bin:$PATH" pip-compile requirements.in > requirements.txt; dpkg-buildpackage -uc -us -tc -b'
+build_cmd = 'dpkg-buildpackage -uc -us -tc -b'
