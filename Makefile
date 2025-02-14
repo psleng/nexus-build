@@ -22,7 +22,8 @@ IMAGE_TARG    = .image.built
 help:
 	@echo First select a build type.  Valid types are:
 	@echo
-	@echo '    make targ-ti-evm # TI evaluation module (default)'
+	@echo '    make targ-ti-am64x # TI AM64x evaluation module (default)'
+	@echo '    make targ-ti-j7200 # TI J7200 evaluation module (default)'
 	@echo '    make targ-x86    # x86'
 	@echo
 	@echo Then type "make all".  Type "make clean" for a clean start.
@@ -35,10 +36,15 @@ help:
 
 # target build: TI eval board (default)
 # BUILDTYPE is a builds entry from ti-bdebstrap/builds.toml
-$(DEFS) targ-ti-evm:
+targ-ti-evm:
 	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=ti-evm > $(DEFS)
 	@echo BUILDTYPE=bookworm-am64xx-evm >> $(DEFS)
+
+targ-ti-j7200:
+	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
+	@echo BUILDTARG=ti-evm > $(DEFS)
+	@echo BUILDTYPE=bookworm-j7200-evm >> $(DEFS)
 
 # target build: x86_64
 targ-x86:
@@ -57,7 +63,7 @@ else
 	IMGTAG := latest
 endif
 
-.PHONY: help all sdcard status clean buildclean targ-ti-evm targ-x86
+.PHONY: help all sdcard status clean buildclean targ-ti-am64x targ-ti-j7200 targ-x86
 
 all: $(DEFS) $(IMAGE_TARG)
 
