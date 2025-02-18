@@ -7,9 +7,9 @@ The two methods are presented below.
 Both ways have to be done inside a suitably prepared Debian12 VM
 on an arm64 based Mac or x86 laptop depending on the target.
 
-The was support for arm64 emulation so you could do the TI build
-on an x86 laptop, but this was extremely slow and not very reliable
-and should no longer be attemped.
+There was support for arm64 emulation via qemu so you could do
+the TI build on an x86 laptop, but this was extremely slow
+and not very reliable and should no longer be attemped.
 
 ---
 ### AUTOMATICALLY

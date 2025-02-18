@@ -36,11 +36,13 @@ help:
 # target build: TI eval board (default)
 # BUILDTYPE is a builds entry from ti-bdebstrap/builds.toml
 $(DEFS) targ-ti-evm:
+	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=ti-evm > $(DEFS)
 	@echo BUILDTYPE=bookworm-am64xx-evm >> $(DEFS)
 
 # target build: x86_64
 targ-x86:
+	@test `arch` = x86_64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=x86_64 > $(DEFS)
 
 
