@@ -161,9 +161,9 @@ RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
 # This is derived from the below and must be updated to match:
 #   https://github.com/psleng/libvyosconfig/blob/current/build.sh
 RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add vyos1x-config https://github.com/psleng/vyos1x-config.git#acfac8d809d526e9e5af1ab26cbe093e45ff9f11 -y
+    opam pin add vyos1x-config https://github.com/psleng/vyos1x-config.git#be576e9d9281d8b97059bba3882be8deac4f724d -y
 RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add vyconf https://github.com/vyos/vyconf.git#5ae7f4150091efb66c6f9946df81adde3ddc6ace -y
+    opam pin add vyconf https://github.com/vyos/vyconf.git#a375860a302a224722d254c31a1cb210cb12d972 -y
 
 # Packages needed for libvyosconfig
 RUN apt-get update && apt-get install -y \
@@ -176,7 +176,7 @@ RUN apt-get update && apt-get install -y \
 #   https://github.com/psleng/libvyosconfig
 RUN eval $(opam env --root=/opt/opam --set-root) && \
     git clone https://github.com/psleng/libvyosconfig.git /tmp/libvyosconfig && \
-    cd /tmp/libvyosconfig && git checkout 17c6b950337310dfe648f685157fdbfaca896e45 && \
+    cd /tmp/libvyosconfig && git checkout 37b9d177a2156df995e10d20d07774fd99b3b47e && \
     dpkg-buildpackage -uc -us -tc -b && \
     dpkg -i /tmp/libvyosconfig0_*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
 
