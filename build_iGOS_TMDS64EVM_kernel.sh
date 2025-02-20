@@ -32,7 +32,7 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b j7200-evm --single-branch "$REPO_URL"
+    git clone --single-branch "$REPO_URL"
 fi
 
 # Make Kernel and associated packages

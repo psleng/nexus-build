@@ -23,8 +23,8 @@ help:
 	@echo First select a build type.  Valid types are:
 	@echo
 	@echo '    make targ-ti-am64x # TI AM64x evaluation module (default)'
-	@echo '    make targ-ti-j7200 # TI J7200 evaluation module (default)'
-	@echo '    make targ-x86    # x86'
+	@echo '    make targ-ti-j7200 # TI J7200 evaluation module'
+	@echo '    make targ-x86      # x86'
 	@echo
 	@echo Then type "make all".  Type "make clean" for a clean start.
 	@echo You will have to reselect the build type after doing that.
@@ -34,13 +34,14 @@ help:
 	    cat $(DEFS); \
 	fi
 
-# target build: TI eval board (default)
+# target build: TI TMDS64EVM board (default)
 # BUILDTYPE is a builds entry from ti-bdebstrap/builds.toml
-targ-ti-evm:
+$(DEFS) targ-ti-am64x:
 	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=ti-evm > $(DEFS)
 	@echo BUILDTYPE=bookworm-am64xx-evm >> $(DEFS)
 
+# target build: TI J7200 board
 targ-ti-j7200:
 	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=ti-evm > $(DEFS)
