@@ -63,7 +63,7 @@ if [ ! -f "$BLT" ]; then
     ./package-build.py --dir $TSK --include \
         ethtool telegraf owamp net-snmp frr frr_exporter strongswan \
         openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
-        podman ddclient dropbear hostap kea keepalived netfilter pam_tacplus \
+        podman ddclient dropbear hostap kea keepalived netfilter \
         pmacct radvd isc-dhcp ndppd hsflowd pyhumps
     touch "$BLT" # build success
 else
@@ -145,7 +145,14 @@ if [ ! -f "$BLT" ]; then
 
         sudo DEB_SUITE=$DEB_SUITE ./run.sh ti-linux-firmware
         cd ${ROOTDIR}
-        ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
+        if [ "$BUILDTYPE" = "bookworm-am64xx-evm" ]; then
+            ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
+        elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then
+            ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*j7200*.deb $ROOTDIR/vyos-build/packages/
+        else
+            echo "=== E: $0: Undefined BUILDTARG:BUILDTYPE ($BUILDTARG:$BUILDTYPE)"
+            exit 1
+        fi
         # end of section for rework
     fi
     touch "$BLT" # build success
