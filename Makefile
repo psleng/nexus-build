@@ -101,7 +101,7 @@ else
 # This invalid directory sometimes appears breaking git ops on build
 	@if [ -d ~root/.gitconfig ]; then sudo rm -rf ~root/.gitconfig; fi
 	@$(call DOCKRUN,image,./buildiGOSti.sh $(BUILDTYPE))
-	@ls -l build/$(BUILDTYPE)/tisdk*.tar.xz
+	@ls -l images/$(BUILDTYPE)/tisdk*.squashfs
 	@echo '### Making uSDcard image COMPLETED'
 	@echo '### Type "make sdcard" to write to an uSD card'
 	@touch $@

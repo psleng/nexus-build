@@ -80,5 +80,5 @@ you must then exit to do the remaining steps.
 
 	sudo ./buildiGOSti.sh bookworm-am64xx-evm
 
-	sudo ./create-sdcard.sh bookworm-am64xx-evm
+	sudo ./ti-bdebstrap/create-sdcard.sh bookworm-am64xx-evm
 ```
