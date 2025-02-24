@@ -1,9 +1,19 @@
-cd ~/nexus-build
+sudo rm -rf nexus-build
+git clone https://github.com/psleng/nexus-build
+cd nexus-build
 echo 'Starting daily iGOS build...' > iGOS-build.out
 date >> iGOS-build.out
-git pull
+echo 'Starting targ-ti-j7200 iGOS build...' >> iGOS-build.out
+date >> iGOS-build.out
+make targ-ti-j7200
+make all
+echo 'Finished targ-ti-j7200 iGOS build...' >> iGOS-build.out
+date >> iGOS-build.out
+ls -l .*built >>  iGOS-build.out
 make clean
-make targ-ti-evm
+echo 'Starting targ-ti-am64x iGOS build...' >> iGOS-build.out
+date >> iGOS-build.out
+make targ-ti-am64x
 make all
 ls -l .*built >>  iGOS-build.out
 date >> iGOS-build.out
