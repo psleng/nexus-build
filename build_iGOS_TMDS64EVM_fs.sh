@@ -81,7 +81,7 @@ if [ ! -f "$BLT" ]; then
         vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname \
         libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
         ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
-        libmnl libpam-radius-auth initramfs-tools igmpproxy libnss-mapuser \
+        libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
         tacacs live-boot
 
     touch "$BLT" # build success
