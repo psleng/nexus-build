@@ -34,23 +34,34 @@ help:
 	    cat $(DEFS); \
 	fi
 
+# List of iGOS packages to build.
+# This is used in build_iGOS_TMDS64EVM_fs.sh and others.
+IGOS_PKGS='vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname \
+        libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
+        ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
+        libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
+        tacacs live-boot'
+
 # target build: TI TMDS64EVM board (default)
 # BUILDTYPE is a builds entry from ti-bdebstrap/builds.toml
 $(DEFS) targ-ti-am64x:
 	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=ti-evm > $(DEFS)
 	@echo BUILDTYPE=bookworm-am64xx-evm >> $(DEFS)
+	@echo IGOS_PKGS="$(IGOS_PKGS)" >> $(DEFS)
 
 # target build: TI J7200 board
 targ-ti-j7200:
 	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=ti-evm > $(DEFS)
 	@echo BUILDTYPE=bookworm-j7200-evm >> $(DEFS)
+	@echo IGOS_PKGS="$(IGOS_PKGS)" >> $(DEFS)
 
 # target build: x86_64
 targ-x86:
 	@test `arch` = x86_64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
 	@echo BUILDTARG=x86_64 > $(DEFS)
+	@echo IGOS_PKGS="$(IGOS_PKGS)" >> $(DEFS)
 
 
 # Base repository to use for all container build recipes.
