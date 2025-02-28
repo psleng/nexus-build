@@ -242,6 +242,8 @@ if [ ! -f "$BLT" ]; then
     sudo cp updates/perle-init.service $FS/lib/systemd/system
     sudo ln -s /lib/systemd/system/perle-init.service $FS/etc/systemd/system/multi-user.target.wants/perle-init.service
     sudo cp updates/perle-init.sh $FS/usr/bin
+    sudo cp -rf updates/model-info $FS/usr/share/vyos/
+    sudo cp -rf updates/product.env $FS/etc/
 
     # Generate a default locale (stops warnings from perl)
     if [ ! -f $FS/usr/lib/locale/locale-archive ]; then
