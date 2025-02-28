@@ -184,6 +184,11 @@ if topush:
     print('\nThis will bring us up to date with the VyOS upstream.')
     print('After that, you can go into each and try merging that')
     print('into the corresponding psleng branch.')
+    print()
+    print('WARNING: before doing this, make sure that VyOS is actually')
+    print('to make a daily build or you will be pulling broken code.')
+    print('Look here:')
+    print('\thttps://vyos.net/get/nightly-builds/')
 
 else:
     print('No changes needs to be committed/pushed.')

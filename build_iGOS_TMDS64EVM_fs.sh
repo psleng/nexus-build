@@ -96,6 +96,10 @@ if [ ! -f "$BLT" ]; then
         case "$a" in
         *libsnmp-dev_*64.deb)  # Needed for frr (despite -dev_ pattern)
             ;;
+        *libvppinfra-dev*)  # Needed for vpp and vyos-1x
+            ;;
+        *vpp-dev_*64.deb)  # Needed for vpp and vyos-1x
+            ;;
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;

@@ -36,7 +36,7 @@ help:
 
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
-IGOS_PKGS='vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname \
+IGOS_PKGS='vpp vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname \
         libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
         ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
         libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
