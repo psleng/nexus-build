@@ -24,6 +24,10 @@ for patch in ../patches/vpp/*.patch; do
     git -c user.email=maintainers@vyos.net -c user.name=vyos am "$patch" || { echo "Failed to apply patch $patch"; exit 1; }
 done
 
+# this assumes debconf-utils is installed and preseeds the popup questions for iperf3 daemon and wireshark-common
+echo "iperf3 iperf3/start-daemon boolean true" | sudo debconf-set-selections
+echo "wireshark-common wireshark-common/install-setuid boolean true" | sudo debconf-set-selections
+
 make UNATTENDED=yes install-dep
 make pkg-deb
 cp build-root/*.deb ../
