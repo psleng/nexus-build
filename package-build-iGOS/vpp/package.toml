@@ -25,7 +25,7 @@ for patch in ../patches/vpp/*.patch; do
 done
 
 # this assumes debconf-utils is installed and preseeds the popup questions for iperf3 daemon and wireshark-common
-echo "iperf3 iperf3/start-daemon boolean true" | sudo debconf-set-selections
+echo "iperf3 iperf3/start_daemon boolean true" | sudo debconf-set-selections
 echo "wireshark-common wireshark-common/install-setuid boolean true" | sudo debconf-set-selections
 
 make UNATTENDED=yes install-dep
