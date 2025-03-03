@@ -467,6 +467,10 @@ RUN apt-get update && apt-get install -y \
 	perl-xs-dev \
 	default-libmysqlclient-dev
 
+# Packages needed for debconf preseed selection of vpp - DK
+RUN apt-get update && apt-get install -y \
+	debconf-utils
+
 # Packages needed for keepalived
 RUN apt-get install -y \
     libipset-dev libnfnetlink-dev libnftnl-dev libnl-nf-3-dev libpopt-dev
