@@ -59,9 +59,11 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
     cwd = os.getcwd()
     try:
         os.chdir(workdir)
-        # Add the corresponding vyos upstream
-        run(['git', 'remote', 'add', 'upstream',
-             f'https://github.com/vyos/{name}.git'], check=True)
+        # Add the corresponding upstream, defaulting to vyos
+        upstream = dpkg.get('scm_url_upstream',
+                            f'https://github.com/vyos/{name}.git')
+
+        run(['git', 'remote', 'add', 'upstream', upstream], check=True)
         run(['git', 'fetch', '-q', '--tags', '--all'], check=True)
         r = run(['git', 'branch', '--show-current'],
                 capture_output=True, check=True)
