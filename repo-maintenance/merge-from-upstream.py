@@ -31,7 +31,7 @@ def findup(targ: str) -> (Path | None):
     return None
 
 
-def merge_from_upstream(dpkg: dict) -> str:
+def merge_from_upstream(dpkg: dict) -> (str | None):
     '''
     Do the merge from upstream work.
     '''
@@ -48,8 +48,12 @@ def merge_from_upstream(dpkg: dict) -> str:
     # git cli directly.
 
     # Clone ours (psleng)
-    assert 'psleng' in url
-    print(f' I: Cloning {name}')
+    if 'psleng' not in url:
+        print(f' W: Cannot merge {url} for {name} because'
+              ' it is not a psleng repo')
+        return None
+
+    print(f' I: Cloning {url} for {name}')
     run(['git', 'clone', '-q', url, workdir], check=True)
 
     cwd = os.getcwd()
@@ -161,14 +165,18 @@ for pkg in igos_pkgs:
     toml = tomli.load(open(pkgtoml, 'rb'))
     pkgs: dict = toml['packages']
     for dpkg in pkgs:
-        workdirs.append(merge_from_upstream(dpkg))
+        d = merge_from_upstream(dpkg)
+        if d:
+            workdirs.append(d)
 
 # Special case: vyos-build (does not use package.toml)
 # Cook up what the parsed package.toml part would look like.
 dpkg = {'name': 'vyos-build',
         'scm_url': 'git@github.com:psleng/vyos-build'}
 print(f'\nI: Processing {dpkg["name"]}')
-workdirs.append(merge_from_upstream(dpkg))
+d = merge_from_upstream(dpkg)
+if d:
+    workdirs.append(d)
 
 # It all worked.  Print a list of directories needing to be committed/pushed.
 topush = []
@@ -181,14 +189,20 @@ if topush:
     print('The following directories need to be committed and pushed:\n')
     for i in topush:
         print(f'\t{i}')
+
     print('\nThis will bring us up to date with the VyOS upstream.')
     print('After that, you can go into each and try merging that')
     print('into the corresponding psleng branch.')
     print()
     print('WARNING: before doing this, make sure that VyOS is actually')
-    print('to make a daily build or you will be pulling broken code.')
+    print('managing to make a daily build or you will be pulling broken code.')
     print('Look here:')
     print('\thttps://vyos.net/get/nightly-builds/')
+    print()
+    print('NOTE you should also manually examine all package.toml files under')
+    print(IGOSPATH, 'to see if they have changed on the corresponding')
+    print('VyOS side:')
+    print('\tvyos-build/scripts/package-build')
 
 else:
     print('No changes needs to be committed/pushed.')
