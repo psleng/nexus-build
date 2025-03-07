@@ -1,4 +1,10 @@
 [[packages]]
+name = "vyos-vpp"
+commit_id = "psl-master"
+scm_url = "https://github.com/psleng/vyos-vpp.git"
+build_cmd = "/bin/true"
+
+[[packages]]
 name = "vyos-1x"
 commit_id = "psl-master"
 scm_url = "https://github.com/psleng/vyos-1x.git"

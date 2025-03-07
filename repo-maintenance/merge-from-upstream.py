@@ -188,7 +188,8 @@ for workdir in workdirs:
 
 print('==============')
 if topush:
-    print('The following directories need to be committed and pushed:\n')
+    print('The following directories need to be committed and pushed '
+          'via "push --all":\n')
     for i in topush:
         print(f'\t{i}')
 
