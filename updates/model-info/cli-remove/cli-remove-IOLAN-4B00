@@ -1,0 +1,3 @@
+./vyatta-cfg/templates/system/option/root-partition-auto-resize
+./vyatta-op/templates/force/root-partition-auto-resize
+./vyatta-op/templates/poweroff
