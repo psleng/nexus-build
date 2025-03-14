@@ -38,7 +38,7 @@ help:
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 IGOS_PKGS='vpp vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname \
         libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
-        ipaddrcheck udp-broadcast-relay hvinfo vyatta-wanloadbalance \
+        ipaddrcheck udp-broadcast-relay hvinfo \
         libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
         tacacs live-boot'
 
