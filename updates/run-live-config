@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# Runs the live-build config scripts during build time.
+# The intent is to keep bootup time as short as possible.
+#
+# NOTE: This assumes that boot=live is NOT set in /proc/cmdline
+# of the target device.  If it *is*, the /usr/lib/live/config/*
+# scripts will run on bootup anyway (live-config.service)
+#
+
+cd /usr/lib/live
+PROG=$(basename $0)
+HOSTNAME=$(hostname)
+LOG=$PROG.log
+
+echo "=== $0 on host $HOSTNAME at $(date)" | tee $LOG
+
+# Create a bogus /proc/cmdline with what scripts might expect
+CMDLINEPATH=/proc/cmdline
+if [ ! -f "$CMDLINEPATH" ]; then
+	cat > $CMDLINEPATH <<-%
+	noautologin boot=live
+	%
+fi
+
+# Create a bogus /etc/hosts with the current hostname for make-ssl-cert
+if ! grep -q "$HOSTNAME" /etc/hosts; then
+	ohosts=/etc/hosts.dist
+	mv /etc/hosts $ohosts
+	echo 127.0.0.1 localhost | tee /etc/hosts
+	echo 127.0.1.1 $(hostname) | tee -a /etc/hosts
+fi
+
+# Run all the scripts
+cd config
+for component in *
+do
+	test -x $component || continue
+	echo === Running $component
+	bash -x ./$component || {
+		echo WARNING: $component returned $?
+	}
+done 2>&1 | tee -a ../$LOG
+
+# Clean up the bogus stuff
+rm -f $CMDLINEPATH
+test -f $ohosts && mv $ohosts /etc/hosts
+
+# vim: set noet

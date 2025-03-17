@@ -183,7 +183,7 @@ if [ ! -f "$BLT" ]; then
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
     export VYOS1X_REPO_BRANCH=psl-master
     sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
-		./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
+        ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
     cd -
     touch "$BLT" # build success
 else
@@ -233,23 +233,20 @@ if [ ! -f "$BLT" ]; then
     sudo cp -R $FS/usr/lib/linux-image*/ti $FS/boot/dtb
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
+    # For debugging: stash the unsullied rootfs for later diffing
+    #test -d $FS.pristine || { echo HACK; sudo cp -pr $FS $FS.pristine; }
 
-    # replace console ttyS0 with ours at ttyS3 and add one more device ttyS2
-    # sudo sed -i 's/ttyS0/ttyS3/' $FS/usr/share/vyos/config.boot.default
-    # sudo sed -i '/console.*$/a \        device ttyS2 {\n\t    speed \"115200\"\n\t}' $FS/usr/share/vyos/config.boot.default
+    # Run the debian-live config scripts now within chroot of the fs.
+    # This is a bit bogus but saves bootup time of the eventual product.
+    sudo cp -p updates/run-live-config $FS/usr/lib/live/
+    sudo chroot $FS bash -c usr/lib/live/run-live-config
 
-    # copy the perle-init once service that mounts /config to /opt/vyatta.etc.config and installs the snakeoil cert if missing
+    # Copy the perle-init once service that performs /lib/live/boot/* tasks
     sudo cp updates/perle-init.service $FS/lib/systemd/system
     sudo ln -s /lib/systemd/system/perle-init.service $FS/etc/systemd/system/multi-user.target.wants/perle-init.service
     sudo cp updates/perle-init.sh $FS/usr/bin
     sudo cp -rf updates/model-info $FS/usr/share/vyos/
     sudo cp -rf updates/product.env $FS/etc/
-
-    # Generate a default locale (stops warnings from perl)
-    if [ ! -f $FS/usr/lib/locale/locale-archive ]; then
-        echo "en_US.UTF-8 UTF-8" | sudo tee -a $FS/etc/locale.gen > /dev/null
-        sudo chroot $FS locale-gen
-    fi
 
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"
