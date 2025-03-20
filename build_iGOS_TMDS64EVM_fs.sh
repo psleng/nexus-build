@@ -77,6 +77,7 @@ TSK=package-build-iGOS
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
+    # See .defs.mk for $IGOS_PKGS value
     ./package-build.py --dir $TSK --include $IGOS_PKGS
     touch "$BLT" # build success
 else
@@ -233,7 +234,8 @@ if [ ! -f "$BLT" ]; then
     sudo cp -R $FS/usr/lib/linux-image*/ti $FS/boot/dtb
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
-    # For debugging: stash the unsullied rootfs for later diffing
+    ## For debugging: stash the unsullied rootfs for later diffing via:
+    ##  sudo diff -r --no-dereference fs fs.pristine 2>&1 | less
     #test -d $FS.pristine || { echo HACK; sudo cp -pr $FS $FS.pristine; }
 
     # Run the debian-live config scripts now within chroot of the fs.
