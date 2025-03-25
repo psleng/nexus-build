@@ -28,6 +28,7 @@ help:
 	@echo
 	@echo Then type "make all".  Type "make clean" for a clean start.
 	@echo You will have to reselect the build type after doing that.
+	@echo "make mostlyclean" will clean everything except built images.
 	@echo
 	@if [ -s "$(DEFS)" ]; then \
 	    echo "The current build settings ($(DEFS)) are:"; \
@@ -75,7 +76,7 @@ else
 	IMGTAG := latest
 endif
 
-.PHONY: help all sdcard status clean buildclean targ-ti-am64x targ-ti-j7200 targ-x86
+.PHONY: help all sdcard status clean buildclean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86
 
 all: $(DEFS) $(IMAGE_TARG)
 
@@ -132,13 +133,17 @@ endif
 status:
 	@ls -ltr .*built
 
-# Clean everything
+# Clean everything including docker image.
 clean: buildclean
 	rm -f *.ERR .*.built $(DEFS)
 	docker image rm vyos/vyos-build:$(IMGTAG) || true
 	@echo 'Cleaning up docker garbage. This could take several minutes.'
 	docker system prune -f
 
-# Clean build artifacts only
-buildclean:
+# Clean everything including build images.
+buildclean: mostlyclean
+	sudo rm -rf images
+
+# Clean build artifacts only (but not built images).
+mostlyclean:
 	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml
