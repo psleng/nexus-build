@@ -131,11 +131,10 @@ endif
 
 # View state of build
 status:
-	@ls -ltr .*built
+	@ls -ltr .*built 2> /dev/null || echo This working tree is clean
 
 # Clean everything including docker image.
 clean: buildclean
-	rm -f *.ERR .*.built $(DEFS)
 	docker image rm vyos/vyos-build:$(IMGTAG) || true
 	@echo 'Cleaning up docker garbage. This could take several minutes.'
 	docker system prune -f
@@ -146,4 +145,5 @@ buildclean: mostlyclean
 
 # Clean build artifacts only (but not built images).
 mostlyclean:
+	rm -f *.ERR .*.built $(DEFS)
 	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml
