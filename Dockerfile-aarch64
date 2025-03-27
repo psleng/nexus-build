@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2024 VyOS maintainers and contributors
+# Copyright (C) 2018-2025 VyOS maintainers and contributors
 #
 # This program is free software; you can redistribute it and/or modify
 # in order to easy exprort images built to "external" world
@@ -18,7 +18,7 @@
 
 # This Dockerfile is installable on both x86, x86-64, armhf and arm64 systems
 ARG ARCH=
-FROM ${ARCH}debian:bookworm
+FROM ${ARCH}debian:bookworm-slim
 
 RUN grep "VERSION_ID" /etc/os-release || (echo 'VERSION_ID="12"' >> /etc/os-release)
 
@@ -138,10 +138,7 @@ RUN dpkg-reconfigure ca-certificates; \
 # Installing OCAML needed to compile libvyosconfig
 RUN curl https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh \
       --output /tmp/opam_install.sh --retry 10 --retry-delay 5 && \
-    sed -i -e 's/read_tty BINDIR$/BINDIR=""/' \
-           -e 's/read_tty R$/R=""/' \
-                /tmp/opam_install.sh && \
-    sh /tmp/opam_install.sh && \
+    sed -i 's/read_tty BINDIR/BINDIR=""/' /tmp/opam_install.sh && sh /tmp/opam_install.sh && \
     opam init --root=/opt/opam --comp=${OCAML_VERSION} --disable-sandboxing --no-setup
 
 RUN eval $(opam env --root=/opt/opam --set-root) && \
@@ -157,28 +154,11 @@ RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
       fileutils \
       xml-light
 
-# Build VyConf which is required to build libvyosconfig
-# This is derived from the below and must be updated to match:
-#   https://github.com/psleng/libvyosconfig/blob/current/build.sh
-RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add vyos1x-config https://github.com/psleng/vyos1x-config.git#be576e9d9281d8b97059bba3882be8deac4f724d -y
-RUN eval $(opam env --root=/opt/opam --set-root) && \
-    opam pin add vyconf https://github.com/vyos/vyconf.git#a375860a302a224722d254c31a1cb210cb12d972 -y
-
 # Packages needed for libvyosconfig
 RUN apt-get update && apt-get install -y \
       quilt \
       libpcre3-dev \
       libffi-dev
-
-# Build libvyosconfig
-# The commit hash is normally the HEAD of:
-#   https://github.com/psleng/libvyosconfig
-RUN eval $(opam env --root=/opt/opam --set-root) && \
-    git clone https://github.com/psleng/libvyosconfig.git /tmp/libvyosconfig && \
-    cd /tmp/libvyosconfig && git checkout 37b9d177a2156df995e10d20d07774fd99b3b47e && \
-    dpkg-buildpackage -uc -us -tc -b && \
-    dpkg -i /tmp/libvyosconfig0_*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
 
 # Packages needed for open-vmdk
 RUN apt-get update && apt-get install -y \
@@ -218,7 +198,6 @@ RUN wget https://salsa.debian.org/klausenbusk-guest/debootstrap/commit/a9a603b17
     sudo dpkg -i ../debootstrap*.deb
 
 # Packages needed for Linux Kernel
-# gnupg2 is required by Jenkins for the TAR verification
 # cmake required by accel-ppp
 RUN apt-get update && apt-get install -y \
       cmake \
@@ -258,6 +237,7 @@ RUN pip install --break-system-packages \
       iproute2 \
       libzmq3-dev \
       procps \
+      protobuf-compiler \
       python3 \
       python3-setuptools \
       python3-inotify \
@@ -279,7 +259,8 @@ RUN pip install --break-system-packages \
       python3-zmq \
       pylint \
       quilt \
-      whois
+      whois \
+      python3-cracklib
 
 # Go required for telegraf and prometheus exporters build.
 # NOTE: 1.23.1 does NOT work under qemu.
@@ -293,11 +274,6 @@ RUN if [ "$ARCH" = "arm64v8" ]; then \
     rm /tmp/go${GO_VERSION_INSTALL}.linux-*.tar.gz
 
 RUN echo "export PATH=/opt/go/bin:$PATH" >> /etc/bash.bashrc
-
-# Packages needed for opennhrp
-RUN apt-get update && apt-get install -y \
-      libc-ares-dev \
-      libev-dev
 
 # Packages needed for Qemu test-suite
 # This is for now only supported on i386 and amd64 platforms
@@ -510,13 +486,8 @@ RUN sed "s/^%sudo.*/%sudo\tALL=(ALL) NOPASSWD:ALL/g" -i /etc/sudoers && \
     echo "vyos_bld\tALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     chmod a+s /usr/sbin/useradd /usr/sbin/groupadd
 
-# Ensure sure all users have access to our OCAM and Go installation
-RUN echo "$(opam env --root=/opt/opam --set-root)" >> /etc/skel/.bashrc && \
-    echo "export PATH=/opt/go/bin:\$PATH" >> /etc/skel/.bashrc && \
-    echo "export DEBEMAIL=${DEBEMAIL}" >> /etc/skel/.bashrc && \
-    echo "export EMAIL=${EMAIL}" >> /etc/skel/.bashrc && \
-    echo "export OCAML_VERSION=${OCAML_VERSION}" >> /etc/skel/.bashrc && \
-    cp -f /etc/skel/.bashrc /root/
+# Ensure sure all users have access to Go
+RUN echo "export PATH=/opt/go/bin:\$PATH" >> /etc/skel/.bashrc
 
 # Rise upper limit for UID when working in an Active Direcotry integrated
 # environment. This solves the warning: vyos_bld's uid 1632000007 outside of the
