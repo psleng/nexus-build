@@ -109,6 +109,7 @@ RUN apt-get update && apt-get install -y \
       debootstrap \
       live-build \
       gdisk \
+      sbsigntool \
       dosfstools
 
 # Packages for TPM test
@@ -263,7 +264,7 @@ RUN pip install --break-system-packages \
       python3-cracklib
 
 # Go required for telegraf and prometheus exporters build.
-# NOTE: 1.23.1 does NOT work under qemu.
+# PSL NOTE: Upstream 1.23.1 does NOT work under qemu.
 ENV GO_VERSION_INSTALL="1.22.8"
 RUN if [ "$ARCH" = "arm64v8" ]; then \
         wget -O /tmp/go${GO_VERSION_INSTALL}.linux-arm64.tar.gz https://go.dev/dl/go${GO_VERSION_INSTALL}.linux-$(dpkg-architecture -qDEB_HOST_ARCH).tar.gz ; \
