@@ -26,9 +26,15 @@ help:
 	@echo '    make targ-ti-j7200 # TI J7200 evaluation module'
 	@echo '    make targ-x86      # x86'
 	@echo
-	@echo Then type "make all".  Type "make clean" for a clean start.
-	@echo You will have to reselect the build type after doing that.
-	@echo "make mostlyclean" will clean everything except built images.
+	@echo 'Then type "make all".  Type "make clean" for a clean start.'
+	@echo 'You will have to reselect the build type after doing that.'
+	@echo
+	@echo 'There are various clean targets.  From most to least destructive:'
+	@echo
+	@echo 'make spotless       # like "make clean containerclean"'
+	@echo 'make clean          # like "make mostlyclean" but also images/'
+	@echo 'make mostlyclean    # clean build artifacts'
+	@echo 'make containerclean # remove build container image.'
 	@echo
 	@if [ -s "$(DEFS)" ]; then \
 	    echo "The current build settings ($(DEFS)) are:"; \
@@ -133,17 +139,20 @@ endif
 status:
 	@ls -ltr .*built 2> /dev/null || echo This working tree is clean
 
-# Clean everything including docker image.
-clean: buildclean
-	docker image rm vyos/vyos-build:$(IMGTAG) || true
-	@echo 'Cleaning up docker garbage. This could take several minutes.'
-	docker system prune -f
+# Clean everything including container image.
+spotless: clean containerclean
 
-# Clean everything including build images.
-buildclean: mostlyclean
+# Clean everything.
+clean: mostlyclean
 	sudo rm -rf images
 
 # Clean build artifacts only (but not built images).
 mostlyclean:
 	rm -f *.ERR .*.built $(DEFS)
 	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml
+
+# Clean the container image.  It rarely needs rebuilding.
+containerclean:
+	docker image rm vyos/vyos-build:$(IMGTAG) || true
+	@echo 'Cleaning up docker garbage. This could take several minutes.'
+	docker system prune -f
