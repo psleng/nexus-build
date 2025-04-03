@@ -29,6 +29,9 @@ help:
 	@echo 'Then type "make all".  Type "make clean" for a clean start.'
 	@echo 'You will have to reselect the build type after doing that.'
 	@echo
+	@echo 'Type "make status" to see the current state of the build'
+	@echo 'and potential build issues.'
+	@echo
 	@echo 'There are various clean targets.  From most to least destructive:'
 	@echo
 	@echo 'make spotless       # like "make clean containerclean"'
@@ -82,7 +85,7 @@ else
 	IMGTAG := latest
 endif
 
-.PHONY: help all sdcard status clean buildclean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86
+.PHONY: help all sdcard status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless
 
 all: $(DEFS) $(IMAGE_TARG)
 
@@ -136,8 +139,25 @@ else
 endif
 
 # View state of build
+#
+# The ad-hoc "error checking" below looks for possible fatal/error failures
+# ignoring ones known to be harmless.
+#
 status:
 	@ls -ltr .*built 2> /dev/null || echo This working tree is clean
+	@echo; if [ -f $(IMAGE_TARG) ]; then \
+	 echo The build appears to be complete!;\
+	 else echo The build appears INCOMPLETE; fi
+	@E=/tmp/builderrs; \
+	 for i in *.ERR; \
+	 do test -f $$i || continue; \
+	   egrep -H -n '(fatal:| error:|^\*\*\*)' $$i | \
+	   egrep -v '(Linking the executable xfrmi|libstrongswan-kernel-netlink.so is not portable|unable to read /etc/init.d/iperf3|/usr/sbin/grub-probe)' &&\
+	   echo "^^^^^^^^ WARNING: POSSIBLE ERROR FOUND IN $$i ^^^^^^^^^^^"; \
+	 done > $$E; \
+	 if [ -s $$E ]; then \
+	   echo; echo "=== WARNING: POSSIBLE BUILD ERRORS:"; cat $$E;\
+	 fi; rm -f $$E
 
 # Clean everything including container image.
 spotless: clean containerclean
