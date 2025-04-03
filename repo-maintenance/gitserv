@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# Create git repository server for testing.
+#
+
+PROG=$(basename $0)
+if [ ! -d work ]; then
+    echo "$0: No work directory.  Run ./merge-from-upstream first" >&2
+    exit 1
+fi
+
+cd work
+
+REPODIR=.REPO
+PIDFILE=$PROG.pid
+LOG=$PROG.out
+
+killdaemon()
+{
+    if [ -f "$PIDFILE" ]; then
+        echo "*** Killing git server daemon"
+        kill $(<$PIDFILE) > /dev/null 2>&1 || true
+        rm -f $PIDFILE
+        sleep 1
+    fi
+}
+
+case "$1" in
+clean)
+    echo "*** Cleaning up"
+    killdaemon
+    rm -rf $REPODIR git-daemon-export-ok $LOG
+    exit 0
+    ;;
+'')
+    ;;
+*)
+    echo Usage: "$0 [clean]" >&2
+    exit 1
+    ;;
+esac
+
+mkdir -p $REPODIR
+
+# Set up all the repos
+for repo in *
+do
+    # test $REPO = $REPODIR && continue
+    test -d $repo || continue
+
+    REPOGIT=$REPODIR/$repo.git
+    test -d $REPOGIT && continue # already here
+
+    echo "*** Copying $repo/.git to $REPOGIT ..."
+    cp -pr $repo/.git $REPOGIT
+
+    echo "*** Making $REPOGIT bare"
+    (
+        cd $REPOGIT
+        git config --bool core.bare true
+        git config --bool daemon.receivepack true
+        # git lfs install
+    )
+done
+
+# Cannot use localhost for git clone as it is mostly done in containers.
+# Try to figure out our routable address.
+IP=$(ip route show default | sed 's/.*src \([0-9.]*\) .*/\1/')
+echo
+echo "Example for cloning:"
+echo
+echo "   git clone git://$IP/vyos-build" | tee $LOG
+echo
+echo "You can hack the ../package-build-iGOS/*/package.toml files"
+echo "files mentioned in work/TODO to use that URL form"
+
+touch git-daemon-export-ok # Allow exports
+killdaemon
+git daemon --reuseaddr --export-all --base-path=$PWD --verbose --pid-file=$PIDFILE $PWD 2>&1 | tee $LOG &
