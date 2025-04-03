@@ -1,8 +1,13 @@
 #!/usr/bin/python3
 '''
-Merge from upstream on all iGOS packages.
+This supports multiple functions depending on the invoked name(see __main__).
+
+merge-from-upstream: Merge from upstream for all iGOS packages.
+tomldiff: Compare iGOS package.toml to the VyOS ones (post merge-from-upstream)
 '''
+import sys
 import os
+import textwrap
 from subprocess import run
 from pathlib import Path
 try:
@@ -14,6 +19,9 @@ except ModuleNotFoundError:
 
 # All the repository merging takes place under this directory.
 WORKDIR = 'work'
+
+# Helpful instructions
+TODO = Path(WORKDIR, 'TODO')
 
 
 def findup(targ: str) -> (Path | None):
@@ -55,6 +63,9 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
 
     print(f' I: Cloning {url} for {name}')
     run(['git', 'clone', '-q', url, workdir], check=True)
+    # commit = dpkg['commit_id']
+    # print(f' I: Checkout commit_id {commit} for {name}')
+    # run(['git', 'checkout', '-q', commit], cwd=workdir, check=True)
 
     cwd = os.getcwd()
     try:
@@ -70,9 +81,12 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
         origbranch = r.stdout.decode().strip()
 
         # Decide on the name of the upstream branch.
-        # Prefer "current" if available remotely, otherwise use existing.
+        # Use upstream_branch from toml if provided, else
+        # prefer "current" if available remotely, otherwise use existing.
         # This happens for packages like libmnl
-        branch = 'current'
+        branch = dpkg.get('upstream_branch', 'current')
+        if branch != 'current':
+            print(f' I: toml suggests {branch} as upstream branch')
         r = run(['git', 'branch', '--list', '--remotes'],
                 capture_output=True, check=True)
         if f'upstream/{branch}' not in r.stdout.decode():
@@ -106,6 +120,7 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
             exit(1)
 
         # Finally, do the merge from upstream
+        print(f' I: Merging from upstream/{branch}')
         run(['git', 'merge', '-q', '--no-commit', f'upstream/{branch}'],
             check=True)
         print(' I: Merge succeeded!')
@@ -122,6 +137,7 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
 topdir = findup('.git')
 if not topdir:
     raise FileNotFoundError('.git')
+
 topdir = topdir.parent
 
 # .defs.mk should be there
@@ -142,70 +158,190 @@ with open(defsmk) as fp:
 if not igos_pkgs:
     print(f'E: Cannot find IGOS_PKGS in {defsmk}')
     exit(1)
+igos_pkgs.sort()
 
 # The directory containing packages with package.toml files
 IGOSPATH = Path(topdir, 'package-build-iGOS')
 
-# Create the new workdir
-if Path(WORKDIR).exists():
-    print(f'E: Directory "{WORKDIR}" already exists from a previous run.')
-    print('E: Examine it and either push the changes in it or remove it.')
-    exit(1)
-os.mkdir(WORKDIR)
 
-# Try to merge from upstream all the repos listed in the packages
-workdirs = []
-for pkg in igos_pkgs:
-    print(f'\nI: Processing {pkg}')
+def do_merge() -> None:
+    '''Do the merge from upstream task'''
+    # Create the new workdir
+    if Path(WORKDIR).exists():
+        print(f'E: Directory "{WORKDIR}" already exists from a previous run.')
+        print('E: Examine it and either push the changes in it or remove it.')
+        if TODO.exists():
+            print(f'E: See the file "{TODO}" for instructions')
+        exit(1)
+    os.mkdir(WORKDIR)
 
-    pkgtoml = Path(IGOSPATH, pkg, 'package.toml')
-    if not pkgtoml.exists():
-        print(f'E: {pkgtoml} not found but is in {defsmk}!')
+    # Try to merge from upstream all the repos listed in the packages
+    workdirs = []
+    for pkg in igos_pkgs:
+        print(f'\nI: Processing {pkg}')
+
+        pkgtoml = Path(IGOSPATH, pkg, 'package.toml')
+        if not pkgtoml.exists():
+            print(f'E: {pkgtoml} not found but is in {defsmk}!')
+            exit(1)
+
+        # Parse the toml
+        toml = tomli.load(open(pkgtoml, 'rb'))
+        pkgs: dict = toml['packages']
+        for dpkg in pkgs:
+            d = merge_from_upstream(dpkg)
+            if d:
+                workdirs.append(d)
+
+    # Special case: vyos-build (does not use package.toml)
+    # Cook up what the parsed package.toml part would look like.
+    dpkg = {'name': 'vyos-build',
+            'scm_url': 'git@github.com:psleng/vyos-build',
+            'commit_id': 'psl-master'}
+    print(f'\nI: Processing {dpkg["name"]}')
+    d = merge_from_upstream(dpkg)
+    if d:
+        workdirs.append(d)
+
+    # It all worked.  Print a list of directories needing
+    # to be committed/pushed.
+    topush = []
+    for workdir in workdirs:
+        if Path(workdir, '.git', 'MERGE_HEAD').exists():
+            topush.append(workdir)
+
+    print('==============')
+    if topush:
+        # Output hopefully helpful instructions.
+        txt = f'''
+            For each, the manual procedure is:
+
+            1. "cd <targetdir>"
+            2. "git commit"
+            3. "git branch"
+            4. "git switch <psl-master or whatever the above shows>"
+            5. "git merge <current or whatever the source branch was>"
+
+            After this you should test that the build still works.
+            If all looks good you can do "push --all" in each of the above
+
+            WARNING: before doing this, make sure that VyOS actually has
+            a working daily build or you will be pulling broken code!
+
+            Look here:
+
+            \thttps://vyos.net/get/nightly-builds/
+
+            NOTE: you should then manually examine all package.toml files under
+            {IGOSPATH} to see if they have changed on the VyOS side.
+
+            \tvyos-build/scripts/package-build
+
+            The program ./tomldiff is helpful for this task.
+
+            NOTE: See also the repo-maintenance/README.md for more hints.'''
+        # Write to TODO
+        with open(TODO, 'w') as fp:
+            print(f'The following directories in {WORKDIR} need to be'
+                  'committed\nand eventually pushed via "push --all":\n',
+                  file=fp)
+            for i in topush:
+                print(f'\t{os.path.basename(i)}', file=fp)
+            print(textwrap.dedent(txt), file=fp)
+        # Echo that stdout
+        with open(TODO) as fp:
+            print(fp.read())
+        print(f'(The above info can be found in {TODO})')
+    else:
+        print('No changes needs to be committed/pushed.')
+
+
+def dodiff(diff: str, igos_toml: Path, vyos_toml: Path) -> None:
+    'Perform a diff using given tool'
+    sys.stdout.flush()
+    os.system(f'{diff} {igos_toml} {vyos_toml}')
+    sys.stdout.flush()
+
+
+def do_tomldiff() -> None:
+    '''Do a toml diff'''
+    if not Path(WORKDIR).exists():
+        print(f'ERROR: {WORKDIR} does not exist', file=sys.stderr)
+        print('You need to run ./merge-from-upstream first', file=sys.stderr)
         exit(1)
 
-    # Parse the toml
-    toml = tomli.load(open(pkgtoml, 'rb'))
-    pkgs: dict = toml['packages']
-    for dpkg in pkgs:
-        d = merge_from_upstream(dpkg)
-        if d:
-            workdirs.append(d)
+    # A bit crude.  If any argument provided, use vimdiff instead of diff
+    if len(sys.argv) > 1:
+        diff = 'vimdiff'
+    else:
+        diff = 'diff'
 
-# Special case: vyos-build (does not use package.toml)
-# Cook up what the parsed package.toml part would look like.
-dpkg = {'name': 'vyos-build',
-        'scm_url': 'git@github.com:psleng/vyos-build'}
-print(f'\nI: Processing {dpkg["name"]}')
-d = merge_from_upstream(dpkg)
-if d:
-    workdirs.append(d)
+    missingdir: list[Path] = []
+    missingtoml: list[Path] = []
+    TOML = Path('package.toml')
+    igos_path = Path('../package-build-iGOS')
+    # vyos_path = Path('../vyos-build/scripts/package-build')
+    vyos_path = Path(f'{WORKDIR}/vyos-build/scripts/package-build')
 
-# It all worked.  Print a list of directories needing to be committed/pushed.
-topush = []
-for workdir in workdirs:
-    if Path(workdir, '.git', 'MERGE_HEAD').exists():
-        topush.append(workdir)
+    # For each iGOS package, compare the package.toml with VyOS's
+    for pkg in igos_pkgs:
+        igos_toml = Path(igos_path, pkg, TOML)
+        vyos_dir = Path(vyos_path, pkg)
+        vyos_toml = Path(vyos_dir, TOML)
 
-print('==============')
-if topush:
-    print('The following directories need to be committed and pushed '
-          'via "push --all":\n')
-    for i in topush:
-        print(f'\t{i}')
+        print(f'================= {pkg}')
+        if not igos_toml.exists():
+            raise FileNotFoundError(igos_toml)
 
-    print('\nThis will bring us up to date with the VyOS upstream.')
-    print('After that, you can go into each and try merging that')
-    print('into the corresponding psleng branch.')
-    print()
-    print('WARNING: before doing this, make sure that VyOS is actually')
-    print('managing to make a daily build or you will be pulling broken code.')
-    print('Look here:')
-    print('\thttps://vyos.net/get/nightly-builds/')
-    print()
-    print('NOTE you should also manually examine all package.toml files under')
-    print(IGOSPATH, 'to see if they have changed on the corresponding')
-    print('VyOS side:')
-    print('\tvyos-build/scripts/package-build')
+        if not vyos_dir.exists():
+            missingdir.append(vyos_dir)
+            continue
 
-else:
-    print('No changes needs to be committed/pushed.')
+        if not vyos_toml.exists():
+            missingtoml.append(vyos_toml)
+            continue
+
+        dodiff(diff, igos_toml, vyos_toml)
+
+    #
+    # Special case for Dockerfile if merge-from-upstream has been done.
+    # This is not .toml, but we really do not want to miss changes here!
+    #
+    print('================= file Dockerfile-aarch64')
+    dockerfile = Path(f'{WORKDIR}/vyos-build/docker/Dockerfile')
+    if dockerfile.exists():
+        dodiff(diff, dockerfile, Path('../Dockerfile-aarch64'))
+    else:
+        print(f'(skipped because {dockerfile} missing)')
+
+    if missingdir:
+        # Probably means VyOS builds them manually on demand.
+        print()
+        print(f'The following directories are missing in {vyos_path}/')
+        print(f'but exist in {igos_path}/ so there is no package.toml')
+        print('to compare against.  It is likely that VyOS are building')
+        print('these manually via "dpkg-buildpackage -uc -us -tc -b"')
+        print()
+        for p in missingdir:
+            print(f'{p}/')
+
+    if missingtoml:
+        # VyOS has it but the build part is apparently disabled.
+        print()
+        print(f'The following package.toml files are missing in {vyos_dir}/')
+        print(f'but exist in {igos_path}/')
+        print('Should we even be building it?')
+        print()
+        for p in missingtoml:
+            print(p)
+
+
+if __name__ == '__main__':
+    prog = Path(sys.argv[0]).stem
+    if prog == 'merge-from-upstream':
+        do_merge()
+    elif prog == 'tomldiff':
+        do_tomldiff()
+    else:
+        print(f'ERROR: do not know how to do "{prog}"', file=sys.stderr)
+        exit(1)

@@ -12,6 +12,7 @@ scm_url = "https://github.com/psleng/vpp"
 scm_url_upstream = "https://github.com/FDio/vpp"
 # Skip apply patches by build.py as we use them in build_cmd
 apply_patches = false
+upstream_branch = "stable/2410"
 
 pre_build_hook = """
 mkdir -p ../patches/vpp/
