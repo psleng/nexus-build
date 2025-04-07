@@ -17,11 +17,19 @@ if [ "$BUILDTARG" != "x86_64" ]; then
 fi
 
 if docker image inspect $IMGNAME > /dev/null 2>&1; then
+    # Docker image exists, but is it up to date?
     P=$(basename $0)
-    echo "$P: $IMGNAME exists; not building again."
-    echo "$P: To force a rebuild type:"
-    echo "    docker image rm $IMGNAME"
-    exit 0
+    if $ROOTDIR/bin/checkDockerImageUptodate.py $IMGNAME Dockerfile-$(arch)
+    then
+        echo "$P: $IMGNAME exists and is up to date; skipping rebuild."
+        echo "$P: To force a rebuild type:"
+        echo "    docker image rm $IMGNAME"
+        exit 0
+    else
+        echo "$P: $IMGNAME exists but is obsolete; rebuilding."
+        docker image rm $IMGNAME
+        docker system prune -f
+    fi
 fi
 
 if [ ! -d vyos-build ]; then
