@@ -256,6 +256,7 @@ RUN pip install --break-system-packages \
       python3-netaddr \
       python3-paramiko \
       python3-passlib \
+      python3-protobuf \
       python3-tabulate \
       python3-zmq \
       pylint \
