@@ -193,15 +193,29 @@ def do_merge() -> None:
             if d:
                 workdirs.append(d)
 
-    # Special case: vyos-build (does not use package.toml)
-    # Cook up what the parsed package.toml part would look like.
-    dpkg = {'name': 'vyos-build',
-            'scm_url': 'git@github.com:psleng/vyos-build',
-            'commit_id': 'psl-master'}
-    print(f'\nI: Processing {dpkg["name"]}')
-    d = merge_from_upstream(dpkg)
-    if d:
-        workdirs.append(d)
+    # Special cases: vyos-build (does not use package.toml).
+    # Also vyos1x-config and vyconf which are explicitly referred
+    # to by libvyosconfig/build.sh .
+    #
+    # Cook up what the parsed package.toml parts would look like.
+    print('\nI: Processing extra packages')
+    extrapkgs = (
+        {'name': 'vyos-build',
+         'scm_url': 'git@github.com:psleng/vyos-build',
+         'commit_id': 'psl-master'},
+        {'name': 'vyos1x-config',
+         'scm_url': 'git@github.com:psleng/vyos1x-config',
+         'commit_id': 'psl-master'},
+        {'name': 'vyconf',
+         'scm_url': 'git@github.com:psleng/vyconf',
+         'upstream_branch': 'master',
+         'commit_id': 'psl-master'}
+    )
+    for dpkg in extrapkgs:
+        print(f'\nI: Processing {dpkg["name"]}')
+        d = merge_from_upstream(dpkg)
+        if d:
+            workdirs.append(d)
 
     # It all worked.  Print a list of directories needing
     # to be committed/pushed.
@@ -243,7 +257,7 @@ def do_merge() -> None:
         # Write to TODO
         with open(TODO, 'w') as fp:
             print(f'The following directories in {WORKDIR} need to be'
-                  'committed\nand eventually pushed via "push --all":\n',
+                  ' committed\nand eventually pushed via "push --all":\n',
                   file=fp)
             for i in topush:
                 print(f'\t{os.path.basename(i)}', file=fp)

@@ -47,6 +47,18 @@ of your Mac VM indicated above, or maybe a lab address):
 
 	# TODO HACK
 	#scm_url = "https://github.com/psleng/libvyosconfig"
-	scm_url = "git://10.10.200.53/libvyosconfig"
+	scm_url = "git://10.10.200.155/libvyosconfig"
 
 Be sure to restore the files when done.
+
+NOTE: if vyos-build has changed, there is no package.toml to hack like this.
+The easiest workaround is to simply "git clone" it using the above 10.10.x.x
+./gitserv address just before doing a "make all", because the build system
+will not try to re-clone the working tree if it already exists.
+
+NOTE: Beware that libvyosconfig/build.sh has commit hashes that VyOS changes
+every now and then.  We have to change the "vyos" to "psleng" in that
+script to get our version of the repositories.  These are referred to
+in the dict "extrapkgs" in `merge-from-upstream` .
+
+Type `./gitserv clean` to stop the server and clean things up.
