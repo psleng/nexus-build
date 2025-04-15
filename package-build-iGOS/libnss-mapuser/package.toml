@@ -3,3 +3,8 @@ name = "libnss-mapuser"
 commit_id = "psl-master"
 scm_url = "https://github.com/psleng/libnss-mapuser"
 build_cmd = "dpkg-buildpackage -uc -us -tc -b"
+
+[dependencies]
+packages = [
+    "libaudit-dev"
+]
