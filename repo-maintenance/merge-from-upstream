@@ -235,9 +235,19 @@ def do_merge() -> None:
             3. "git branch"
             4. "git switch <psl-master or whatever the above shows>"
             5. "git merge <current or whatever the source branch was>"
+            6. On merge conflicts, fix them and do "git commit"
 
             After this you should test that the build still works.
-            If all looks good you can do "push --all" in each of the above
+            If all looks good you can do "push --all" in each of the above.
+
+            To do the push you will have to edit .git/config
+            and change the url from the form:
+
+                https://github.com/psleng/XXX
+
+            to:
+
+                git@github.com:psleng/XXX
 
             WARNING: before doing this, make sure that VyOS actually has
             a working daily build or you will be pulling broken code!
@@ -253,7 +263,8 @@ def do_merge() -> None:
 
             The program ./tomldiff is helpful for this task.
 
-            NOTE: See also the repo-maintenance/README.md for more hints.'''
+            NOTE: See also the repo-maintenance/README.md for more hints,
+            such as running a local gitserver for testing before pushing.'''
         # Write to TODO
         with open(TODO, 'w') as fp:
             print(f'The following directories in {WORKDIR} need to be'

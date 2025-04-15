@@ -9,11 +9,12 @@ if [ ! -d work ]; then
     exit 1
 fi
 
-cd work
-
-REPODIR=.REPO
-PIDFILE=$PROG.pid
-LOG=$PROG.out
+# We use a copy to guarantee that we do not accidentally make changes in
+# the source "work" directory, which is what is targeted for upstream push.
+WORK=$PWD/work.copy
+REPODIR=$WORK/.REPO
+PIDFILE=$WORK/$PROG.pid
+LOG=$WORK/$PROG.out
 
 killdaemon()
 {
@@ -29,7 +30,7 @@ case "$1" in
 clean)
     echo "*** Cleaning up"
     killdaemon
-    rm -rf $REPODIR git-daemon-export-ok $LOG
+    rm -rf $REPODIR git-daemon-export-ok $LOG $WORK
     exit 0
     ;;
 '')
@@ -39,6 +40,11 @@ clean)
     exit 1
     ;;
 esac
+
+echo "*** Copying the precious work directory to $WORK..."
+rm -rf $WORK
+cp -pr work $WORK
+cd $WORK
 
 mkdir -p $REPODIR
 
@@ -51,14 +57,17 @@ do
     REPOGIT=$REPODIR/$repo.git
     test -d $REPOGIT && continue # already here
 
-    echo "*** Copying $repo/.git to $REPOGIT ..."
-    cp -pr $repo/.git $REPOGIT
-
-    echo "*** Making $REPOGIT bare"
+    #echo "*** Copying $repo/.git to $REPOGIT ..."
+    #cp -pr $repo/.git $REPOGIT
+    echo "*** Making bare copy of $repo to $REPOGIT"
     (
-        cd $REPOGIT
-        git config --bool core.bare true
+        cd $REPODIR
+        git clone --bare --no-hardlinks ../$repo
+        cd $repo.git
         git config --bool daemon.receivepack true
+        # git config --bool core.bare true
+        # # See --enable=receive-pack below
+        git config receive.denyCurrentBranch ignore
         # git lfs install
     )
 done
@@ -74,6 +83,15 @@ echo
 echo "You can hack the ../package-build-iGOS/*/package.toml files"
 echo "files mentioned in work/TODO to use that URL form"
 
+cd $REPODIR
 touch git-daemon-export-ok # Allow exports
 killdaemon
-git daemon --reuseaddr --export-all --base-path=$PWD --verbose --pid-file=$PIDFILE $PWD 2>&1 | tee $LOG &
+
+# Enable push.  This is NOT secure, but means we can push temporary hacks
+# to the $WORK/.REPO copy (git://10.x.x.x/) for the sake of test builds.
+# Such pushed changes will NOT end up at github.com/psleng since it is
+# being made to a local copy of the source "work" directory which is what
+# will actually be pushed.
+EXTRAOPTS=--enable=receive-pack
+
+git daemon --reuseaddr --export-all $EXTRAOPTS --base-path=$PWD --verbose --pid-file=$PIDFILE $PWD 2>&1 | tee $LOG &
