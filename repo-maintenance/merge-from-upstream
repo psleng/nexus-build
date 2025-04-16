@@ -8,7 +8,7 @@ tomldiff: Compare iGOS package.toml to the VyOS ones (post merge-from-upstream)
 import sys
 import os
 import textwrap
-from subprocess import run
+from subprocess import run, CompletedProcess
 from pathlib import Path
 try:
     import tomli
@@ -43,6 +43,12 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
     '''
     Do the merge from upstream work.
     '''
+    def dump(pfx: str, r: CompletedProcess) -> None:
+        '''Helper for printing process output'''
+        for i in (r.stdout, r.stderr):
+            if i:
+                sys.stdout.write(pfx + ' ' + i.decode())
+
     workdir = Path(WORKDIR, dpkg['name'])
     if os.path.exists(workdir):
         print(f' I: directory "{workdir}" already exists; skipping')
@@ -79,6 +85,7 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
         r = run(['git', 'branch', '--show-current'],
                 capture_output=True, check=True)
         origbranch = r.stdout.decode().strip()
+        print(f' I: Default branch is {origbranch}')
 
         # Decide on the name of the upstream branch.
         # Use upstream_branch from toml if provided, else
@@ -109,10 +116,14 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
         if not Path(f'.git/refs/heads/{branch}').exists():
             print(f' I: No "{branch}" branch; making it')
             r = run(['git', 'checkout', '-q',
-                     '--track', f'origin/{branch}'])
+                     '--track', f'origin/{branch}'],
+                     capture_output=True)
+            dump('  N:', r)
             if r.returncode:
-                print(f' I: Failed; falling back to {origbranch}')
-                branch = origbranch
+                branch = dpkg.get('upstream_branch', 'current')
+                print(f' I: Failed; falling back to {branch}')
+            else:
+                origbranch = branch
 
         if branch == 'psl-master':
             # No branch found
@@ -120,9 +131,10 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
             exit(1)
 
         # Finally, do the merge from upstream
-        print(f' I: Merging from upstream/{branch}')
-        run(['git', 'merge', '-q', '--no-commit', f'upstream/{branch}'],
-            check=True)
+        print(f' I: Merging from upstream/{branch} into {origbranch}')
+        r = run(['git', 'merge', '-q', '--no-commit', f'upstream/{branch}'],
+                capture_output=True, check=True)
+        dump('  N:', r)
         print(' I: Merge succeeded!')
 
     finally:
@@ -194,22 +206,25 @@ def do_merge() -> None:
                 workdirs.append(d)
 
     # Special cases: vyos-build (does not use package.toml).
+    #
     # Also vyos1x-config and vyconf which are explicitly referred
-    # to by libvyosconfig/build.sh .
+    # to by libvyosconfig/build.sh .  We use the default branch
+    # as commit_id for these so the merge happens to the correct place.
+    # The above build.sh uses a commit hash so the psl-master
+    # does not actually get used.
     #
     # Cook up what the parsed package.toml parts would look like.
-    print('\nI: Processing extra packages')
+    print('\nI: Processing extra packages (no package.toml)')
     extrapkgs = (
         {'name': 'vyos-build',
          'scm_url': 'git@github.com:psleng/vyos-build',
          'commit_id': 'psl-master'},
         {'name': 'vyos1x-config',
          'scm_url': 'git@github.com:psleng/vyos1x-config',
-         'commit_id': 'psl-master'},
+         'commit_id': 'current'},
         {'name': 'vyconf',
          'scm_url': 'git@github.com:psleng/vyconf',
-         'upstream_branch': 'master',
-         'commit_id': 'psl-master'}
+         'commit_id': 'master'}
     )
     for dpkg in extrapkgs:
         print(f'\nI: Processing {dpkg["name"]}')
@@ -239,6 +254,7 @@ def do_merge() -> None:
 
             After this you should test that the build still works.
             If all looks good you can do "push --all" in each of the above.
+            Note: You *MUST* use the "--all" flag so that all branches push!
 
             To do the push you will have to edit .git/config
             and change the url from the form:
