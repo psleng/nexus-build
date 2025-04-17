@@ -15,15 +15,17 @@ and not very reliable and should no longer be attemped.
 ### AUTOMATICALLY
 
 In a suitably prepared Debian12 VM or equivalent, type `make help`
-for instructions.  In short, you just need to say what kind of
+for instructions on selecting the targets and displaying the current
+target.  In short, you just need to say what kind of
 build you want (currently TI TMDS64EVM or generic x86).
 
 Then type `make all`.  If you get an error "`make: command not found`"
 install make via `sudo apt install make` .  A full build typically
-takes about an hour.
+takes about an hour. After a successful build, you can create a
+bootable SDcard image using the command `make sdcard`.
 
-This will effectively run all of the build steps in order
-except for the `create-sdcard.sh` (for arm64) since that is interactive,
+The `maake all` will effectively run all of the build steps in order
+except for the `create-sdcardiGOS.sh` (for arm64) since that is interactive,
 or writing the live .iso image to a USB stick (for x86).
 
 Do *not* run the make in the background, as there are occasional programs that
@@ -80,5 +82,5 @@ you must then exit to do the remaining steps.
 
 	sudo ./buildiGOSti.sh bookworm-am64xx-evm
 
-	sudo ./ti-bdebstrap/create-sdcard.sh bookworm-am64xx-evm
+	sudo ./ti-bdebstrap/create-sdcardiGOS.sh bookworm-am64xx-evm
 ```
