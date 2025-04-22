@@ -9,7 +9,6 @@ if [ "$#" -lt 2 ] || [ "$1" != "--repo" ]; then
 fi
 
 set -x
-set -e
 
 REPPREFIX_URL="$2/"
 REPO_NAME="psleng.github.io"
@@ -64,6 +63,10 @@ for file1 in $(find $dir1 -name "*.deb"); do
         filename=$(basename "$file1")
         # Extract deb package name from the file
         pkgname=`dpkg-deb -f $file1 Package`
+        if [ -z "$pkgname" ]; then
+            echo "ERROR: Cannot get package name from $file; skipping"
+            continue;
+        fi
         echo source file: $file1
         archname=`dpkg-deb -I $file1 | grep "Architecture:" | awk '{print $2}'`
         echo architecture: $archname
