@@ -47,6 +47,7 @@ fi
 # Directories to compare
 dir1="$ROOTDIR/vyos-build/packages"
 dir2="$ROOTDIR/psleng.github.io/pool/main"
+chksumdbfile="$ROOTDIR/psleng.github.io/db/checksums.db"
 # archname=`dpkg-architecture -qDEB_HOST_ARCH`
 
 # Variable to track if a difference is found
@@ -54,6 +55,10 @@ files_differ=false
 
 echo $dir1
 echo $dir2
+
+# remove the db/checksum.db file and a reprepro check to rebuild to fixup database
+rm -f $chksumdbfile
+reprepro -b $REPO_NAME check
 
 # Loop thru each .deb file in directory
 for file1 in $(find $dir1 -name "*.deb"); do
@@ -64,7 +69,7 @@ for file1 in $(find $dir1 -name "*.deb"); do
         # Extract deb package name from the file
         pkgname=`dpkg-deb -f $file1 Package`
         if [ -z "$pkgname" ]; then
-            echo "ERROR: Cannot get package name from $file; skipping"
+            echo "ERROR: Cannot get package name from $file1; skipping"
             continue;
         fi
         echo source file: $file1
@@ -85,7 +90,10 @@ for file1 in $(find $dir1 -name "*.deb"); do
                     reprepro -A $archname -b $REPO_NAME remove current $pkgname
                 fi
                 echo "Adding package: $file1 to apt repo $REPO_NAME"
-                reprepro -b $REPO_NAME includedeb current $file1
+                reprepro -b $REPO_NAME includedeb current $file1 || {
+                    echo "ERROR: cannot add $file1, giving up"
+                    exit 1
+                }
             fi
             found=true
         done
@@ -94,7 +102,10 @@ for file1 in $(find $dir1 -name "*.deb"); do
         if ! $found; then
             echo "File $filename not found in $dir2... "
             echo "Adding package: $file1 to apt repo $REPO_NAME"
-            reprepro -b $REPO_NAME includedeb current $file1
+            reprepro -b $REPO_NAME includedeb current $file1 || {
+                echo "ERROR: cannot add $file1, giving up"
+                exit 1
+            }
             files_differ=true
         fi
     fi
