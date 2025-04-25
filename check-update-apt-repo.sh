@@ -10,6 +10,8 @@ fi
 
 set -x
 
+$HOME/bin/preseed-gpg # Recache passphrases
+
 REPPREFIX_URL="$2/"
 REPO_NAME="psleng.github.io"
 REPO_URL="$2/$REPO_NAME"

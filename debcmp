@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Compare two .deb files by content and control.
+#
+# Returns nonzero if they appear to be different, else zero.
+#
 
 set -x
 set -e
@@ -19,7 +24,6 @@ pkg2_dir="debs/pkg2"
 
 # Function to clean up directories
 cleanup() {
-#  rm -rf "$pkg1_dir" "$pkg2_dir"
   rm -rf debs || true
 }
 
@@ -28,14 +32,26 @@ trap cleanup EXIT
 
 # Extract the contents of the Debian package files into directories pkg1 and pkg2
 mkdir -p debs
-dpkg-deb -x "$deb_file_1" "$pkg1_dir" || { echo "Failed to extract $deb_file_1"; exit 1; }
-dpkg-deb -x "$deb_file_2" "$pkg2_dir" || { echo "Failed to extract $deb_file_2"; exit 1; }
+dpkg-deb -x "$deb_file_1" "$pkg1_dir" || { echo "Failed to -x extract $deb_file_1"; exit 1; }
+dpkg-deb -x "$deb_file_2" "$pkg2_dir" || { echo "Failed to -x extract $deb_file_2"; exit 1; }
 
 # Perform a recursive diff on the extracted directories
 if diff -r "$pkg1_dir" "$pkg2_dir" > /dev/null; then
-  echo "No differences found."
-  exit 0
+  echo "No data differences found."
 else
-  echo "Differences found."
+  echo "Data differences found!"
+  exit 1
+fi
+
+# No differences with data portion; check the control files
+rm -rf "$pkg1_dir" "$pkg2_dir"
+dpkg-deb -e "$deb_file_1" "$pkg1_dir" || { echo "Failed to -e extract $deb_file_1"; exit 1; }
+dpkg-deb -e "$deb_file_2" "$pkg2_dir" || { echo "Failed to -e extract $deb_file_2"; exit 1; }
+
+# Perform a recursive diff on the extracted directories
+if diff -r "$pkg1_dir" "$pkg2_dir" > /dev/null; then
+  echo "No control differences found."
+else
+  echo "Control differences found!"
   exit 1
 fi
