@@ -27,7 +27,7 @@ system {
         commit-revisions "100"
     }
     console {
-        device ttyS2 {
+        device ttyS0 {
             speed 115200
         }
         device ttyS3 {
