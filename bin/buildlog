@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# Check nexus-build for evidence of failures.
+#
+
+# Set "n" in the environment to your nexus-build workdir for convenience
+test -z "$n" || cd "$n"
+
+PROG=$(basename $0)
+smso=$(tput smso)
+rmso=$(tput rmso)
+
+test -f .defs.mk || {
+    echo "$PROG: This must be run in a nexus-build working tree" >&2
+    exit 1
+}
+
+TS=typescript
+P='^(===|###|I:|E:|W:|.* - INFO - Running .* in) '
+H='====================='
+if [ -f "$TS" ]; then
+    if [ $# = 1 ]; then
+        tail -c +0 -F $TS | egrep --color "$P"
+    else
+        egrep --color "$P" $TS
+    fi
+
+    echo
+    echo $H Possible failures in $TS
+    FILES=$TS
+else
+    echo No $TS found so cannot check it for build failures.
+    echo Using .ERR and .out files instead
+    FILES='*.ERR *.out'
+fi
+
+# egrep for errors followed by removing known false positives
+cat $FILES 2> /dev/null | \
+    egrep '(fatal:| error:|^\*\*\*)' |
+    egrep -v '(Linking the executable xfrmi|libstrongswan-kernel-netlink.so is not portable|unable to read /etc/init.d/iperf3|/usr/sbin/grub-probe|bash-completion-test-subject.deb)'
+echo $H
+
+# Check for failure to eventually create .deb files as well as
+# suspiciously small ones.
+. ./.defs.mk
+for i in $IGOS_PKGS
+do
+    d=vyos-build/scripts/package-build-iGOS/$i
+    for deb in $d/*.deb
+    do
+        # Check for missing completely.
+        test -f $deb || {
+            echo "${smso}BUILD FAILURE:${rmso} $d contains no .deb files!"
+            break
+        }
+
+        # Check for suspiciously small size.
+        siz=$(stat -c %s $deb)
+        if [ "$siz" -lt 512 ]; then
+            echo "${smso}POSSIBLE BUILD FAILURE:${rmso} $deb is very small!"
+            ls -l $deb
+        fi
+    done
+done
+
+test -f .image.built || {
+    echo "$PROG: ${smso}INCOMPLETE BUILD${rmso} (.image.built not found)" >&2
+    echo "$PROG: Any diagnostics above are suspect" >&2
+}
