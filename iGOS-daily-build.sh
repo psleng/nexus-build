@@ -1,6 +1,6 @@
 #!/bin/sh
 sudo rm -rf nexus-build
-git clone https://github.com/psleng/nexus-build
+git clone -q https://github.com/psleng/nexus-build
 cd nexus-build
 
 exec > iGOS-build.out 2>&1
