@@ -158,6 +158,7 @@ status:
 	 if [ -s $$E ]; then \
 	   echo; echo "=== WARNING: POSSIBLE BUILD ERRORS:"; cat $$E;\
 	 fi; rm -f $$E
+	@echo; echo "For more details type:\n\t./bin/buildlog"
 
 # Clean everything including container image.
 spotless: clean containerclean
