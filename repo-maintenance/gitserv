@@ -27,16 +27,33 @@ killdaemon()
 }
 
 case "$1" in
-clean)
-    echo "*** Cleaning up"
+
+stop)
+    echo "*** Stopping server and cleaning up"
     killdaemon
     rm -rf $REPODIR git-daemon-export-ok $LOG $WORK
     exit 0
     ;;
+
+status)
+    if [ -f "$PIDFILE" ]; then
+        kill -0 $(cat $PIDFILE) > /dev/null 2>&1 && {
+            IP=$(ip route show default | sed 's/.*src \([0-9.]*\) .*/\1/')
+            echo "Running.  Clone via:"
+            echo "   git clone git://$IP/vyos-build"
+            echo "Logfile is $LOG"
+        }
+    else
+        echo Not running
+    fi
+    exit 0
+    ;;
+
 '')
     ;;
+
 *)
-    echo Usage: "$0 [clean]" >&2
+    echo Usage: "$0 [stop|status]" >&2
     exit 1
     ;;
 esac
@@ -62,13 +79,14 @@ do
     echo "*** Making bare copy of $repo to $REPOGIT"
     (
         cd $REPODIR
-        git clone --bare --no-hardlinks ../$repo
+        git clone --mirror --no-hardlinks ../$repo
         cd $repo.git
         git config --bool daemon.receivepack true
         # git config --bool core.bare true
         # # See --enable=receive-pack below
         git config receive.denyCurrentBranch ignore
         # git lfs install
+        git fetch --all
     )
 done
 

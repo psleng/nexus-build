@@ -61,4 +61,4 @@ every now and then.  We have to change the "vyos" to "psleng" in that
 script to get our version of the repositories.  These are referred to
 in the dict "extrapkgs" in `merge-from-upstream` .
 
-Type `./gitserv clean` to stop the server and clean things up.
+Type `./gitserv stop` to stop the server and clean things up.
