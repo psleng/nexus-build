@@ -92,7 +92,8 @@ if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
     # Symlink everything to the vyos-build/packages directory
-    for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")
+    for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")\
+             $ROOTDIR/ti-bdebstrap/*.deb
     do
         case "$a" in
         *libsnmp-dev_*64.deb)  # Needed for frr (despite -dev_ pattern)
@@ -112,6 +113,7 @@ if [ ! -f "$BLT" ]; then
             ;;
         esac
 
+        test -f "$a" || continue
         echo "Symlinking package: $a"
         ln -vrfs $a $ROOTDIR/vyos-build/packages/
     done
