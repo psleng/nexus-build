@@ -61,4 +61,9 @@ every now and then.  We have to change the "vyos" to "psleng" in that
 script to get our version of the repositories.  These are referred to
 in the dict "extrapkgs" in `merge-from-upstream` .
 
+If you are using ./gitserv for test building you can can check out a
+copy of libvyosconfig somewhere using the local git:// URL, hack the
+build.sh to refer to that local URL instead of the github one,
+check that in and push it (which will go to the local test repo only).
+
 Type `./gitserv stop` to stop the server and clean things up.

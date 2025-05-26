@@ -76,6 +76,12 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
     cwd = os.getcwd()
     try:
         os.chdir(workdir)
+
+        # In case of submodules
+        print(' I: Setting up submodules')
+        run(['git', 'submodule', 'init'])
+        run(['git', 'submodule', 'update'])
+
         # Add the corresponding upstream, defaulting to vyos
         upstream = dpkg.get('scm_url_upstream',
                             f'https://github.com/vyos/{name}.git')
@@ -117,7 +123,7 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
             print(f' I: No "{branch}" branch; making it')
             r = run(['git', 'checkout', '-q',
                      '--track', f'origin/{branch}'],
-                     capture_output=True)
+                    capture_output=True)
             dump('  N:', r)
             if r.returncode:
                 branch = dpkg.get('upstream_branch', 'current')
@@ -253,7 +259,7 @@ def do_merge() -> None:
             6. On merge conflicts, fix them and do "git commit"
 
             After this you should test that the build still works.
-            If all looks good you can do "push --all" in each of the above.
+            If all looks good you can do "git push --all" in each of the above.
             Note: You *MUST* use the "--all" flag so that all branches push!
 
             To do the push you will have to edit .git/config
@@ -284,7 +290,7 @@ def do_merge() -> None:
         # Write to TODO
         with open(TODO, 'w') as fp:
             print(f'The following directories in {WORKDIR} need to be'
-                  ' committed\nand eventually pushed via "push --all":\n',
+                  ' committed\nand eventually pushed via "git push --all":\n',
                   file=fp)
             for i in topush:
                 print(f'\t{os.path.basename(i)}', file=fp)
