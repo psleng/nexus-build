@@ -18,4 +18,4 @@ fi
 # Set up links to TI files and do some modifications
 $TI/PSL-mklinks $(pwd) || { exit $?; }
 
-exec sudo $TI/buildiGOSti2.sh "$1"
+exec sudo $TI/buildiGOSti2.sh "$@"

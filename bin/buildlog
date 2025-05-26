@@ -15,24 +15,51 @@ test -f .defs.mk || {
     exit 1
 }
 
-TS=typescript
-P='^(===|###|I:|E:|W:|.* - INFO - Running .* in) '
+# "Progress" patterns during build.
+P='^(===|###|E:|W:|.* - INFO - Running .* in) '
+# Noise to ignore in the above.
+PIGN='^(W: analyze_copyright|E: Module .* is not signed!)'
 H='====================='
+
+TS=typescript
 if [ -f "$TS" ]; then
+    # Ensure we are not running under script because egrep of typescript
+    # will add matching lines to typescript itself and never finish.
+    ARGS="$@"
+    pid=$$
+    while test $pid != 1
+    do
+        exe=/proc/$pid/exe
+        test -f "$exe" || break
+        if expr $(readlink $exe) : '.*/script' > /dev/null; then
+            echo "$PROG: You seem to be running this under 'script'" >&2
+            echo "$PROG: This will cause breakage.  Use another window." >&2
+            exit 1
+        fi
+        set -- $(cat /proc/$pid/stat)
+        pid="$4"  # ppid
+    done
+    set -- $ARGS
+
+    # Show build progress log, with live tail if an arg given
     if [ $# = 1 ]; then
-        tail -c +0 -F $TS | egrep --color "$P"
+        tail -c +0 -F $TS | egrep -v "$PIGN" | egrep --color=always "$P"
     else
-        egrep --color "$P" $TS
+        egrep -v "$PIGN" $TS | egrep --color=always "$P"
     fi
 
-    echo
-    echo $H Possible failures in $TS
     FILES=$TS
 else
-    echo No $TS found so cannot check it for build failures.
-    echo Using .ERR and .out files instead
     FILES='*.ERR *.out'
+    echo "No $TS found so cannot check it for progress or build failures."
+    echo "Using $FILES instead."
+
+    # Show build progress log
+    cat $FILES 2> /dev/null | egrep -v "$PIGN" | egrep --color=always "$P"
 fi
+
+echo
+echo "$H Possible failures in $FILES"
 
 # egrep for errors followed by removing known false positives
 cat $FILES 2> /dev/null | \

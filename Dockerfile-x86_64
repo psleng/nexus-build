@@ -89,7 +89,8 @@ RUN apt-get update && apt-get install -y \
       openssh-client \
       jq \
       less \
-      socat
+      socat \
+      python-is-python3
 
 # Packages needed for vyos-build
 RUN apt-get update && apt-get install -y \
@@ -125,9 +126,11 @@ RUN if dpkg-architecture -ii386 || dpkg-architecture -iamd64; then \
 
 # Building libvyosconf requires a full configured OPAM/OCaml setup
 RUN apt-get update && apt-get install -y \
+      quilt \
       debhelper \
       libffi-dev \
       libpcre3-dev \
+      libpcre2-dev \
       unzip
 
 # Update certificate store to not crash ocaml package install
@@ -151,6 +154,7 @@ RUN eval $(opam env --root=/opt/opam --set-root) && \
 
 RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
       re \
+      pcre2 \
       num \
       ctypes \
       ctypes-foreign \
@@ -255,11 +259,13 @@ RUN pip install --break-system-packages \
       git+https://github.com/aristanetworks/j2lint.git@341b5d5db86 \
       pyhumps==3.8.0 && \
     apt-get update && apt-get install -y \
+      build-essential \
       dh-python \
       fakeroot \
       iproute2 \
       libzmq3-dev \
       procps \
+      protobuf-compiler \
       python3 \
       python3-setuptools \
       python3-inotify \
@@ -277,11 +283,13 @@ RUN pip install --break-system-packages \
       python3-netaddr \
       python3-paramiko \
       python3-passlib \
+      python3-protobuf \
       python3-tabulate \
       python3-zmq \
       pylint \
       quilt \
-      whois
+      whois \
+      python3-cracklib
 
 # Go required for telegraf and prometheus exporters build.
 # NOTE: 1.23.1 does NOT work under qemu.

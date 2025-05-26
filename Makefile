@@ -16,6 +16,7 @@ DEFS := .defs.mk
 # Quasi targets
 CONT_TARG     = .cont.built
 KERNEL_TARG   = .kernel.built
+UBOOT_TARG    = .uboot.built
 FS_TARG       = .filesystem.built
 IMAGE_TARG    = .image.built
 
@@ -107,8 +108,12 @@ $(CONT_TARG):
 $(KERNEL_TARG): $(CONT_TARG)
 	@$(call DOCKRUN,kernel,./build_iGOS_TMDS64EVM_kernel.sh)
 
+# Build u-boot (vyos-build/packages/u-boot_*.deb)
+$(UBOOT_TARG): $(KERNEL_TARG)
+	@$(call DOCKRUN,$@,./buildiGOSti.sh $(BUILDTYPE) --ubootonly)
+
 # Build the root filesystem
-$(FS_TARG): $(KERNEL_TARG)
+$(FS_TARG): $(UBOOT_TARG)
 	@$(call DOCKRUN,filesystem,./build_iGOS_TMDS64EVM_fs.sh)
 
 # Create a uSDcard image
@@ -158,6 +163,7 @@ status:
 	 if [ -s $$E ]; then \
 	   echo; echo "=== WARNING: POSSIBLE BUILD ERRORS:"; cat $$E;\
 	 fi; rm -f $$E
+	@echo; echo "For more details type:\n\t./bin/buildlog"
 
 # Clean everything including container image.
 spotless: clean containerclean
