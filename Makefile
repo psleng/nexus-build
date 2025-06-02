@@ -110,7 +110,12 @@ $(KERNEL_TARG): $(CONT_TARG)
 
 # Build u-boot (vyos-build/packages/u-boot_*.deb)
 $(UBOOT_TARG): $(KERNEL_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+	@touch $@
+else
 	@$(call DOCKRUN,$@,./buildiGOSti.sh $(BUILDTYPE) --ubootonly)
+endif
 
 # Build the root filesystem
 $(FS_TARG): $(UBOOT_TARG)
@@ -122,6 +127,7 @@ ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
 	@echo "### The final .iso image should be here:"
 	@ISO=vyos-build/build/live-image-$(ARCH).hybrid.iso; if [ -f $$ISO ]; then ls -l `realpath $$ISO`; else echo "Error: $$ISO not found!"; fi
+	@touch $@
 else
 	@echo '### Making uSDcard image'
 # This invalid directory sometimes appears breaking git ops on build
@@ -153,16 +159,6 @@ status:
 	@echo; if [ -f $(IMAGE_TARG) ]; then \
 	 echo The build appears to be complete!;\
 	 else echo The build appears INCOMPLETE; fi
-	@E=/tmp/builderrs; \
-	 for i in *.ERR; \
-	 do test -f $$i || continue; \
-	   egrep -H -n '(fatal:| error:|^\*\*\*)' $$i | \
-	   egrep -v '(Linking the executable xfrmi|libstrongswan-kernel-netlink.so is not portable|unable to read /etc/init.d/iperf3|/usr/sbin/grub-probe)' &&\
-	   echo "^^^^^^^^ WARNING: POSSIBLE ERROR FOUND IN $$i ^^^^^^^^^^^"; \
-	 done > $$E; \
-	 if [ -s $$E ]; then \
-	   echo; echo "=== WARNING: POSSIBLE BUILD ERRORS:"; cat $$E;\
-	 fi; rm -f $$E
 	@echo; echo "For more details type:\n\t./bin/buildlog"
 
 # Clean everything including container image.
