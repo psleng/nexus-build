@@ -732,7 +732,7 @@ diff -ur linux-6.6.69ori/drivers/tty/tty_port.c linux-6.6.69/drivers/tty/tty_por
 +// Perle end for trueport
 +            if (C_BAUD(tty))
 +            {
-+                tty_port_raise_dtr_rts(port);
++             //   tty_port_raise_dtr_rts(port);
 +            }
 +// Perle start for trueport
 +        }
@@ -1305,6 +1305,19 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
  
  #define ASYNC_FLAGS		((1U << (ASYNCB_LAST_USER + 1)) - 1)
  #define ASYNC_DEPRECATED	(ASYNC_SPLIT_TERMIOS | ASYNC_SESSION_LOCKOUT | \
+
+--- linux-6.6.92/drivers/Makefile	2025-05-22 08:12:26.000000000 -0400
++++ linux-6.6.92changed/drivers/Makefile	2025-06-13 18:36:54.070115970 -0400
+@@ -11,6 +11,8 @@
+ MAKEFLAGS += --include-dir=$(srctree)
+ endif
+ 
++obj-y += perle/
++
+ obj-y				+= cache/
+ obj-y				+= irqchip/
+ obj-y				+= bus/
+
 --- /dev/null	2025-01-15 10:22:07.042000000 -0500
 +++ linux-6.6.69/include/linux/perle_serial.h	2025-01-15 14:20:16.206917130 -0500
 @@ -0,0 +1,31 @@
@@ -1339,18 +1352,607 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +#endif  // _LINUX_PERLE_SERIAL_H
 +
+
 --- /dev/null	2025-02-19 10:39:48.396000000 -0500
-+++ linux-6.6.69/drivers/tty/serial/8250/8250_perleomap.c	2025-02-19 15:05:49.622034812 -0500
-@@ -0,0 +1,4030 @@
-+// SPDX-License-Identifier: GPL-2.0
++++ linux-6.6.69/drivers/char/fanout.c	2025-02-19 15:18:41.776654822 -0500
+@@ -0,0 +1,409 @@
 +/*
-+ * 8250-core based driver for the OMAP internal UART
-+ *
-+ * based on omap-serial.c, Copyright (C) 2010 Texas Instruments.
-+ *
-+ * Copyright (C) 2014 Sebastian Andrzej Siewior
++ *  fanout.c:  A one-to-many multiplexer
 + *
 + */
++//#define FANOUT_IOC_MAGIC    'k'
++//#define FANOUT_IOCT_FLUSH     _IO(FANOUT_IOC_MAGIC, 0x80)
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/fs.h>
++#include <linux/poll.h>
++#include <linux/cdev.h>
++#include <linux/slab.h>
++#include <asm/uaccess.h>
++#include <asm/ioctls.h>
++#include <linux/sched.h>
++#include <linux/wait.h>
++//#include <linux/devfs_fs_kernel.h>
++
++// this function was removed from include /asm-arm/semaphore.c in kernel 2.6
++// define it here so we don't need to change the code
++static inline void init_MUTEX(struct semaphore *sem)
++{
++    sema_init(sem, 1);
++}
++
++
++/* Limits and other defines */
++	/* The # fanout devices.  Max minor # is one less than this */
++#ifdef CONFIG_FANOUT_NUM_DEVS
++#define NUM_FO_DEVS CONFIG_FANOUT_NUM_DEVS
++#else
++#define NUM_FO_DEVS 49
++#endif
++#define DEVNAME "fanout"
++
++
++
++/* Data structure definitions */
++	/* This data structure describes one fanout device.  There
++	 * is one of these for each instance (minor #) of fanout */
++struct fo {
++	int	minor;		/* minor number of this fanout instance */
++	char   *buf;		/* points to circular buffer */
++	int	indx;		/* where to put next char recv'd */
++	loff_t	count;		/* number chars received */
++    loff_t  read_offset;    // offset of where to start reading for new opens
++                            // the app must make an IOCTL(FANOUT_IOCT_READMARK) to set this to f_pos
++	wait_queue_head_t waitq; /* readers wait on this queue */
++	struct semaphore wlock;	/* write lock to keep buf/indx sane */
++};
++
++
++
++/*  Function prototypes.  */
++int fanout_init(void);
++void fanout_exit(void);
++static int fanout_open(struct inode *, struct file *);
++static int fanout_release(struct inode *, struct file *);
++static ssize_t fanout_read(struct file *, char *, size_t, loff_t *);
++static ssize_t fanout_write(struct file *, const char *, size_t, loff_t *);
++static unsigned int fanout_poll(struct file *, poll_table *);
++static long fanout_ioctl(struct file *, unsigned int, unsigned long);
++
++
++
++/* Global variables */
++#ifdef CONFIG_FANOUT_BUF_SZ
++static int buf_sz = CONFIG_FANOUT_BUF_SZ;		/* Size of the circular buffer */
++#else
++static int buf_sz = 16384;		/* Size of the circular buffer */
++#endif
++	/* Debuglvl controls whether a printk is executed
++	 * 	0 = no printk at all
++	 *	1 = printk on error only
++	 *	2 = printk on errors and on init/remove
++	 *	3 = debug prink to trace calls into fanout
++	 *	4 = debug trace inside of fanout calls */
++     
++#ifdef CONFIG_FANOUT_DEBUG_LVL
++static int debuglvl = CONFIG_FANOUT_DEBUG_LVL;		/* printk verbosity */
++#else
++static int debuglvl = 2;		/* printk verbosity */
++#endif
++
++static int debugec = 0;
++
++#ifdef CONFIG_FANOUT_MAJOR_DEV
++static int devmajor = CONFIG_FANOUT_MAJOR_DEV;        // 0 measn dynamically assign one
++#else
++static int devmajor = 0;        // 0 measn dynamically assign one
++#endif
++
++struct fo fodevs[NUM_FO_DEVS];		/* fanout devices */
++struct cdev fo_cdev;
++dev_t fo_devt;
++
++static struct file_operations fanout_fops = {
++	.owner = THIS_MODULE,
++	.read = fanout_read,
++	.open = fanout_open,
++	.write = fanout_write,
++    .unlocked_ioctl = fanout_ioctl,
++	.poll = fanout_poll,
++	.release = fanout_release
++};
++
++
++
++/* Module description and macros */
++MODULE_DESCRIPTION("A device to replicate input on all outputs");
++MODULE_AUTHOR("Bob Smith");
++MODULE_LICENSE("GPL");
++module_param(buf_sz, int, S_IRUSR);
++MODULE_PARM_DESC(buf_sz, "Size of each circular buffer.  Def=16k");
++module_param(debuglvl, int, S_IRUSR);
++MODULE_PARM_DESC(debuglvl, "Debug level. Higher=verbose. Def=2");
++module_param(devmajor, int, S_IRUSR);
++MODULE_PARM_DESC(devmajor, "Device major number Def=dynamic");
++module_init(fanout_init);
++module_exit(fanout_exit);
++
++
++
++int fanout_init(void)
++{
++	int i, err;
++
++printk("%s %d %d\n", __FUNCTION__,__LINE__,NUM_FO_DEVS);
++	for (i = 0; i < NUM_FO_DEVS; i++) {
++		fodevs[i].minor = i;
++		fodevs[i].buf = (char *) 0;
++		fodevs[i].indx = 0;
++		fodevs[i].count = 0;
++        fodevs[i].read_offset = 0;
++		init_waitqueue_head(&fodevs[i].waitq);
++		init_MUTEX(&fodevs[i].wlock);
++	}
++printk("%s %d %d\n", __FUNCTION__,__LINE__,devmajor);
++    if (devmajor==0)
++    {
++        err = alloc_chrdev_region(&fo_devt, 0, NUM_FO_DEVS, DEVNAME);
++    }
++    else
++    {
++        fo_devt = MKDEV(devmajor, 0);
++        err = register_chrdev_region(fo_devt, NUM_FO_DEVS, DEVNAME);
++    }
++    if (err < 0) {
++        if (debuglvl >= 1) {
++            printk(KERN_ALERT "fanout-%d: init fails. err=%d\n", debugec++,err);
++        }
++        return err;
++    }
++    devmajor = MAJOR(fo_devt);
++	cdev_init(&fo_cdev, &fanout_fops);
++	kobject_set_name(&(fo_cdev.kobj), "fanout%d", fo_devt);
++
++	err = cdev_add(&fo_cdev, fo_devt, NUM_FO_DEVS);
++	if (err < 0) {
++		if (debuglvl >= 1) {
++			printk(KERN_ALERT "fanout-%d: init fails. err=%d\n", debugec++, err);
++		}
++		return err;
++	}
++
++	if (debuglvl >= 2) {
++		printk(KERN_INFO "fanout-%d: Installed, Device Major=%d, buf_sz=%d, debuglvl=%d\n",debugec++,devmajor,buf_sz,debuglvl);
++	}
++
++	return 0;  /* success */
++}
++
++
++void fanout_exit(void)
++{
++	int i;
++
++	for (i = 0; i < NUM_FO_DEVS; i++) {
++		if (fodevs[i].buf) {
++			kfree(fodevs[i].buf);
++		}
++	}
++
++	cdev_del(&fo_cdev);
++	unregister_chrdev_region(fo_devt, NUM_FO_DEVS);
++
++	if (debuglvl >= 2) {
++		printk(KERN_INFO "fanout-%d: Uninstalled\n",debugec++);
++	}
++}
++
++
++static int fanout_open(struct inode *inode, struct file *filp)
++{
++	int mnr = iminor(inode);
++	struct fo *fodp = &fodevs[mnr];
++
++	if (debuglvl >= 3) {
++		printk(KERN_DEBUG "fanout-%d open. Minor#=%d\n", debugec++, mnr);
++	}
++
++	if (!fodp->buf) {
++		fodp->buf = kmalloc(buf_sz, GFP_KERNEL);
++		if (debuglvl >= 3) {
++			printk(KERN_DEBUG "fanout-%d: Got memory for minor=%d\n",
++					debugec++,mnr);
++		}
++		if (!fodp->buf) {
++			if (debuglvl >= 1) {
++				printk(KERN_ALERT "fanout-%d: No memory dev=%d\n",
++						debugec++, mnr);
++			}
++			return -ENOMEM;
++		}
++	}
++
++	/* store which fanout device in the file's private data */
++	filp->private_data = (void *) fodp;
++
++	/* set the current start of file */
++	filp->f_pos = fodp->count;
++    if (filp->f_mode & FMODE_READ)
++    {
++        if (fodp->read_offset == 0)
++        {
++            if (fodp->count > buf_sz)
++            {
++                filp->f_pos=fodp->count-buf_sz;
++            }
++            else
++            {
++                filp->f_pos=0;
++            }
++        }
++        else
++        {
++            filp->f_pos=fodp->read_offset;
++        }
++    }
++
++	return 0;	/* success */
++}
++
++static int fanout_release(struct inode *inode, struct file *filp)
++{
++	if (debuglvl >= 3) {
++		printk(KERN_DEBUG "fanout-%d close. Minor#=%d\n", debugec++,
++			((struct fo *)filp->private_data)->minor);
++	}
++
++	return 0;	/* success */
++}
++
++
++
++static ssize_t fanout_read( struct file *filp, char *buff, size_t len,
++	loff_t * offset)
++{
++	int ret, xfer;			/* num bytes read from fanout buf */
++	int cpcnt, cpstrt;		/* cp count and start location */
++
++	struct fo *fodp = (struct fo *)filp->private_data;
++
++	if (debuglvl >= 3) {
++		printk(KERN_DEBUG "fanout-%d: read %d char from dev%d, off=%d f_pos=%d count=%d\n",debugec++,
++			len, fodp->minor, (int)*offset,(int)filp->f_pos,(int)fodp->count);
++        printk(KERN_DEBUG "fanout-%d read fmode=%x\n", debugec++, filp->f_mode);
++	}
++
++	/* Verify that data requested is in the buffer or is next byte */
++	xfer = fodp->count - *offset;
++	if ((xfer > buf_sz) || (xfer < 0)) {
++        fodp->read_offset=0;
++		return -EPIPE;
++	}
++
++	/* Wait here until new data is available */
++	if (*offset == fodp->count) {
++		wait_event_interruptible(fodp->waitq, *offset != fodp->count);
++	}
++
++	/* Copy the data out to the user */
++	xfer = fodp->count - *offset;
++    cpstrt=fodp->indx-xfer;
++    if (cpstrt < 0)
++    {
++        cpstrt+=buf_sz;
++    }
++	ret = xfer = (len < xfer) ? len : xfer;
++	while (xfer) {
++        cpcnt=buf_sz-cpstrt;
++        cpcnt=(cpcnt < xfer) ? cpcnt : xfer;
++
++		if (copy_to_user(buff, fodp->buf + cpstrt, cpcnt) ) {
++			return -EFAULT;
++		}
++		buff += cpcnt;
++		xfer -= cpcnt;
++        cpstrt += cpcnt;
++        cpstrt = (cpstrt == buf_sz) ? 0 : cpstrt;
++	};
++
++	/* We may have slept during the above copy_to_user() and more
++	 * data may have been added while we slept.  Do a sanity check
++	 * to make sure the buffer did not wrap while we slept. */
++	if (fodp->count - *offset > buf_sz) {
++        fodp->read_offset=0;
++		return -EPIPE;
++	}
++
++	*offset += ret;
++
++	return ret;
++}
++
++
++static ssize_t
++fanout_write(struct file *filp, const char *buff, size_t len, loff_t * off)
++{
++	int ret, xfer;		/* num bytes to read from user */
++	int cpcnt;		/* num bytes in a copy */
++
++	struct fo *fodp = (struct fo *)filp->private_data;
++
++	if (debuglvl >= 3) {
++		printk(KERN_DEBUG "fanout-%d: write %d char to dev%d, off=%d\n", debugec++,
++			len, fodp->minor, (int)*off);
++        printk(KERN_DEBUG "fanout-%d write fmode=%x\n", debugec++, filp->f_mode);
++	}
++
++	/* Copy at most one-quarter of the circular buffer size.  This
++	 * gives readers more of a chance to wake up and get some data */
++//	ret = xfer = (len > (buf_sz / 4)) ? (buf_sz / 4) : len;
++	ret = xfer = len;
++
++	if (down_interruptible(&fodp->wlock)) {
++		return -ERESTARTSYS;
++	}
++
++	while (xfer) {
++		cpcnt = buf_sz - fodp->indx;
++		cpcnt = (cpcnt < xfer) ? cpcnt : xfer;
++
++		/* Don't we need a lock of some kind here ? */
++		if (copy_from_user(fodp->buf + fodp->indx, buff, cpcnt) ) {
++			up(&fodp->wlock);
++			return -EFAULT;
++		}
++		fodp->indx += cpcnt;
++		fodp->indx = (fodp->indx == buf_sz) ? 0 : fodp->indx;
++		xfer -= cpcnt;
++		buff += cpcnt;
++	}
++	fodp->count += ret;
++	up(&fodp->wlock);
++
++	/* This is what the readers have been waiting for */
++	wake_up_interruptible(&(fodp->waitq));
++
++	return ret;
++}
++
++
++static unsigned int fanout_poll(struct file *filp, poll_table *ppt)
++{
++	/* The circular buffer is always available for writing */
++	int ready_mask = POLLOUT | POLLWRNORM;
++
++	struct fo *fodp = (struct fo *)filp->private_data;
++
++	poll_wait(filp, &fodp->waitq, ppt);
++
++	if (filp->f_pos != fodp->count) {
++		ready_mask = (POLLIN | POLLRDNORM);
++	}
++
++	if (debuglvl >= 3) {
++		printk(KERN_DEBUG "fanout-%d: poll returns 0x%x\n", debugec++, ready_mask);
++	}
++
++	return ready_mask;
++}
++
++static long fanout_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
++{
++    struct fo *fodp = (struct fo *)filp->private_data;
++    
++    if (debuglvl >= 3) {
++        printk(KERN_DEBUG "fanout-%d: ioctl cmd=%x %x\n", debugec++,cmd,FANOUT_IOCT_FLUSH);
++    }
++    switch(cmd)
++    {
++        case FANOUT_IOCT_FLUSH:
++            fodp->indx=0;
++            fodp->count=0;
++            fodp->read_offset=0;
++            wake_up_interruptible(&(fodp->waitq));  // wake up readers
++            return(0);
++            
++        case FANOUT_IOCT_READMARK:
++            fodp->read_offset=filp->f_pos;
++            return(0);
++            
++        default:
++            return(-EINVAL);
++    }
++}
++
+
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/drivers/perle/perle_info.c	2025-06-16 12:10:23.445945793 -0400
+@@ -0,0 +1,153 @@
++/*
++ * read led, header info, switch status
++ * write led.
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/proc_fs.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++#include <linux/i2c.h>
++#include <linux/delay.h>
++
++#include <linux/ctype.h>
++#include <linux/of.h>
++
++#define MODULE_VERSION_STR "3.1"
++#define MODULE_NAME "perle"
++
++static struct proc_dir_entry *perle_dir;
++
++char procSigScan[256];	// one for each port
++
++static ssize_t proc_read_signal_scan(struct file *file, char __user *buf, size_t size, loff_t *ppos)
++{
++    int len;
++    
++    if (*ppos==0)
++    {
++        /* fill the buffer, return the buffer size */
++        if(copy_to_user(buf, procSigScan, sizeof(procSigScan)))
++			return -EFAULT;
++        len = sizeof(procSigScan);
++        *ppos=len;
++    }
++    else
++    {
++        len=0;
++    }
++    return len;
++}
++
++/*
++    currently does nothing
++*/
++static ssize_t proc_write_signal_scan(struct file *file, const char __user *buf, size_t size, loff_t *ppos)
++{
++    return(size);
++}
++
++static const struct proc_ops signal_scan_fops = {
++    // .owner = THIS_MODULE,
++    .proc_read  = proc_read_signal_scan,
++    .proc_write = proc_write_signal_scan,
++};
++
++typedef struct
++{
++    const char *filename;
++    const struct proc_ops *fops;
++} proc_file_table_t;
++
++
++proc_file_table_t proc_file_table[]={
++/*************************** COMMON ******************************/
++        {"signal_scan",                     &signal_scan_fops},
++        {NULL,NULL},
++};
++
++static int __init init_procfs_perle(void)
++{
++    struct proc_dir_entry *proc_file;
++    int rv = 0;
++    int i;
++    
++    /* create directory */
++    perle_dir = proc_mkdir(MODULE_NAME, NULL);
++    if(perle_dir == NULL)
++    {
++        rv = -ENOMEM;
++    }
++    else
++    {
++        for (i=0;proc_file_table[i].filename!=NULL;i++)
++        {
++            proc_file = proc_create(proc_file_table[i].filename,0644, perle_dir,proc_file_table[i].fops);
++            if(proc_file == NULL)
++            {
++                rv  = -ENOMEM;
++                break;
++            }
++        }
++
++        if (rv!=0)
++        {
++            /*
++             * an error occurred creating the last proc file
++             * start removing the proc files at the previous one
++             */
++            for (i--;i>0;i--)
++            {
++                remove_proc_entry(proc_file_table[i].filename, perle_dir);
++            }
++            remove_proc_entry(MODULE_NAME, NULL);   // now remove the /proc/perle directory
++            return rv;
++        }
++        else
++        {
++// #ifdef CONFIG_PERLE_X86_HARDWARE
++// 			if(bdinfoLen == 0)
++// 				printk(KERN_INFO "%s %s BDINFO missing?\n",
++// 						MODULE_NAME, MODULE_VERSION_STR);				
++// #else
++// 			printk(KERN_INFO "%s %s BDINFO initialising\n",
++//                    MODULE_NAME, MODULE_VERSION_STR);
++//             bdinfoInit();
++// #endif      
++            /* everything OK */
++            printk(KERN_INFO "%s %s initialised\n",
++                   MODULE_NAME, MODULE_VERSION_STR);
++        }
++    }
++    return(rv);
++}
++
++
++static void __exit cleanup_procfs_perle(void)
++{
++    int i;
++    for (i=0;proc_file_table[i].filename!=NULL;i++)
++    {
++        remove_proc_entry(proc_file_table[i].filename, perle_dir);
++    }
++	remove_proc_entry(MODULE_NAME, NULL);
++	printk(KERN_INFO "%s %s removed\n",
++	       MODULE_NAME, MODULE_VERSION_STR);
++}
++
++//late_initcall(init_i2c_hardware);
++
++
++
++
++module_init(init_procfs_perle);
++module_exit(cleanup_procfs_perle);
++
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("perle");
++MODULE_DESCRIPTION("procfs for perle console server");
++
+
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/drivers/perle/Makefile	2025-06-13 17:18:11.417730200 -0400
+@@ -0,0 +1,7 @@
++#
++# Makefile for iolan driver
++#
++obj-y	+= perle_info.o
++#include $(TOPDIR)/Rules.make
++
++
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/drivers/perle/Kconfig	2025-06-13 18:22:45.653940253 -0400
+@@ -0,0 +1,4 @@
++config CONFIG_PERLE_HARDWARE
++    tristate "Perle sig scan"
++    default y
++
+
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/drivers/tty/serial/8250/8250_perleomap.c	2025-06-13 17:20:55.400653557 -0400
+@@ -0,0 +1,4194 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++* 8250-core based driver for the OMAP internal UART
++*
++* based on omap-serial.c, Copyright (C) 2010 Texas Instruments.
++*
++* Copyright (C) 2014 Sebastian Andrzej Siewior
++*
++*/
 +
 +#include <linux/clk.h>
 +#include <linux/device.h>
@@ -1393,9 +1995,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +#define OMAP_UART_WER_HAS_TX_WAKEUP    (1 << 1)
 +#define OMAP_DMA_TX_KICK        (1 << 2)
 +/*
-+ * See Advisory 21 in AM437x errata SPRZ408B, updated April 2015.
-+ * The same errata is applicable to AM335x and DRA7x processors too.
-+ */
++* See Advisory 21 in AM437x errata SPRZ408B, updated April 2015.
++* The same errata is applicable to AM335x and DRA7x processors too.
++*/
 +#define UART_ERRATA_CLOCK_DISABLE    (1 << 3)
 +#define    UART_HAS_EFR2            BIT(4)
 +#define UART_HAS_RHR_IT_DIS        BIT(5)
@@ -1515,8 +2117,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +#define SERIAL_DEBUG_RTSTOGGLE 1
 +#define SERIAL_DEBUG_FORWARDING 0
 +
-+// extern char procSigScan[];    // one for each port
-+char procSigScan[256];
++extern char procSigScan[];    // one for each port
 +
 +int getProcSigScan(int dsline)
 +{
@@ -1588,10 +2189,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    serial_out(up, UART_FCR, up->fcr|UART_FCR_CLEAR_RCVR);
 +}
 +/*
-+ * ===============================================
-+ * rtscontrol routines
-+ * ===============================================
-+ */
++* ===============================================
++* rtscontrol routines
++* ===============================================
++*/
 +static unsigned int serial_in_UART_TXCNT(struct uart_8250_port *up)
 +{
 +    int i;
@@ -1689,10 +2290,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +EXPORT_SYMBOL(serial8250_rs232_rts_toggle_initial_timer);
 +
-+ /* ===============================================
-+ * packet forwarding routines
-+ * ===============================================
-+ */
++/* ===============================================
++* packet forwarding routines
++* ===============================================
++*/
 +/*
 +    this routine is a copy of uart_insert_char from serial_core.c
 +    we need this here because if we're buffering data because of packet forwarding
@@ -1706,7 +2307,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +                0   discard the data
 +*/
 +static int uart_insert_char_ok(struct uart_port *port, unsigned int status,
-+         unsigned int overrun, unsigned int ch, unsigned int flag)
++        unsigned int overrun, unsigned int ch, unsigned int flag)
 +{
 +    int returnCode=0;
 +
@@ -1717,9 +2318,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    }
 +
 +    /*
-+     * Overrun is special.  Since it's reported immediately,
-+     * it doesn't affect the current character.
-+     */
++    * Overrun is special.  Since it's reported immediately,
++    * it doesn't affect the current character.
++    */
 +    if (status & ~port->ignore_status_mask & overrun)
 +    {
 +        returnCode=1;
@@ -1749,6 +2350,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    {
 +        if(ch != up->direct_trigger)                        // eat rxed character until match
 +            return;
++        else
++            ch = '/r';
 +        up->oneshot_forwarding &= ~DS_ONESHOT_ON_DIRECT_TRIGGER;    // clear DIRECT_TRIGGER bit
 +    }
 +
@@ -1773,11 +2376,11 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        {
 +            if (up->count == 0)
 +            {
-+                 restarttimerflag = TRUE;
++                restarttimerflag = TRUE;
 +            }
 +            else
 +            {
-+                 restarttimerflag = FALSE;
++                restarttimerflag = FALSE;
 +            }
 +            if (forwarding & PERLE_SERIAL_FORWARD_ON_CHAR)
 +            {
@@ -1832,7 +2435,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +                    forward_frame(up);
 +                }
 +            }
-+       }
++    }
 +    }
 +#ifdef SERIAL_DEBUG_FORWARDING
 +    // printk("push_char: end, up 0x%x\n", (unsigned int)up);
@@ -2395,7 +2998,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    struct uart_8250_port *up = from_timer(up, t, forward_send_timer);
 +    struct uart_port *port = &up->port;
 +    typeof(port->icount.buf_overrun) overrun=port->icount.buf_overrun;
-+     unsigned long flags;
++    unsigned long flags;
 +
 +#ifdef SERIAL_DEBUG_FORWARDING
 +    printk("ps_forward_send_timer: start, get count %d\n", up->get_count);
@@ -2432,10 +3035,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +EXPORT_SYMBOL(serial8250_forward_send_timer);
 +
 +/*
-+ * ===============================================
-+ * Signal Scan routines
-+ * ===============================================
-+ */
++* ===============================================
++* Signal Scan routines
++* ===============================================
++*/
 +#ifdef SERIAL_DEBUG_SEND_SIGNAL
 +static int send_signal_DEBUG(int pid, int sig, int priv, const char *func, int line)
 +{
@@ -2628,9 +3231,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        user_sigmask = 0xffff & arg;
 +        up->rpt_user_sigmask = user_sigmask;
 +        up->rpt_sigmask =  ((user_sigmask & TIOCM_CD) ? UART_MSR_DCD : 0)
-+                  | ((user_sigmask & TIOCM_RI) ? UART_MSR_RI : 0)
-+                  | ((user_sigmask & TIOCM_DSR) ? UART_MSR_DSR : 0)
-+                  | ((user_sigmask & TIOCM_CTS) ? UART_MSR_CTS : 0);
++                | ((user_sigmask & TIOCM_RI) ? UART_MSR_RI : 0)
++                | ((user_sigmask & TIOCM_DSR) ? UART_MSR_DSR : 0)
++                | ((user_sigmask & TIOCM_CTS) ? UART_MSR_CTS : 0);
 +        up->rpt_lsrmask = 0xffff & (arg >> 16);
 +        send_signal(up->rpt_pid, SIGUSR1, 1);
 +    }
@@ -2806,6 +3409,135 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    return 0;
 +}
 +
++static int tiocmapXXX_handler(struct uart_port *port,unsigned long arg,unsigned int cmd)
++{
++    struct uart_8250_port *up = up_to_u8250p(port);
++    unsigned int bits;
++
++    if (copy_from_user(&bits, (unsigned int *)arg, sizeof(int)))
++    {
++        return -EFAULT;
++    }
++
++    if(getProcSigScan(up->sigScan.line) == PROCSS_DELAY)       // no signal control now please
++    {
++        return 0;
++    }
++
++    return 0;
++    // return set_modem_info(up, cmd, bits);
++}
++static void tiocosarmds_handler(struct uart_port *port)
++{
++    struct uart_8250_port *up = up_to_u8250p(port);
++
++    up->oneshot_forwarding = up->oneshot_config;
++}
++static int tresetcount_handler(struct uart_port *port,unsigned long arg)
++{
++    unsigned int drain_arg;
++
++    if (copy_from_user(&drain_arg, (unsigned int *)arg, sizeof(int)))
++    {
++        return -EFAULT;
++    }
++
++    if(drain_arg)
++    {
++        port->drain_flag=0;
++    }
++    else
++    {
++        port->drain_flag=1;
++    }
++
++    return 0;
++}
++static int tsigscan_handler(struct uart_port *port,unsigned long arg)
++{
++    unsigned long flags;
++    struct uart_8250_port *up = up_to_u8250p(port);
++    struct sigscan sigCopy;
++    int returnCode=0;
++
++    do
++    {
++        if(copy_from_user(&sigCopy, (struct sigscan *)arg, sizeof(struct sigscan)))
++        {
++            returnCode = -EFAULT;
++            break;
++        }
++
++        // incase other CPU runs during del_timer_sync() we must be unlocked...
++        fsmSigScan(up, FSMSS_EXIT, 0);
++
++        spin_lock_irqsave(&port->lock, flags);
++        if(sigCopy.pid != 0 && sigCopy.sigmask != 0)
++        {
++            memcpy(&up->sigScan, &sigCopy, sizeof(struct sigscan));
++            fsmSigScan(up, FSMSS_SCAN, 0);
++            fsmSigScan(up, FSMSS_TIOCM, MSR2TIOCM((unsigned char)up->last_msr_read));
++        }
++        // else if(sigCopy.sigdrop)    // allow drop only function
++        // {
++        //     returnCode=set_modem_info(up, TIOCMBIC, sigCopy.sigdrop);
++        // }
++        spin_unlock_irqrestore(&port->lock, flags);
++
++    }while(0);
++
++    return(returnCode);
++}
++static void tioccicount_handler(struct uart_port *port,unsigned long arg)
++{
++    struct uart_8250_port *up = up_to_u8250p(port);
++    unsigned int resetControl=(unsigned int )arg;
++
++    if (resetControl & TIOCCICOUNT_CTS)
++    {
++        up->port.icount.cts=0;
++    }
++    if (resetControl & TIOCCICOUNT_DSR)
++    {
++        up->port.icount.dsr=0;
++    }
++    if (resetControl & TIOCCICOUNT_RNG)
++    {
++        up->port.icount.rng=0;
++    }
++    if (resetControl & TIOCCICOUNT_DCD)
++    {
++        up->port.icount.dcd=0;
++    }
++    if (resetControl & TIOCCICOUNT_TX)
++    {
++        up->port.icount.tx=0;
++    }
++    if (resetControl & TIOCCICOUNT_RX)
++    {
++        up->port.icount.rx=0;
++    }
++    if (resetControl & TIOCCICOUNT_FRAME)
++    {
++        up->port.icount.frame=0;
++    }
++    if (resetControl & TIOCCICOUNT_PARITY)
++    {
++        up->port.icount.parity=0;
++    }
++    if (resetControl & TIOCCICOUNT_OVERRUN)
++    {
++        up->port.icount.overrun=0;
++    }
++    if (resetControl & TIOCCICOUNT_BRK)
++    {
++        up->port.icount.brk=0;
++    }
++    if (resetControl & TIOCCICOUNT_BUFOVERRUN)
++    {
++        up->port.icount.buf_overrun=0;
++    }
++}
 +int serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg)
 +{
 +    int ret = 0;
@@ -2835,6 +3567,38 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            // printk("%s,%d: TIOCFWDDS ret %d\n", __func__, __LINE__, ret);
 +            break;
 +
++        case TIOCMAPDTR:
++        case TIOCMAPRTS:
++            ret=tiocmapXXX_handler(port,arg,cmd);
++            printk("%s,%d: TIOCMAPRTS  TIOCMAPDTR ret %d\n", __func__, __LINE__, ret);
++            break;
++        // case TRACECONTROL:
++        //     ret=tracecontrol_handler(port,arg);
++        //     break;
++
++        // case TRACEREAD:
++        //     ret=traceread_handler(port,arg);
++        //     break;
++
++        case TIOCOSARMDS:
++            tiocosarmds_handler(port);
++            printk("%s,%d: TIOCOSARMDS ret %d\n", __func__, __LINE__, ret);
++            break;
++
++        case TRESETCOUNT:
++            ret=tresetcount_handler(port,arg);
++            printk("%s,%d: TRESETCOUNT ret %d\n", __func__, __LINE__, ret);
++            break;
++
++        case TSIGSCAN:
++            ret=tsigscan_handler(port,arg);
++            printk("%s,%d: TSIGSCAN ret %d\n", __func__, __LINE__, ret);
++            break;
++
++        case TIOCCICOUNT:
++            tioccicount_handler(port,arg);
++            printk("%s,%d: TIOCCICOUNT ret %d\n", __func__, __LINE__, ret);
++            break;
 +        case TRTSCONTROL:
 +            ret=perle_set_rts_toggle(port,arg);
 +            // printk("%s,%d: TRTSCONTROL ret %d\n", __func__, __LINE__, ret);
@@ -2881,9 +3645,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +}
 +// EXPORT_SYMBOL_GPL(perle_serial8250_do_set_mctrl);
 +/*
-+ * Called on runtime PM resume path from perleomap8250_restore_regs(), and
-+ * perleomap8250_set_mctrl().
-+ */
++* Called on runtime PM resume path from perleomap8250_restore_regs(), and
++* perleomap8250_set_mctrl().
++*/
 +static void __perleomap8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 +{
 +    struct uart_8250_port *up = up_to_u8250p(port);
@@ -2894,9 +3658,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +    if (!mctrl_gpio_to_gpiod(up->gpios, UART_GPIO_RTS)) {
 +        /*
-+         * Turn off autoRTS if RTS is lowered and restore autoRTS
-+         * setting if RTS is raised
-+         */
++        * Turn off autoRTS if RTS is lowered and restore autoRTS
++        * setting if RTS is raised
++        */
 +        lcr = serial_in(up, UART_LCR);
 +        serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
 +        if ((mctrl & TIOCM_RTS) && (port->status & UPSTAT_AUTORTS))
@@ -2906,6 +3670,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        serial_out(up, UART_EFR, priv->efr);
 +        serial_out(up, UART_LCR, lcr);
 +    }
++    
 +}
 +
 +static void perleomap8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
@@ -2923,16 +3688,16 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +}
 +
 +/*
-+ * Work Around for Errata i202 (2430, 3430, 3630, 4430 and 4460)
-+ * The access to uart register after MDR1 Access
-+ * causes UART to corrupt data.
-+ *
-+ * Need a delay =
-+ * 5 L4 clock cycles + 5 UART functional clock cycle (@48MHz = ~0.2uS)
-+ * give 10 times as much
-+ */
++* Work Around for Errata i202 (2430, 3430, 3630, 4430 and 4460)
++* The access to uart register after MDR1 Access
++* causes UART to corrupt data.
++*
++* Need a delay =
++* 5 L4 clock cycles + 5 UART functional clock cycle (@48MHz = ~0.2uS)
++* give 10 times as much
++*/
 +static void omap_8250_mdr1_errataset(struct uart_8250_port *up,
-+                     struct perleomap8250_priv *priv)
++                    struct perleomap8250_priv *priv)
 +{
 +    serial_out(up, UART_OMAP_MDR1, priv->mdr1);
 +    udelay(2);
@@ -2941,22 +3706,22 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +}
 +
 +static void omap_8250_get_divisor(struct uart_port *port, unsigned int baud,
-+                  struct perleomap8250_priv *priv)
++                struct perleomap8250_priv *priv)
 +{
 +    unsigned int uartclk = port->uartclk;
 +    unsigned int div_13, div_16;
 +    unsigned int abs_d13, abs_d16;
 +
 +    /*
-+     * Old custom speed handling.
-+     */
++    * Old custom speed handling.
++    */
 +    if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST) {
 +        priv->quot = port->custom_divisor & UART_DIV_MAX;
 +        /*
-+         * I assume that nobody is using this. But hey, if somebody
-+         * would like to specify the divisor _and_ the mode then the
-+         * driver is ready and waiting for it.
-+         */
++        * I assume that nobody is using this. But hey, if somebody
++        * would like to specify the divisor _and_ the mode then the
++        * driver is ready and waiting for it.
++        */
 +        if (port->custom_divisor & (1 << 16))
 +            priv->mdr1 = UART_OMAP_MDR1_13X_MODE;
 +        else
@@ -2993,18 +3758,18 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        return;
 +
 +    /*
-+     * The manual recommends not to enable the DMA mode selector in the SCR
-+     * (instead of the FCR) register _and_ selecting the DMA mode as one
-+     * register write because this may lead to malfunction.
-+     */
++    * The manual recommends not to enable the DMA mode selector in the SCR
++    * (instead of the FCR) register _and_ selecting the DMA mode as one
++    * register write because this may lead to malfunction.
++    */
 +    if (priv->scr & OMAP_UART_SCR_DMAMODE_MASK)
 +        serial_out(up, UART_OMAP_SCR,
-+               priv->scr & ~OMAP_UART_SCR_DMAMODE_MASK);
++            priv->scr & ~OMAP_UART_SCR_DMAMODE_MASK);
 +    serial_out(up, UART_OMAP_SCR, priv->scr);
 +}
 +
 +static void perleomap8250_update_mdr1(struct uart_8250_port *up,
-+                 struct perleomap8250_priv *priv)
++                struct perleomap8250_priv *priv)
 +{
 +    if (priv->habit & UART_ERRATA_i202_MDR1_ACCESS)
 +        omap_8250_mdr1_errataset(up, priv);
@@ -3023,11 +3788,11 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +    if (dma && dma->tx_running) {
 +        /*
-+         * TCSANOW requests the change to occur immediately however if
-+         * we have a TX-DMA operation in progress then it has been
-+         * observed that it might stall and never complete. Therefore we
-+         * delay DMA completes to prevent this hang from happen.
-+         */
++        * TCSANOW requests the change to occur immediately however if
++        * we have a TX-DMA operation in progress then it has been
++        * observed that it might stall and never complete. Therefore we
++        * delay DMA completes to prevent this hang from happen.
++        */
 +        priv->delayed_restore = 1;
 +        return;
 +    }
@@ -3046,8 +3811,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    serial_out(up, UART_TI752_TCR, OMAP_UART_TCR_RESTORE(16) |
 +            OMAP_UART_TCR_HALT(52));
 +    serial_out(up, UART_TI752_TLR,
-+           TRIGGER_TLR_MASK(priv->tx_trigger) << UART_TI752_TLR_TX |
-+           TRIGGER_TLR_MASK(priv->rx_trigger) << UART_TI752_TLR_RX);
++        TRIGGER_TLR_MASK(priv->tx_trigger) << UART_TI752_TLR_TX |
++        TRIGGER_TLR_MASK(priv->rx_trigger) << UART_TI752_TLR_RX);
 +
 +    serial_out(up, UART_LCR, 0);
 +
@@ -3100,12 +3865,12 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +}
 +
 +/*
-+ * OMAP can use "CLK / (16 or 13) / div" for baud rate. And then we have have
-+ * some differences in how we want to handle flow control.
-+ */
++* OMAP can use "CLK / (16 or 13) / div" for baud rate. And then we have have
++* some differences in how we want to handle flow control.
++*/
 +static void omap_8250_set_termios(struct uart_port *port,
-+                  struct ktermios *termios,
-+                  const struct ktermios *old)
++                struct ktermios *termios,
++                const struct ktermios *old)
 +{
 +    struct uart_8250_port *up = up_to_u8250p(port);
 +    struct perleomap8250_priv *priv = up->port.private_data;
@@ -3124,24 +3889,24 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        cval |= UART_LCR_SPAR;
 +
 +    /*
-+     * Ask the core to calculate the divisor for us.
-+     */
++    * Ask the core to calculate the divisor for us.
++    */
 +    baud = uart_get_baud_rate(port, termios, old,
-+                  port->uartclk / 16 / UART_DIV_MAX,
-+                  port->uartclk / 13);
++                port->uartclk / 16 / UART_DIV_MAX,
++                port->uartclk / 13);
 +    omap_8250_get_divisor(port, baud, priv);
 +
 +
 +    /*
-+     * Ok, we're now changing the port state. Do it with
-+     * interrupts disabled.
-+     */
++    * Ok, we're now changing the port state. Do it with
++    * interrupts disabled.
++    */
 +    pm_runtime_get_sync(port->dev);
 +    spin_lock_irq(&port->lock);
 +
 +    /*
-+     * Update the per-port timeout.
-+     */
++    * Update the per-port timeout.
++    */
 +    uart_update_timeout(port, termios->c_cflag, baud);
 +
 +    up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
@@ -3151,30 +3916,30 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        up->port.read_status_mask |= UART_LSR_BI;
 +
 +    /*
-+     * Characters to ignore
-+     */
++    * Characters to ignore
++    */
 +    up->port.ignore_status_mask = 0;
 +    if (termios->c_iflag & IGNPAR)
 +        up->port.ignore_status_mask |= UART_LSR_PE | UART_LSR_FE;
 +    if (termios->c_iflag & IGNBRK) {
 +        up->port.ignore_status_mask |= UART_LSR_BI;
 +        /*
-+         * If we're ignoring parity and break indicators,
-+         * ignore overruns too (for real raw support).
-+         */
++        * If we're ignoring parity and break indicators,
++        * ignore overruns too (for real raw support).
++        */
 +        if (termios->c_iflag & IGNPAR)
 +            up->port.ignore_status_mask |= UART_LSR_OE;
 +    }
 +
 +    /*
-+     * ignore all characters if CREAD is not set
-+     */
++    * ignore all characters if CREAD is not set
++    */
 +    if ((termios->c_cflag & CREAD) == 0)
 +        up->port.ignore_status_mask |= UART_LSR_DR;
 +
 +    /*
-+     * Modem status interrupts
-+     */
++    * Modem status interrupts
++    */
 +    // up->ier &= ~UART_IER_MSI;
 +    // if (UART_ENABLE_MS(&up->port, termios->c_cflag))
 +//         up->ier |= UART_IER_MSI;
@@ -3184,22 +3949,22 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    /* Up to here it was mostly serial8250_do_set_termios() */
 +
 +    /*
-+     * We enable TRIG_GRANU for RX and TX and additionally we set
-+     * SCR_TX_EMPTY bit. The result is the following:
-+     * - RX_TRIGGER amount of bytes in the FIFO will cause an interrupt.
-+     * - less than RX_TRIGGER number of bytes will also cause an interrupt
-+     *   once the UART decides that there no new bytes arriving.
-+     * - Once THRE is enabled, the interrupt will be fired once the FIFO is
-+     *   empty - the trigger level is ignored here.
-+     *
-+     * Once DMA is enabled:
-+     * - UART will assert the TX DMA line once there is room for TX_TRIGGER
-+     *   bytes in the TX FIFO. On each assert the DMA engine will move
-+     *   TX_TRIGGER bytes into the FIFO.
-+     * - UART will assert the RX DMA line once there are RX_TRIGGER bytes in
-+     *   the FIFO and move RX_TRIGGER bytes.
-+     * This is because threshold and trigger values are the same.
-+     */
++    * We enable TRIG_GRANU for RX and TX and additionally we set
++    * SCR_TX_EMPTY bit. The result is the following:
++    * - RX_TRIGGER amount of bytes in the FIFO will cause an interrupt.
++    * - less than RX_TRIGGER number of bytes will also cause an interrupt
++    *   once the UART decides that there no new bytes arriving.
++    * - Once THRE is enabled, the interrupt will be fired once the FIFO is
++    *   empty - the trigger level is ignored here.
++    *
++    * Once DMA is enabled:
++    * - UART will assert the TX DMA line once there is room for TX_TRIGGER
++    *   bytes in the TX FIFO. On each assert the DMA engine will move
++    *   TX_TRIGGER bytes into the FIFO.
++    * - UART will assert the RX DMA line once there are RX_TRIGGER bytes in
++    *   the FIFO and move RX_TRIGGER bytes.
++    * This is because threshold and trigger values are the same.
++    */
 +    up->fcr = UART_FCR_ENABLE_FIFO;
 +    up->fcr |= TRIGGER_FCR_MASK(priv->tx_trigger) << OMAP_UART_FCR_TX_TRIG;
 +    up->fcr |= TRIGGER_FCR_MASK(priv->rx_trigger) << OMAP_UART_FCR_RX_TRIG;
@@ -3225,15 +3990,15 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        priv->efr |= UART_EFR_CTS;
 +    } else    if (up->port.flags & UPF_SOFT_FLOW) {
 +        /*
-+         * OMAP rx s/w flow control is borked; the transmitter remains
-+         * stuck off even if rx flow control is subsequently disabled
-+         */
++        * OMAP rx s/w flow control is borked; the transmitter remains
++        * stuck off even if rx flow control is subsequently disabled
++        */
 +
 +        /*
-+         * IXOFF Flag:
-+         * Enable XON/XOFF flow control on output.
-+         * Transmit XON1, XOFF1
-+         */
++        * IXOFF Flag:
++        * Enable XON/XOFF flow control on output.
++        * Transmit XON1, XOFF1
++        */
 +        if (termios->c_iflag & IXOFF) {
 +            up->port.status |= UPSTAT_AUTOXOFF;
 +            priv->efr |= OMAP_UART_SW_TX;
@@ -3258,7 +4023,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +/* same as 8250 except that we may have extra flow bits set in EFR */
 +static void omap_8250_pm(struct uart_port *port, unsigned int state,
-+             unsigned int oldstate)
++            unsigned int oldstate)
 +{
 +    struct uart_8250_port *up = up_to_u8250p(port);
 +    u8 efr;
@@ -3285,7 +4050,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +}
 +
 +static void omap_serial_fill_features_erratas(struct uart_8250_port *up,
-+                          struct perleomap8250_priv *priv)
++                        struct perleomap8250_priv *priv)
 +{
 +    static const struct soc_device_attribute k3_soc_devices[] = {
 +        { .family = "AM65X",  },
@@ -3316,7 +4081,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        break;
 +    default:
 +        dev_warn(up->port.dev,
-+             "Unknown revision, defaulting to highest\n");
++            "Unknown revision, defaulting to highest\n");
 +        /* highest possible revision */
 +        major = 0xff;
 +        minor = 0xff;
@@ -3341,10 +4106,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    }
 +
 +    /*
-+     * AM65x SR1.0, AM65x SR2.0 and J721e SR1.0 don't
-+     * don't have RHR_IT_DIS bit in IER2 register. So drop to flag
-+     * to enable errata workaround.
-+     */
++    * AM65x SR1.0, AM65x SR2.0 and J721e SR1.0 don't
++    * don't have RHR_IT_DIS bit in IER2 register. So drop to flag
++    * to enable errata workaround.
++    */
 +    if (soc_device_match(k3_soc_devices))
 +        priv->habit &= ~UART_HAS_RHR_IT_DIS;
 +}
@@ -3371,9 +4136,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    stop_delay += (u64)p->port.rs485.delay_rts_after_send * NSEC_PER_MSEC;
 +
 +    /*
-+     * rs485_stop_tx() is going to set RTS according to config
-+     * AND flush RX FIFO if required.
-+     */
++    * rs485_stop_tx() is going to set RTS according to config
++    * AND flush RX FIFO if required.
++    */
 +    if (stop_delay > 0) {
 +        em485->active_timer = &em485->stop_tx_timer;
 +        hrtimer_start(&em485->stop_tx_timer, ns_to_ktime(stop_delay), HRTIMER_MODE_REL);
@@ -3398,12 +4163,12 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +
 +/*
-+ * perle_serial8250_rx_chars - Read characters. The first LSR value must be passed in.
-+ *
-+ * Returns LSR bits. The caller should rely only on non-Rx related LSR bits
-+ * (such as THRE) because the LSR value might come from an already consumed
-+ * character.
-+ */
++* perle_serial8250_rx_chars - Read characters. The first LSR value must be passed in.
++*
++* Returns LSR bits. The caller should rely only on non-Rx related LSR bits
++* (such as THRE) because the LSR value might come from an already consumed
++* character.
++*/
 +static u16 perle_serial8250_rx_chars(struct uart_8250_port *up, u16 lsr)
 +{
 +    struct uart_port *port = &up->port;
@@ -3428,12 +4193,12 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        ch = serial_in(up, UART_RX);
 +    else
 +        /*
-+         * Intel 82571 has a Serial Over Lan device that will
-+         * set UART_LSR_BI without setting UART_LSR_DR when
-+         * it receives a break. To avoid reading from the
-+         * receive buffer without UART_LSR_DR bit set, we
-+         * just force the read character to be 0
-+         */
++        * Intel 82571 has a Serial Over Lan device that will
++        * set UART_LSR_BI without setting UART_LSR_DR when
++        * it receives a break. To avoid reading from the
++        * receive buffer without UART_LSR_DR bit set, we
++        * just force the read character to be 0
++        */
 +        ch = 0;
 +    // printk("(%s,%d):serial8250_read_char starting,ch = %c\n",__FUNCTION__,__LINE__, ch);
 +    port->icount.rx++;
@@ -3446,11 +4211,11 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            lsr &= ~(UART_LSR_FE | UART_LSR_PE);
 +            port->icount.brk++;
 +            /*
-+             * We do the SysRQ and SAK checking
-+             * here because otherwise the break
-+             * may get masked by ignore_status_mask
-+             * or read_status_mask.
-+             */
++            * We do the SysRQ and SAK checking
++            * here because otherwise the break
++            * may get masked by ignore_status_mask
++            * or read_status_mask.
++            */
 +            if (uart_handle_break(port))
 +                break;
 +// Perle start for trueport
@@ -3513,8 +4278,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +// Perle end for trueport
 +        }
 +        /*
-+         * Mask off conditions which should be ignored.
-+         */
++        * Mask off conditions which should be ignored.
++        */
 +        lsr &= port->read_status_mask;
 +
 +        if (lsr & UART_LSR_BI) {
@@ -3610,13 +4375,13 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    status = serial_lsr_in(up);
 +
 +    /*
-+     * If port is stopped and there are no error conditions in the
-+     * FIFO, then don't drain the FIFO, as this may lead to TTY buffer
-+     * overflow. Not servicing, RX FIFO would trigger auto HW flow
-+     * control when FIFO occupancy reaches preset threshold, thus
-+     * halting RX. This only works when auto HW flow control is
-+     * available.
-+     */
++    * If port is stopped and there are no error conditions in the
++    * FIFO, then don't drain the FIFO, as this may lead to TTY buffer
++    * overflow. Not servicing, RX FIFO would trigger auto HW flow
++    * control when FIFO occupancy reaches preset threshold, thus
++    * halting RX. This only works when auto HW flow control is
++    * available.
++    */
 +    if (!(status & (UART_LSR_FIFOE | UART_LSR_BRK_ERROR_BITS)) &&
 +        (port->status & (UPSTAT_AUTOCTS | UPSTAT_AUTORTS)) &&
 +        !(port->read_status_mask & UART_LSR_DR))
@@ -3667,11 +4432,11 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    ret = perle_serial8250_handle_irq(port, iir);
 +
 +    /*
-+     * On K3 SoCs, it is observed that RX TIMEOUT is signalled after
-+     * FIFO has been drained or erroneously.
-+     * So apply solution of Errata i2310 as mentioned in
-+     * https://www.ti.com/lit/pdf/sprz536
-+     */
++    * On K3 SoCs, it is observed that RX TIMEOUT is signalled after
++    * FIFO has been drained or erroneously.
++    * So apply solution of Errata i2310 as mentioned in
++    * https://www.ti.com/lit/pdf/sprz536
++    */
 +    if (priv->habit & UART_RX_TIMEOUT_QUIRK &&
 +        (iir & UART_IIR_RX_TIMEOUT) == UART_IIR_RX_TIMEOUT &&
 +        serial_port_in(port, UART_OMAP_RX_LVL) == 0) {
@@ -3700,8 +4465,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            port->ops->stop_rx(port);
 +        } else {
 +            /* Keep restarting the timer until
-+             * the input overrun subsides.
-+             */
++            * the input overrun subsides.
++            */
 +            cancel_delayed_work(&up->overrun_backoff);
 +        }
 +        spin_unlock(&port->lock);
@@ -3743,7 +4508,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        ret = serial8250_request_dma(up);
 +        if (ret) {
 +            dev_warn_ratelimited(port->dev,
-+                         "failed to request DMA\n");
++                        "failed to request DMA\n");
 +            up->dma = NULL;
 +        }
 +    } else {
@@ -3829,8 +4594,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    up->dma = NULL;
 +
 +    /*
-+     * Disable break condition and FIFOs
-+     */
++    * Disable break condition and FIFOs
++    */
 +    if (up->lcr & UART_LCR_SBC)
 +        serial_out(up, UART_LCR, up->lcr & ~UART_LCR_SBC);
 +    serial_out(up, UART_FCR, UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
@@ -3909,8 +4674,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +}
 +
 +static int perleomap8250_rs485_config(struct uart_port *port,
-+                 struct ktermios *termios,
-+                 struct serial_rs485 *rs485)
++                struct ktermios *termios,
++                struct serial_rs485 *rs485)
 +{
 +    struct perleomap8250_priv *priv = port->private_data;
 +    struct uart_8250_port *up = up_to_u8250p(port);
@@ -3919,14 +4684,14 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    unsigned int baud;
 +
 +    /*
-+     * There is a fixed delay of 3 bit clock cycles after the TX shift
-+     * register is going empty to allow time for the stop bit to transition
-+     * through the transceiver before direction is changed to receive.
-+     *
-+     * Additionally there appears to be a 1 bit clock delay between writing
-+     * to the THR register and transmission of the start bit, per page 8783
-+     * of the AM65 TRM:  https://www.ti.com/lit/ug/spruid7e/spruid7e.pdf
-+     */
++    * There is a fixed delay of 3 bit clock cycles after the TX shift
++    * register is going empty to allow time for the stop bit to transition
++    * through the transceiver before direction is changed to receive.
++    *
++    * Additionally there appears to be a 1 bit clock delay between writing
++    * to the THR register and transmission of the start bit, per page 8783
++    * of the AM65 TRM:  https://www.ti.com/lit/ug/spruid7e/spruid7e.pdf
++    */
 +    if (priv->quot) {
 +        if (priv->mdr1 == UART_OMAP_MDR1_16X_MODE)
 +            baud = port->uartclk / (16 * priv->quot);
@@ -3938,11 +4703,11 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    }
 +
 +    /*
-+     * Fall back to RS485 software emulation if the UART is missing
-+     * hardware support, if the device tree specifies an mctrl_gpio
-+     * (indicates that RTS is unavailable due to a pinmux conflict)
-+     * or if the requested delays exceed the fixed hardware delays.
-+     */
++    * Fall back to RS485 software emulation if the UART is missing
++    * hardware support, if the device tree specifies an mctrl_gpio
++    * (indicates that RTS is unavailable due to a pinmux conflict)
++    * or if the requested delays exceed the fixed hardware delays.
++    */
 +    if (!(priv->habit & UART_HAS_NATIVE_RS485) ||
 +        mctrl_gpio_to_gpiod(up->gpios, UART_GPIO_RTS) ||
 +        rs485->delay_rts_after_send  > fixed_delay_rts_after_send ||
@@ -3963,9 +4728,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        priv->mdr3 &= ~UART_OMAP_MDR3_DIR_EN;
 +
 +    /*
-+     * Retain same polarity semantics as RS485 software emulation,
-+     * i.e. SER_RS485_RTS_ON_SEND means driving RTS low on send.
-+     */
++    * Retain same polarity semantics as RS485 software emulation,
++    * i.e. SER_RS485_RTS_ON_SEND means driving RTS low on send.
++    */
 +    if (rs485->flags & SER_RS485_RTS_ON_SEND)
 +        priv->mdr3 &= ~UART_OMAP_MDR3_DIR_POL;
 +    else
@@ -4012,14 +4777,14 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        dmaengine_terminate_async(rxchan);
 +
 +        /*
-+         * Poll for teardown to complete which guarantees in
-+         * flight data is drained.
-+         */
++        * Poll for teardown to complete which guarantees in
++        * flight data is drained.
++        */
 +        if (state.in_flight_bytes) {
 +            int poll_count = 25;
 +
 +            while (dmaengine_tx_status(rxchan, cookie, NULL) &&
-+                   poll_count--)
++                poll_count--)
 +                cpu_relax();
 +
 +            if (poll_count == -1)
@@ -4049,10 +4814,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    spin_lock_irqsave(&p->port.lock, flags);
 +
 +    /*
-+     * If the tx status is not DMA_COMPLETE, then this is a delayed
-+     * completion callback. A previous RX timeout flush would have
-+     * already pushed the data, so exit.
-+     */
++    * If the tx status is not DMA_COMPLETE, then this is a delayed
++    * completion callback. A previous RX timeout flush would have
++    * already pushed the data, so exit.
++    */
 +    if (dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state) !=
 +            DMA_COMPLETE) {
 +        spin_unlock_irqrestore(&p->port.lock, flags);
@@ -4117,9 +4882,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        state = dmaengine_tx_status(dma->rxchan, dma->rx_cookie, NULL);
 +        if (state == DMA_COMPLETE) {
 +            /*
-+             * Disable RX interrupts to allow RX DMA completion
-+             * callback to run.
-+             */
++            * Disable RX interrupts to allow RX DMA completion
++            * callback to run.
++            */
 +            p->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
 +            serial_out(p, UART_IER, p->ier);
 +        }
@@ -4127,8 +4892,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    }
 +
 +    desc = dmaengine_prep_slave_single(dma->rxchan, dma->rx_addr,
-+                       dma->rx_size, DMA_DEV_TO_MEM,
-+                       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++                    dma->rx_size, DMA_DEV_TO_MEM,
++                    DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
 +    if (!desc) {
 +        err = -EBUSY;
 +        goto out;
@@ -4141,10 +4906,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    dma->rx_cookie = dmaengine_submit(desc);
 +
 +    /*
-+     * Disable RX FIFO interrupt while RX DMA is enabled, else
-+     * spurious interrupt may be raised when data is in the RX FIFO
-+     * but is yet to be drained by DMA.
-+     */
++    * Disable RX FIFO interrupt while RX DMA is enabled, else
++    * spurious interrupt may be raised when data is in the RX FIFO
++    * but is yet to be drained by DMA.
++    */
 +    if (priv->habit & UART_HAS_RHR_IT_DIS) {
 +        reg = serial_in(p, UART_OMAP_IER2);
 +        reg |= UART_OMAP_IER2_RHR_IT_DIS;
@@ -4217,10 +4982,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    if (uart_tx_stopped(&p->port) || uart_circ_empty(xmit)) {
 +
 +        /*
-+         * Even if no data, we need to return an error for the two cases
-+         * below so perle_serial8250_tx_chars() is invoked and properly clears
-+         * THRI and/or runtime suspend.
-+         */
++        * Even if no data, we need to return an error for the two cases
++        * below so perle_serial8250_tx_chars() is invoked and properly clears
++        * THRI and/or runtime suspend.
++        */
 +        if (dma->tx_err || p->capabilities & UART_CAP_RPM) {
 +            ret = -EBUSY;
 +            goto err;
@@ -4234,20 +4999,20 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        u8 tx_lvl;
 +
 +        /*
-+         * We need to put the first byte into the FIFO in order to start
-+         * the DMA transfer. For transfers smaller than four bytes we
-+         * don't bother doing DMA at all. It seem not matter if there
-+         * are still bytes in the FIFO from the last transfer (in case
-+         * we got here directly from omap_8250_dma_tx_complete()). Bytes
-+         * leaving the FIFO seem not to trigger the DMA transfer. It is
-+         * really the byte that we put into the FIFO.
-+         * If the FIFO is already full then we most likely got here from
-+         * omap_8250_dma_tx_complete(). And this means the DMA engine
-+         * just completed its work. We don't have to wait the complete
-+         * 86us at 115200,8n1 but around 60us (not to mention lower
-+         * baudrates). So in that case we take the interrupt and try
-+         * again with an empty FIFO.
-+         */
++        * We need to put the first byte into the FIFO in order to start
++        * the DMA transfer. For transfers smaller than four bytes we
++        * don't bother doing DMA at all. It seem not matter if there
++        * are still bytes in the FIFO from the last transfer (in case
++        * we got here directly from omap_8250_dma_tx_complete()). Bytes
++        * leaving the FIFO seem not to trigger the DMA transfer. It is
++        * really the byte that we put into the FIFO.
++        * If the FIFO is already full then we most likely got here from
++        * omap_8250_dma_tx_complete(). And this means the DMA engine
++        * just completed its work. We don't have to wait the complete
++        * 86us at 115200,8n1 but around 60us (not to mention lower
++        * baudrates). So in that case we take the interrupt and try
++        * again with an empty FIFO.
++        */
 +        tx_lvl = serial_in(p, UART_OMAP_TX_LVL);
 +        if (tx_lvl == p->tx_loadsz) {
 +            ret = -EBUSY;
@@ -4277,7 +5042,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    dma->tx_cookie = dmaengine_submit(desc);
 +
 +    dma_sync_single_for_device(dma->txchan->device->dev, dma->tx_addr,
-+                   UART_XMIT_SIZE, DMA_TO_DEVICE);
++                UART_XMIT_SIZE, DMA_TO_DEVICE);
 +
 +    dma_async_issue_pending(dma->txchan);
 +    if (dma->tx_err)
@@ -4306,24 +5071,24 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +}
 +
 +static void am654_8250_handle_rx_dma(struct uart_8250_port *up, u8 iir,
-+                     u16 status)
++                    u16 status)
 +{
 +    /* Port locked to synchronize UART_IER access against the console. */
 +    lockdep_assert_held_once(&up->port.lock);
 +
 +    /*
-+     * Queue a new transfer if FIFO has data.
-+     */
++    * Queue a new transfer if FIFO has data.
++    */
 +    if ((status & (UART_LSR_DR | UART_LSR_BI)) &&
 +        (up->ier & UART_IER_RDI)) {
 +        omap_8250_rx_dma(up);
 +        serial_out(up, UART_OMAP_EFR2, UART_OMAP_EFR2_TIMEOUT_BEHAVE);
 +    } else if ((iir & 0x3f) == UART_IIR_RX_TIMEOUT) {
 +        /*
-+         * Disable RX timeout, read IIR to clear
-+         * current timeout condition, clear EFR2 to
-+         * periodic timeouts, re-enable interrupts.
-+         */
++        * Disable RX timeout, read IIR to clear
++        * current timeout condition, clear EFR2 to
++        * periodic timeouts, re-enable interrupts.
++        */
 +        up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
 +        serial_out(up, UART_IER, up->ier);
 +        omap_8250_rx_dma_flush(up);
@@ -4346,6 +5111,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    serial8250_rpm_put(up);
 +
 +    val = serial8250_MSR_to_TIOCM(status);
++
 +    if (up->gpios)
 +        return mctrl_gpio_get(up->gpios, &val);
 +
@@ -4363,23 +5129,23 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        if (!(lsr & UART_LSR_THRE))
 +            return;
 +        /*
-+         * To provide required timing and allow FIFO transfer,
-+         * __perle_stop_tx_rs485() must be called only when both FIFO and
-+         * shift register are empty. The device driver should either
-+         * enable interrupt on TEMT or set UART_CAP_NOTEMT that will
-+         * enlarge stop_tx_timer by the tx time of one frame to cover
-+         * for emptying of the shift register.
-+         */
++        * To provide required timing and allow FIFO transfer,
++        * __perle_stop_tx_rs485() must be called only when both FIFO and
++        * shift register are empty. The device driver should either
++        * enable interrupt on TEMT or set UART_CAP_NOTEMT that will
++        * enlarge stop_tx_timer by the tx time of one frame to cover
++        * for emptying of the shift register.
++        */
 +        if (!(lsr & UART_LSR_TEMT)) {
 +            if (!(p->capabilities & UART_CAP_NOTEMT))
 +                return;
 +            /*
-+             * RTS might get deasserted too early with the normal
-+             * frame timing formula. It seems to suggest THRE might
-+             * get asserted already during tx of the stop bit
-+             * rather than after it is fully sent.
-+             * Roughly estimate 1 extra bit here with / 7.
-+             */
++            * RTS might get deasserted too early with the normal
++            * frame timing formula. It seems to suggest THRE might
++            * get asserted already during tx of the stop bit
++            * rather than after it is fully sent.
++            * Roughly estimate 1 extra bit here with / 7.
++            */
 +            stop_delay = p->port.frame_time + DIV_ROUND_UP(p->port.frame_time, 7);
 +        }
 +
@@ -4400,8 +5166,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    __perle_stop_tx(up);
 +
 +    /*
-+     * We really want to stop the transmitter from sending.
-+     */
++    * We really want to stop the transmitter from sending.
++    */
 +    if (port->type == PORT_16C950) {
 +        up->acr |= UART_ACR_TXDIS;
 +        serial_icr_write(up, UART_ACR, up->acr);
@@ -4555,14 +5321,14 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            /*
 +        if (up->bugs & UART_BUG_TXRACE) {
 +
-+             * The Aspeed BMC virtual UARTs have a bug where data
-+             * may get stuck in the BMC's Tx FIFO from bursts of
-+             * writes on the APB interface.
-+             *
-+             * Delay back-to-back writes by a read cycle to avoid
-+             * stalling the VUART. Read a register that won't have
-+             * side-effects and discard the result.
-+             */
++            * The Aspeed BMC virtual UARTs have a bug where data
++            * may get stuck in the BMC's Tx FIFO from bursts of
++            * writes on the APB interface.
++            *
++            * Delay back-to-back writes by a read cycle to avoid
++            * stalling the VUART. Read a register that won't have
++            * side-effects and discard the result.
++            */
 +            serial_in(up, UART_SCR);
 +
 +        uart_xmit_advance(port, 1);
@@ -4616,10 +5382,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        uart_write_wakeup(port);
 +    }
 +    /*
-+     * With RPM enabled, we have to wait until the FIFO is empty before the
-+     * HW can go idle. So we get here once again with empty FIFO and disable
-+     * the interrupt and RPM in __perle_stop_tx()s
-+     */
++    * With RPM enabled, we have to wait until the FIFO is empty before the
++    * HW can go idle. So we get here once again with empty FIFO and disable
++    * the interrupt and RPM in __perle_stop_tx()s
++    */
 +    // Perle start for trueport
 +    if(!up->port.rs485_txing_no_echo)
 +// Perle end for trueport
@@ -4634,9 +5400,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +#ifdef CONFIG_CONSOLE_POLL
 +/*
-+ * Console polling routines for writing and reading from the uart while
-+ * in an interrupt or debug context.
-+ */
++* Console polling routines for writing and reading from the uart while
++* in an interrupt or debug context.
++*/
 +
 +static int perle_serial8250_get_poll_char(struct uart_port *port)
 +{
@@ -4670,36 +5436,36 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +
 +static void perle_serial8250_put_poll_char(struct uart_port *port,
-+             unsigned char c)
++            unsigned char c)
 +{
 +    unsigned int ier;
 +    struct uart_8250_port *up = up_to_u8250p(port);
 +
 +    /*
-+     * Normally the port is locked to synchronize UART_IER access
-+     * against the console. However, this function is only used by
-+     * KDB/KGDB, where it may not be possible to acquire the port
-+     * lock because all other CPUs are quiesced. The quiescence
-+     * should allow safe lockless usage here.
-+     */
++    * Normally the port is locked to synchronize UART_IER access
++    * against the console. However, this function is only used by
++    * KDB/KGDB, where it may not be possible to acquire the port
++    * lock because all other CPUs are quiesced. The quiescence
++    * should allow safe lockless usage here.
++    */
 +
 +    serial8250_rpm_get(up);
 +    /*
-+     *    First save the IER then disable the interrupts
-+     */
++    *    First save the IER then disable the interrupts
++    */
 +    ier = serial_port_in(port, UART_IER);
 +    serial8250_clear_IER(up);
 +
 +    wait_for_xmitr(up, UART_LSR_BOTH_EMPTY);
 +    /*
-+     *    Send the character out.
-+     */
++    *    Send the character out.
++    */
 +    serial_port_out(port, UART_TX, c);
 +
 +    /*
-+     *    Finally, wait for transmitter to become empty
-+     *    and restore the IER
-+     */
++    *    Finally, wait for transmitter to become empty
++    *    and restore the IER
++    */
 +    wait_for_xmitr(up, UART_LSR_BOTH_EMPTY);
 +    serial_port_out(port, UART_IER, ier);
 +    serial8250_rpm_put(up);
@@ -4714,10 +5480,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    return(up->rs232_rts_toggle);
 +}
 +/*
-+ * This is mostly serial8250_handle_irq(). We have a slightly different DMA
-+ * hoook for RX/TX and need different logic for them in the ISR. Therefore we
-+ * use the default routine in the non-DMA case and this one for with DMA.
-+ */
++* This is mostly serial8250_handle_irq(). We have a slightly different DMA
++* hoook for RX/TX and need different logic for them in the ISR. Therefore we
++* use the default routine in the non-DMA case and this one for with DMA.
++*/
 +static int omap_8250_dma_handle_irq(struct uart_port *port)
 +{
 +    struct uart_8250_port *up = up_to_u8250p(port);
@@ -4752,9 +5518,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            perle_serial8250_tx_chars(up);
 +        } else  {
 +            /*
-+             * try again due to an earlier failer which
-+             * might have been resolved by now.
-+             */
++            * try again due to an earlier failer which
++            * might have been resolved by now.
++            */
 +            if (omap_8250_tx_dma(up))
 +                perle_serial8250_tx_chars(up);
 +        }
@@ -4801,7 +5567,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +static struct perleomap8250_platdata perleam654_platdata = {
 +    .dma_params    = &am654_dma,
 +    .habit        = UART_HAS_EFR2 | UART_HAS_RHR_IT_DIS |
-+              UART_RX_TIMEOUT_QUIRK | UART_HAS_NATIVE_RS485,
++            UART_RX_TIMEOUT_QUIRK | UART_HAS_NATIVE_RS485,
 +};
 +
 +static struct perleomap8250_platdata am33xx_platdata = {
@@ -4860,7 +5626,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        return -ENOMEM;
 +
 +    membase = devm_ioremap(&pdev->dev, regs->start,
-+                       resource_size(regs));
++                    resource_size(regs));
 +    if (!membase)
 +        return -ENODEV;
 +
@@ -4870,13 +5636,13 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    up.port.membase = membase;
 +    up.port.irq = irq;
 +    /*
-+     * It claims to be 16C750 compatible however it is a little different.
-+     * It has EFR and has no FCR7_64byte bit. The AFE (which it claims to
-+     * have) is enabled via EFR instead of MCR. The type is set here 8250
-+     * just to get things going. UNKNOWN does not work for a few reasons and
-+     * we don't need our own type since we don't use 8250's set_termios()
-+     * or pm callback.
-+     */
++    * It claims to be 16C750 compatible however it is a little different.
++    * It has EFR and has no FCR7_64byte bit. The AFE (which it claims to
++    * have) is enabled via EFR instead of MCR. The type is set here 8250
++    * just to get things going. UNKNOWN does not work for a few reasons and
++    * we don't need our own type since we don't use 8250's set_termios()
++    * or pm callback.
++    */
 +    up.port.type = PORT_8250;
 +    up.port.iotype = UPIO_MEM;
 +    up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE | UPF_SOFT_FLOW |
@@ -4889,11 +5655,11 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    up.capabilities = UART_CAP_FIFO;
 +#ifdef CONFIG_PM
 +    /*
-+     * Runtime PM is mostly transparent. However to do it right we need to a
-+     * TX empty interrupt before we can put the device to auto idle. So if
-+     * PM is not enabled we don't add that flag and can spare that one extra
-+     * interrupt in the TX path.
-+     */
++    * Runtime PM is mostly transparent. However to do it right we need to a
++    * TX empty interrupt before we can put the device to auto idle. So if
++    * PM is not enabled we don't add that flag and can spare that one extra
++    * interrupt in the TX path.
++    */
 +    up.capabilities |= UART_CAP_RPM;
 +#endif
 +    up.port.set_termios = omap_8250_set_termios;
@@ -4932,7 +5698,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    }
 +
 +    if (of_property_read_u32(np, "overrun-throttle-ms",
-+                 &up.overrun_backoff_time_ms) != 0)
++                &up.overrun_backoff_time_ms) != 0)
 +        up.overrun_backoff_time_ms = 0;
 +
 +    pdata = of_device_get_match_data(&pdev->dev);
@@ -4942,8 +5708,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    if (!up.port.uartclk) {
 +        up.port.uartclk = DEFAULT_CLK_SPEED;
 +        dev_warn(&pdev->dev,
-+             "No clock speed specified: using default: %d\n",
-+             DEFAULT_CLK_SPEED);
++            "No clock speed specified: using default: %d\n",
++            DEFAULT_CLK_SPEED);
 +    }
 +
 +    priv->membase = membase;
@@ -4962,12 +5728,12 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    pm_runtime_use_autosuspend(&pdev->dev);
 +
 +    /*
-+     * Disable runtime PM until autosuspend delay unless specifically
-+     * enabled by the user via sysfs. This is the historic way to
-+     * prevent an unsafe default policy with lossy characters on wake-up.
-+     * For serdev devices this is not needed, the policy can be managed by
-+     * the serdev driver.
-+     */
++    * Disable runtime PM until autosuspend delay unless specifically
++    * enabled by the user via sysfs. This is the historic way to
++    * prevent an unsafe default policy with lossy characters on wake-up.
++    * For serdev devices this is not needed, the policy can be managed by
++    * the serdev driver.
++    */
 +    if (!of_get_available_child_count(pdev->dev.of_node))
 +        pm_runtime_set_autosuspend_delay(&pdev->dev, -1);
 +
@@ -4981,13 +5747,13 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    priv->tx_trigger = TX_TRIGGER;
 +#ifdef CONFIG_SERIAL_8250_DMA
 +    /*
-+     * Oh DMA support. If there are no DMA properties in the DT then
-+     * we will fall back to a generic DMA channel which does not
-+     * really work here. To ensure that we do not get a generic DMA
-+     * channel assigned, we have the the_no_dma_filter_fn() here.
-+     * To avoid "failed to request DMA" messages we check for DMA
-+     * properties in DT.
-+     */
++    * Oh DMA support. If there are no DMA properties in the DT then
++    * we will fall back to a generic DMA channel which does not
++    * really work here. To ensure that we do not get a generic DMA
++    * channel assigned, we have the the_no_dma_filter_fn() here.
++    * To avoid "failed to request DMA" messages we check for DMA
++    * properties in DT.
++    */
 +    ret = of_property_count_strings(np, "dma-names");
 +    if (ret == 2) {
 +        struct perleomap8250_dma_params *dma_params = NULL;
@@ -5015,7 +5781,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +    irq_set_status_flags(irq, IRQ_NOAUTOEN);
 +    ret = devm_request_irq(&pdev->dev, irq, perleomap8250_irq, 0,
-+                   dev_name(&pdev->dev), priv);
++                dev_name(&pdev->dev), priv);
 +    if (ret < 0)
 +        goto err;
 +
@@ -5128,10 +5894,10 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +    val = serial_in(up, UART_OMAP_SCR);
 +    /*
-+     * If we lose context, then SCR is set to its reset value of zero.
-+     * After set_termios() we set bit 3 of SCR (TX_EMPTY_CTL_IT) to 1,
-+     * among other bits, to never set the register back to zero again.
-+     */
++    * If we lose context, then SCR is set to its reset value of zero.
++    * After set_termios() we set bit 3 of SCR (TX_EMPTY_CTL_IT) to 1,
++    * among other bits, to never set the register back to zero again.
++    */
 +    if (!val)
 +        return 1;
 +    return 0;
@@ -5151,17 +5917,17 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    int syss;
 +
 +    /*
-+     * At least on omap4, unused uarts may not idle after reset without
-+     * a basic scr dma configuration even with no dma in use. The
-+     * module clkctrl status bits will be 1 instead of 3 blocking idle
-+     * for the whole clockdomain. The softreset below will clear scr,
-+     * and we restore it on resume so this is safe to do on all SoCs
-+     * needing perleomap8250_soft_reset() quirk. Do it in two writes as
-+     * recommended in the comment for perleomap8250_update_scr().
-+     */
++    * At least on omap4, unused uarts may not idle after reset without
++    * a basic scr dma configuration even with no dma in use. The
++    * module clkctrl status bits will be 1 instead of 3 blocking idle
++    * for the whole clockdomain. The softreset below will clear scr,
++    * and we restore it on resume so this is safe to do on all SoCs
++    * needing perleomap8250_soft_reset() quirk. Do it in two writes as
++    * recommended in the comment for perleomap8250_update_scr().
++    */
 +    uart_write(priv, UART_OMAP_SCR, OMAP_UART_SCR_DMAMODE_1);
 +    uart_write(priv, UART_OMAP_SCR,
-+           OMAP_UART_SCR_DMAMODE_1 | OMAP_UART_SCR_DMAMODE_CTL);
++        OMAP_UART_SCR_DMAMODE_1 | OMAP_UART_SCR_DMAMODE_CTL);
 +
 +    sysc = uart_read(priv, UART_OMAP_SYSC);
 +
@@ -5322,7 +6088,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +    // add_preferred_console("ttyS", idx, options);
 +    pr_err("WARNING: Your 'console=ttyO%d' has been replaced by 'ttyS%d'\n",
-+           idx, idx);
++        idx, idx);
 +    pr_err("This ensures that you still see kernel messages. Please\n");
 +    pr_err("update your kernel commandline.\n");
 +    return 0;
@@ -5333,7 +6099,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +static const struct dev_pm_ops perleomap8250_dev_pm_ops = {
 +    SYSTEM_SLEEP_PM_OPS(perleomap8250_suspend, perleomap8250_resume)
 +    RUNTIME_PM_OPS(perleomap8250_runtime_suspend,
-+               perleomap8250_runtime_resume, NULL)
++            perleomap8250_runtime_resume, NULL)
 +    .prepare        = pm_sleep_ptr(perleomap8250_prepare),
 +    .complete       = pm_sleep_ptr(perleomap8250_complete),
 +};
@@ -5372,415 +6138,3 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +MODULE_AUTHOR("Perle");
 +MODULE_LICENSE("GPL");
 +MODULE_DESCRIPTION("Modularized 8250 OMAP UART driver");
---- /dev/null	2025-02-19 10:39:48.396000000 -0500
-+++ linux-6.6.69/drivers/char/fanout.c	2025-02-19 15:18:41.776654822 -0500
-@@ -0,0 +1,409 @@
-+/*
-+ *  fanout.c:  A one-to-many multiplexer
-+ *
-+ */
-+//#define FANOUT_IOC_MAGIC    'k'
-+//#define FANOUT_IOCT_FLUSH     _IO(FANOUT_IOC_MAGIC, 0x80)
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/fs.h>
-+#include <linux/poll.h>
-+#include <linux/cdev.h>
-+#include <linux/slab.h>
-+#include <asm/uaccess.h>
-+#include <asm/ioctls.h>
-+#include <linux/sched.h>
-+#include <linux/wait.h>
-+//#include <linux/devfs_fs_kernel.h>
-+
-+// this function was removed from include /asm-arm/semaphore.c in kernel 2.6
-+// define it here so we don't need to change the code
-+static inline void init_MUTEX(struct semaphore *sem)
-+{
-+    sema_init(sem, 1);
-+}
-+
-+
-+/* Limits and other defines */
-+	/* The # fanout devices.  Max minor # is one less than this */
-+#ifdef CONFIG_FANOUT_NUM_DEVS
-+#define NUM_FO_DEVS CONFIG_FANOUT_NUM_DEVS
-+#else
-+#define NUM_FO_DEVS 49
-+#endif
-+#define DEVNAME "fanout"
-+
-+
-+
-+/* Data structure definitions */
-+	/* This data structure describes one fanout device.  There
-+	 * is one of these for each instance (minor #) of fanout */
-+struct fo {
-+	int	minor;		/* minor number of this fanout instance */
-+	char   *buf;		/* points to circular buffer */
-+	int	indx;		/* where to put next char recv'd */
-+	loff_t	count;		/* number chars received */
-+    loff_t  read_offset;    // offset of where to start reading for new opens
-+                            // the app must make an IOCTL(FANOUT_IOCT_READMARK) to set this to f_pos
-+	wait_queue_head_t waitq; /* readers wait on this queue */
-+	struct semaphore wlock;	/* write lock to keep buf/indx sane */
-+};
-+
-+
-+
-+/*  Function prototypes.  */
-+int fanout_init(void);
-+void fanout_exit(void);
-+static int fanout_open(struct inode *, struct file *);
-+static int fanout_release(struct inode *, struct file *);
-+static ssize_t fanout_read(struct file *, char *, size_t, loff_t *);
-+static ssize_t fanout_write(struct file *, const char *, size_t, loff_t *);
-+static unsigned int fanout_poll(struct file *, poll_table *);
-+static long fanout_ioctl(struct file *, unsigned int, unsigned long);
-+
-+
-+
-+/* Global variables */
-+#ifdef CONFIG_FANOUT_BUF_SZ
-+static int buf_sz = CONFIG_FANOUT_BUF_SZ;		/* Size of the circular buffer */
-+#else
-+static int buf_sz = 16384;		/* Size of the circular buffer */
-+#endif
-+	/* Debuglvl controls whether a printk is executed
-+	 * 	0 = no printk at all
-+	 *	1 = printk on error only
-+	 *	2 = printk on errors and on init/remove
-+	 *	3 = debug prink to trace calls into fanout
-+	 *	4 = debug trace inside of fanout calls */
-+     
-+#ifdef CONFIG_FANOUT_DEBUG_LVL
-+static int debuglvl = CONFIG_FANOUT_DEBUG_LVL;		/* printk verbosity */
-+#else
-+static int debuglvl = 2;		/* printk verbosity */
-+#endif
-+
-+static int debugec = 0;
-+
-+#ifdef CONFIG_FANOUT_MAJOR_DEV
-+static int devmajor = CONFIG_FANOUT_MAJOR_DEV;        // 0 measn dynamically assign one
-+#else
-+static int devmajor = 0;        // 0 measn dynamically assign one
-+#endif
-+
-+struct fo fodevs[NUM_FO_DEVS];		/* fanout devices */
-+struct cdev fo_cdev;
-+dev_t fo_devt;
-+
-+static struct file_operations fanout_fops = {
-+	.owner = THIS_MODULE,
-+	.read = fanout_read,
-+	.open = fanout_open,
-+	.write = fanout_write,
-+    .unlocked_ioctl = fanout_ioctl,
-+	.poll = fanout_poll,
-+	.release = fanout_release
-+};
-+
-+
-+
-+/* Module description and macros */
-+MODULE_DESCRIPTION("A device to replicate input on all outputs");
-+MODULE_AUTHOR("Bob Smith");
-+MODULE_LICENSE("GPL");
-+module_param(buf_sz, int, S_IRUSR);
-+MODULE_PARM_DESC(buf_sz, "Size of each circular buffer.  Def=16k");
-+module_param(debuglvl, int, S_IRUSR);
-+MODULE_PARM_DESC(debuglvl, "Debug level. Higher=verbose. Def=2");
-+module_param(devmajor, int, S_IRUSR);
-+MODULE_PARM_DESC(devmajor, "Device major number Def=dynamic");
-+module_init(fanout_init);
-+module_exit(fanout_exit);
-+
-+
-+
-+int fanout_init(void)
-+{
-+	int i, err;
-+
-+printk("%s %d %d\n", __FUNCTION__,__LINE__,NUM_FO_DEVS);
-+	for (i = 0; i < NUM_FO_DEVS; i++) {
-+		fodevs[i].minor = i;
-+		fodevs[i].buf = (char *) 0;
-+		fodevs[i].indx = 0;
-+		fodevs[i].count = 0;
-+        fodevs[i].read_offset = 0;
-+		init_waitqueue_head(&fodevs[i].waitq);
-+		init_MUTEX(&fodevs[i].wlock);
-+	}
-+printk("%s %d %d\n", __FUNCTION__,__LINE__,devmajor);
-+    if (devmajor==0)
-+    {
-+        err = alloc_chrdev_region(&fo_devt, 0, NUM_FO_DEVS, DEVNAME);
-+    }
-+    else
-+    {
-+        fo_devt = MKDEV(devmajor, 0);
-+        err = register_chrdev_region(fo_devt, NUM_FO_DEVS, DEVNAME);
-+    }
-+    if (err < 0) {
-+        if (debuglvl >= 1) {
-+            printk(KERN_ALERT "fanout-%d: init fails. err=%d\n", debugec++,err);
-+        }
-+        return err;
-+    }
-+    devmajor = MAJOR(fo_devt);
-+	cdev_init(&fo_cdev, &fanout_fops);
-+	kobject_set_name(&(fo_cdev.kobj), "fanout%d", fo_devt);
-+
-+	err = cdev_add(&fo_cdev, fo_devt, NUM_FO_DEVS);
-+	if (err < 0) {
-+		if (debuglvl >= 1) {
-+			printk(KERN_ALERT "fanout-%d: init fails. err=%d\n", debugec++, err);
-+		}
-+		return err;
-+	}
-+
-+	if (debuglvl >= 2) {
-+		printk(KERN_INFO "fanout-%d: Installed, Device Major=%d, buf_sz=%d, debuglvl=%d\n",debugec++,devmajor,buf_sz,debuglvl);
-+	}
-+
-+	return 0;  /* success */
-+}
-+
-+
-+void fanout_exit(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < NUM_FO_DEVS; i++) {
-+		if (fodevs[i].buf) {
-+			kfree(fodevs[i].buf);
-+		}
-+	}
-+
-+	cdev_del(&fo_cdev);
-+	unregister_chrdev_region(fo_devt, NUM_FO_DEVS);
-+
-+	if (debuglvl >= 2) {
-+		printk(KERN_INFO "fanout-%d: Uninstalled\n",debugec++);
-+	}
-+}
-+
-+
-+static int fanout_open(struct inode *inode, struct file *filp)
-+{
-+	int mnr = iminor(inode);
-+	struct fo *fodp = &fodevs[mnr];
-+
-+	if (debuglvl >= 3) {
-+		printk(KERN_DEBUG "fanout-%d open. Minor#=%d\n", debugec++, mnr);
-+	}
-+
-+	if (!fodp->buf) {
-+		fodp->buf = kmalloc(buf_sz, GFP_KERNEL);
-+		if (debuglvl >= 3) {
-+			printk(KERN_DEBUG "fanout-%d: Got memory for minor=%d\n",
-+					debugec++,mnr);
-+		}
-+		if (!fodp->buf) {
-+			if (debuglvl >= 1) {
-+				printk(KERN_ALERT "fanout-%d: No memory dev=%d\n",
-+						debugec++, mnr);
-+			}
-+			return -ENOMEM;
-+		}
-+	}
-+
-+	/* store which fanout device in the file's private data */
-+	filp->private_data = (void *) fodp;
-+
-+	/* set the current start of file */
-+	filp->f_pos = fodp->count;
-+    if (filp->f_mode & FMODE_READ)
-+    {
-+        if (fodp->read_offset == 0)
-+        {
-+            if (fodp->count > buf_sz)
-+            {
-+                filp->f_pos=fodp->count-buf_sz;
-+            }
-+            else
-+            {
-+                filp->f_pos=0;
-+            }
-+        }
-+        else
-+        {
-+            filp->f_pos=fodp->read_offset;
-+        }
-+    }
-+
-+	return 0;	/* success */
-+}
-+
-+static int fanout_release(struct inode *inode, struct file *filp)
-+{
-+	if (debuglvl >= 3) {
-+		printk(KERN_DEBUG "fanout-%d close. Minor#=%d\n", debugec++,
-+			((struct fo *)filp->private_data)->minor);
-+	}
-+
-+	return 0;	/* success */
-+}
-+
-+
-+
-+static ssize_t fanout_read( struct file *filp, char *buff, size_t len,
-+	loff_t * offset)
-+{
-+	int ret, xfer;			/* num bytes read from fanout buf */
-+	int cpcnt, cpstrt;		/* cp count and start location */
-+
-+	struct fo *fodp = (struct fo *)filp->private_data;
-+
-+	if (debuglvl >= 3) {
-+		printk(KERN_DEBUG "fanout-%d: read %d char from dev%d, off=%d f_pos=%d count=%d\n",debugec++,
-+			len, fodp->minor, (int)*offset,(int)filp->f_pos,(int)fodp->count);
-+        printk(KERN_DEBUG "fanout-%d read fmode=%x\n", debugec++, filp->f_mode);
-+	}
-+
-+	/* Verify that data requested is in the buffer or is next byte */
-+	xfer = fodp->count - *offset;
-+	if ((xfer > buf_sz) || (xfer < 0)) {
-+        fodp->read_offset=0;
-+		return -EPIPE;
-+	}
-+
-+	/* Wait here until new data is available */
-+	if (*offset == fodp->count) {
-+		wait_event_interruptible(fodp->waitq, *offset != fodp->count);
-+	}
-+
-+	/* Copy the data out to the user */
-+	xfer = fodp->count - *offset;
-+    cpstrt=fodp->indx-xfer;
-+    if (cpstrt < 0)
-+    {
-+        cpstrt+=buf_sz;
-+    }
-+	ret = xfer = (len < xfer) ? len : xfer;
-+	while (xfer) {
-+        cpcnt=buf_sz-cpstrt;
-+        cpcnt=(cpcnt < xfer) ? cpcnt : xfer;
-+
-+		if (copy_to_user(buff, fodp->buf + cpstrt, cpcnt) ) {
-+			return -EFAULT;
-+		}
-+		buff += cpcnt;
-+		xfer -= cpcnt;
-+        cpstrt += cpcnt;
-+        cpstrt = (cpstrt == buf_sz) ? 0 : cpstrt;
-+	};
-+
-+	/* We may have slept during the above copy_to_user() and more
-+	 * data may have been added while we slept.  Do a sanity check
-+	 * to make sure the buffer did not wrap while we slept. */
-+	if (fodp->count - *offset > buf_sz) {
-+        fodp->read_offset=0;
-+		return -EPIPE;
-+	}
-+
-+	*offset += ret;
-+
-+	return ret;
-+}
-+
-+
-+static ssize_t
-+fanout_write(struct file *filp, const char *buff, size_t len, loff_t * off)
-+{
-+	int ret, xfer;		/* num bytes to read from user */
-+	int cpcnt;		/* num bytes in a copy */
-+
-+	struct fo *fodp = (struct fo *)filp->private_data;
-+
-+	if (debuglvl >= 3) {
-+		printk(KERN_DEBUG "fanout-%d: write %d char to dev%d, off=%d\n", debugec++,
-+			len, fodp->minor, (int)*off);
-+        printk(KERN_DEBUG "fanout-%d write fmode=%x\n", debugec++, filp->f_mode);
-+	}
-+
-+	/* Copy at most one-quarter of the circular buffer size.  This
-+	 * gives readers more of a chance to wake up and get some data */
-+//	ret = xfer = (len > (buf_sz / 4)) ? (buf_sz / 4) : len;
-+	ret = xfer = len;
-+
-+	if (down_interruptible(&fodp->wlock)) {
-+		return -ERESTARTSYS;
-+	}
-+
-+	while (xfer) {
-+		cpcnt = buf_sz - fodp->indx;
-+		cpcnt = (cpcnt < xfer) ? cpcnt : xfer;
-+
-+		/* Don't we need a lock of some kind here ? */
-+		if (copy_from_user(fodp->buf + fodp->indx, buff, cpcnt) ) {
-+			up(&fodp->wlock);
-+			return -EFAULT;
-+		}
-+		fodp->indx += cpcnt;
-+		fodp->indx = (fodp->indx == buf_sz) ? 0 : fodp->indx;
-+		xfer -= cpcnt;
-+		buff += cpcnt;
-+	}
-+	fodp->count += ret;
-+	up(&fodp->wlock);
-+
-+	/* This is what the readers have been waiting for */
-+	wake_up_interruptible(&(fodp->waitq));
-+
-+	return ret;
-+}
-+
-+
-+static unsigned int fanout_poll(struct file *filp, poll_table *ppt)
-+{
-+	/* The circular buffer is always available for writing */
-+	int ready_mask = POLLOUT | POLLWRNORM;
-+
-+	struct fo *fodp = (struct fo *)filp->private_data;
-+
-+	poll_wait(filp, &fodp->waitq, ppt);
-+
-+	if (filp->f_pos != fodp->count) {
-+		ready_mask = (POLLIN | POLLRDNORM);
-+	}
-+
-+	if (debuglvl >= 3) {
-+		printk(KERN_DEBUG "fanout-%d: poll returns 0x%x\n", debugec++, ready_mask);
-+	}
-+
-+	return ready_mask;
-+}
-+
-+static long fanout_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-+{
-+    struct fo *fodp = (struct fo *)filp->private_data;
-+    
-+    if (debuglvl >= 3) {
-+        printk(KERN_DEBUG "fanout-%d: ioctl cmd=%x %x\n", debugec++,cmd,FANOUT_IOCT_FLUSH);
-+    }
-+    switch(cmd)
-+    {
-+        case FANOUT_IOCT_FLUSH:
-+            fodp->indx=0;
-+            fodp->count=0;
-+            fodp->read_offset=0;
-+            wake_up_interruptible(&(fodp->waitq));  // wake up readers
-+            return(0);
-+            
-+        case FANOUT_IOCT_READMARK:
-+            fodp->read_offset=filp->f_pos;
-+            return(0);
-+            
-+        default:
-+            return(-EINVAL);
-+    }
-+}
-+
