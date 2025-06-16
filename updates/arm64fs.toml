@@ -9,7 +9,6 @@ packages = [
   "qemu-guest-agent",
   "python3-pip",
   "python3-venv",
-  "python3-systemd", # needed by vyos-vpp
   # "vyos-xe-guest-utilities",
 ]
 
