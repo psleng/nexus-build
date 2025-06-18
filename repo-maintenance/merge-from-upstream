@@ -68,7 +68,8 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
         return None
 
     print(f' I: Cloning {url} for {name}')
-    run(['git', 'clone', '-q', url, workdir], check=True)
+    run(['git', 'clone', '-q', '--recurse-submodules',
+        url, workdir], check=True)
     # commit = dpkg['commit_id']
     # print(f' I: Checkout commit_id {commit} for {name}')
     # run(['git', 'checkout', '-q', commit], cwd=workdir, check=True)
@@ -76,11 +77,6 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
     cwd = os.getcwd()
     try:
         os.chdir(workdir)
-
-        # In case of submodules
-        print(' I: Setting up submodules')
-        run(['git', 'submodule', 'init'])
-        run(['git', 'submodule', 'update'])
 
         # Add the corresponding upstream, defaulting to vyos
         upstream = dpkg.get('scm_url_upstream',

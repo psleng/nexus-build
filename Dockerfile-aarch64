@@ -129,7 +129,6 @@ RUN apt-get update && apt-get install -y \
       quilt \
       debhelper \
       libffi-dev \
-      libpcre3-dev \
       libpcre2-dev \
       unzip
 
@@ -434,6 +433,7 @@ RUN apt-get update && apt-get install -y \
 	libreadline-dev \
 	gdb \
 	libgrpc-dev \
+	libpcre3-dev \
 	libpcre2-dev \
 	libgrpc++-dev \
 	libsqlite3-dev \
