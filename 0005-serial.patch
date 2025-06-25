@@ -611,10 +611,9 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/serial_core.c linux-6.6.69/drivers/t
  
   out:
  	mutex_unlock(&port->mutex);
-diff -ur linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c linux-6.6.69/drivers/tty/serial/serial_mctrl_gpio.c
---- linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/tty/serial/serial_mctrl_gpio.c	2025-02-19 17:31:27.267665176 -0500
-@@ -13,6 +13,7 @@
+--- linux-6.6.93/drivers/tty/serial/serial_mctrl_gpio.c	2025-06-04 08:42:26.000000000 -0400
++++ linux-6.6.93changed/drivers/tty/serial/serial_mctrl_gpio.c	2025-06-25 15:20:16.857519188 -0400
+@@ -13,9 +13,17 @@
  #include <linux/serial_core.h>
  #include <linux/module.h>
  #include <linux/property.h>
@@ -622,7 +621,36 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c linux-6.6.69/dri
  
  #include "serial_mctrl_gpio.h"
  
-@@ -173,39 +174,65 @@
++// events for fsmSigScan
++#define FSMSS_EXIT 0
++#define FSMSS_TIMEOUT 1
++#define FSMSS_SCAN 2
++#define FSMSS_TIOCM 3
++int fsmSigScan(struct uart_8250_port *up, int event, int data, int caller);
++unsigned short MSR2TIOCM(unsigned char msr);
+ struct mctrl_gpios {
+ 	struct uart_port *port;
+ 	struct gpio_desc *gpio[UART_GPIO_MAX];
+@@ -96,6 +104,8 @@
+  */
+ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+ {
++	struct uart_port *port = gpios->port;
++    struct uart_8250_port *up = up_to_u8250p(port);
+ 	enum mctrl_gpio_idx i;
+ 
+ 	if (gpios == NULL)
+@@ -109,7 +119,8 @@
+ 				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
+ 		}
+ 	}
+-
++	printk("(%s,%d) mctrl = %x\n",__FUNCTION__,__LINE__,*mctrl);
++	up->mctrl_prev = *mctrl;
+ 	return *mctrl;
+ }
+ EXPORT_SYMBOL_GPL(mctrl_gpio_get);
+@@ -173,39 +184,67 @@
  }
  EXPORT_SYMBOL_GPL(mctrl_gpio_init_noauto);
  
@@ -646,13 +674,14 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c linux-6.6.69/dri
  
  	mctrl_gpio_get(gpios, &mctrl);
 -
-+    //printk("(%s,%d) mctrl  %d \n",__FUNCTION__,__LINE__, mctrl);
-+//printk("(%s,%d) mctrl ^ gpios->mctrl_prev %d \n",__FUNCTION__,__LINE__, mctrl ^ gpios->mctrl_prev);
++    printk("(%s,%d) mctrl  %x \n",__FUNCTION__,__LINE__, mctrl);
++printk("(%s,%d) mctrl ^ gpios->mctrl_prev %x \n",__FUNCTION__,__LINE__, mctrl ^ gpios->mctrl_prev);
 +//printk("(%s,%d) irq %d\n",__FUNCTION__,__LINE__, irq);
  	spin_lock_irqsave(&port->lock, flags);
  
  	mctrl_diff = mctrl ^ gpios->mctrl_prev;
  	gpios->mctrl_prev = mctrl;
++	up->mctrl_prev = mctrl;
  
 -	if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
 -		if ((mctrl_diff & mctrl) & TIOCM_RI)
@@ -690,6 +719,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c linux-6.6.69/dri
 +        {
 +			send_signal(up->rpt_pid, SIGUSR1, 1);
 +        }
++		fsmSigScan(up, FSMSS_TIOCM, mctrl,9);
 +        // if (port->irq)
 +        // {
 +        //     printk("(%s,%d) Triggering fake MSI interrupt for uart%d\n",__FUNCTION__,__LINE__,port->line);
@@ -700,7 +730,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c linux-6.6.69/dri
  
  	return IRQ_HANDLED;
  }
-@@ -229,7 +256,7 @@
+@@ -229,7 +268,7 @@
  	gpios = mctrl_gpio_init_noauto(port->dev, idx);
  	if (IS_ERR(gpios))
  		return gpios;
@@ -709,7 +739,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c linux-6.6.69/dri
  	gpios->port = port;
  
  	for (i = 0; i < UART_GPIO_MAX; ++i) {
-@@ -239,6 +266,7 @@
+@@ -239,6 +278,7 @@
  			continue;
  
  		ret = gpiod_to_irq(gpios->gpio[i]);
@@ -717,6 +747,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/serial_mctrl_gpio.c linux-6.6.69/dri
  		if (ret < 0) {
  			dev_err(port->dev,
  				"failed to find corresponding irq for %s (idx=%d, err=%d)\n",
+
 diff -ur linux-6.6.69ori/drivers/tty/tty_port.c linux-6.6.69/drivers/tty/tty_port.c
 --- linux-6.6.69ori/drivers/tty/tty_port.c	2025-01-02 04:32:11.000000000 -0500
 +++ linux-6.6.69/drivers/tty/tty_port.c	2025-02-19 14:02:44.483376713 -0500
@@ -744,9 +775,8 @@ diff -ur linux-6.6.69ori/drivers/tty/tty_port.c linux-6.6.69/drivers/tty/tty_por
  	if (C_CLOCAL(tty))
  		do_clocal = 1;
 
-diff -ur linux-6.6.69ori/include/linux/serial_8250.h linux-6.6.69/include/linux/serial_8250.h
---- linux-6.6.69ori/include/linux/serial_8250.h	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/include/linux/serial_8250.h	2025-02-19 14:02:44.483376713 -0500
+--- linux-6.6.93/include/linux/serial_8250.h	2025-06-04 08:42:26.000000000 -0400
++++ linux-6.6.93changed/include/linux/serial_8250.h	2025-06-25 15:17:47.952961995 -0400
 @@ -11,7 +11,9 @@
  #include <linux/serial_core.h>
  #include <linux/serial_reg.h>
@@ -769,7 +799,7 @@ diff -ur linux-6.6.69ori/include/linux/serial_8250.h linux-6.6.69/include/linux/
  	unsigned char		cur_iotype;	/* Running I/O type */
  	unsigned int		rpm_tx_active;
  	unsigned char		canary;		/* non-zero during system sleep
-@@ -161,6 +167,126 @@
+@@ -161,6 +167,127 @@
  	void			(*dl_write)(struct uart_8250_port *up, u32 value);
  
  	struct uart_8250_em485 *em485;
@@ -891,12 +921,13 @@ diff -ur linux-6.6.69ori/include/linux/serial_8250.h linux-6.6.69/include/linux/
 +    unsigned short rts_toggle_final_delay;
 +    struct timer_list signal_timer;
 +    int signal_count;
++    unsigned int mctrl_prev;
 +// Perle end for trueport
 +
  	void			(*rs485_start_tx)(struct uart_8250_port *);
  	void			(*rs485_stop_tx)(struct uart_8250_port *);
  
-@@ -209,6 +335,23 @@
+@@ -209,6 +336,23 @@
  
  void serial8250_set_isa_configurator(void (*v)(int port, struct uart_port *up,
  					       u32 *capabilities));
@@ -920,6 +951,7 @@ diff -ur linux-6.6.69ori/include/linux/serial_8250.h linux-6.6.69/include/linux/
  
  #ifdef CONFIG_SERIAL_8250_RT288X
  int rt288x_setup(struct uart_port *p);
+
 diff -ur linux-6.6.69ori/include/linux/serial_core.h linux-6.6.69/include/linux/serial_core.h
 --- linux-6.6.69ori/include/linux/serial_core.h	2025-01-02 04:32:11.000000000 -0500
 +++ linux-6.6.69/include/linux/serial_core.h	2025-02-19 14:02:44.486376646 -0500
@@ -1942,8 +1974,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 
 --- /dev/null	2025-06-13 16:46:25.248000000 -0400
-+++ linux-6.6.92changed/drivers/tty/serial/8250/8250_perleomap.c	2025-06-13 17:20:55.400653557 -0400
-@@ -0,0 +1,4194 @@
++++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-06-25 15:21:50.655350525 -0400
+@@ -0,0 +1,4200 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 +* 8250-core based driver for the OMAP internal UART
@@ -2112,7 +2144,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    u8 habit;
 +};
 +// Perle start for trueport
-+
++typedef struct mctrl_gpios;
 +#define SERIAL_DEBUG_SEND_SIGNAL 1
 +#define SERIAL_DEBUG_RTSTOGGLE 1
 +#define SERIAL_DEBUG_FORWARDING 0
@@ -3050,7 +3082,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +#define send_signal(pid, sig, priv) kill_pid(find_vpid(pid), sig, priv)
 +#endif
 +
-+static unsigned short MSR2TIOCM(unsigned char msr)
++unsigned short MSR2TIOCM(unsigned char msr)
 +{
 +    unsigned short tiocm = 0;
 +
@@ -3072,7 +3104,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    up->sigScan.line = 0xffff;
 +}
 +
-+static int fsmSigScan(struct uart_8250_port *up, int event, int data)
++int fsmSigScan(struct uart_8250_port *up, int event, int data, int caller)
 +{
 +    int pid = up->sigScan.pid;
 +//    struct uart_port *port = &up->port;    // SVT
@@ -3080,7 +3112,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +
 +    proc = getProcSigScan(up->sigScan.line);
-+//  printk("%s()@%d: pid=%d line=%d event=%d data=%s proc=%d\n",__FUNCTION__,__LINE__, pid, up->sigScan.line, event, data, proc );
++  printk_deferred("%s()@%d: pid=%d line=%d event=%d data=%x proc=%d caller=%d\n",__FUNCTION__,__LINE__, pid, up->sigScan.line, event, data, proc, caller );
 +    if(proc < 0)
 +        return(-1);
 +
@@ -3105,6 +3137,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        switch(proc)
 +        {
 +        case PROCSS_SCAN:
++        printk("%s %d %x\n",__FUNCTION__,__LINE__,up->sigScan.sigmask);
 +            if((data & up->sigScan.sigmask) == up->sigScan.sigmask)
 +            {
 +                setProcSigScan(up->sigScan.line, PROCSS_START);
@@ -3173,7 +3206,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    struct uart_port *port = &up->port;
 +
 +    spin_lock_irqsave(&port->lock, flags);
-+    fsmSigScan(up, FSMSS_TIMEOUT, 0);
++    fsmSigScan(up, FSMSS_TIMEOUT, 0, 1);
 +    spin_unlock_irqrestore(&port->lock, flags);
 +}
 +
@@ -3457,6 +3490,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +{
 +    unsigned long flags;
 +    struct uart_8250_port *up = up_to_u8250p(port);
++    struct mctrl_gpios *gpios = up->gpios;
 +    struct sigscan sigCopy;
 +    int returnCode=0;
 +
@@ -3469,14 +3503,17 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        }
 +
 +        // incase other CPU runs during del_timer_sync() we must be unlocked...
-+        fsmSigScan(up, FSMSS_EXIT, 0);
++        fsmSigScan(up, FSMSS_EXIT, 0,2);
 +
 +        spin_lock_irqsave(&port->lock, flags);
 +        if(sigCopy.pid != 0 && sigCopy.sigmask != 0)
 +        {
 +            memcpy(&up->sigScan, &sigCopy, sizeof(struct sigscan));
-+            fsmSigScan(up, FSMSS_SCAN, 0);
-+            fsmSigScan(up, FSMSS_TIOCM, MSR2TIOCM((unsigned char)up->last_msr_read));
++            fsmSigScan(up, FSMSS_SCAN, 0,3);
++            fsmSigScan(up, FSMSS_TIOCM, up->mctrl_prev,4);
++            //fsmSigScan(up, FSMSS_TIOCM, MSR2TIOCM((unsigned char)up->last_msr_read),4);
++            //fsmSigScan(up, FSMSS_TIOCM, (unsigned char)up->last_msr_read,4);
++            printk("%s,%d: mctrl_prev %x \n", __func__, __LINE__, up->mctrl_prev);
 +        }
 +        // else if(sigCopy.sigdrop)    // allow drop only function
 +        // {
@@ -4338,7 +4375,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            send_signal(up->rpt_pid, SIGUSR1, 1);
 +        }
 +
-+        fsmSigScan(up, FSMSS_TIOCM, MSR2TIOCM((unsigned char)status));
++        fsmSigScan(up, FSMSS_TIOCM, MSR2TIOCM((unsigned char)status),5);
++        up->last_msr_read = (unsigned char)status;
 +// Perle end for trueport
 +    if (status & UART_MSR_ANY_DELTA && up->ier & UART_IER_MSI &&
 +        port->state != NULL) {
@@ -4369,7 +4407,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    //printk("(%s,%d)\n",__FUNCTION__,__LINE__);
 +    if (iir & UART_IIR_NO_INT)
 +        return 0;
-+    // printk("(%s,%d)\n",__FUNCTION__,__LINE__);
++    printk("(%s,%d)\n",__FUNCTION__,__LINE__);
 +    spin_lock_irqsave(&port->lock, flags);
 +
 +    status = serial_lsr_in(up);
@@ -4625,7 +4663,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    del_timer_sync(&up->forward_send_timer);
 +    del_timer_sync(&up->rs232_rts_toggle_timer);
 +    del_timer_sync(&up->rs232_rts_toggle_initial_timer);
-+    fsmSigScan(up, FSMSS_EXIT, 0);
++    fsmSigScan(up, FSMSS_EXIT, 0,6);
 +    up->forwarding = 0;
 +
 +    del_timer_sync(&up->signal_timer);
