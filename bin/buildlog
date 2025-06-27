@@ -3,16 +3,17 @@
 # Check nexus-build for evidence of failures.
 #
 
-# Set "n" in the environment to your nexus-build workdir for convenience
-test -z "$n" || cd "$n"
-
 PROG=$(basename $0)
 smso=$(tput smso)
 rmso=$(tput rmso)
 
 test -f .defs.mk || {
-    echo "$PROG: This must be run in a nexus-build working tree" >&2
-    exit 1
+    # Set "n" in the environment to your nexus-build workdir for convenience
+    test -z "$n" || { echo "$PROG: Using directory $n"; cd "$n"; }
+    test -f .defs.mk || {
+        echo "$PROG: This must be run in a nexus-build working tree" >&2
+        exit 1
+    }
 }
 
 # "Progress" patterns during build.
