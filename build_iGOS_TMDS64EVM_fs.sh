@@ -119,6 +119,8 @@ if [ ! -f "$BLT" ]; then
         echo "Symlinking package: $a"
         ln -vrfs $a $ROOTDIR/vyos-build/packages/
     done
+
+    cp $ROOTDIR/packages/* $ROOTDIR/vyos-build/packages/
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP $TSK ($BLT exists)"
@@ -253,6 +255,10 @@ if [ ! -f "$BLT" ]; then
     sudo cp updates/perle-init.sh $FS/usr/bin
     sudo cp -rf updates/model-info $FS/usr/share/vyos/
     sudo cp -rf updates/product.env $FS/etc/
+
+    # Copy the iolan service that performs monitoring start and stop services on serial ports
+    sudo cp updates/iolan.service $FS/lib/systemd/system
+    sudo ln -s /lib/systemd/system/iolan.service $FS/etc/systemd/system/multi-user.target.wants/iolan.service
 
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"

@@ -1,0 +1,17 @@
+[Unit]
+Description=Perle IOLAN monitor
+
+DefaultDependencies=no
+
+After=vyos-router.service
+
+[Service]
+ExecStart=/usr/bin/iol_monitor
+Type=simple
+Restart=no
+
+[Install]
+WantedBy=vyos.target
+
+
+
