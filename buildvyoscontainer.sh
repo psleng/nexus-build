@@ -16,10 +16,16 @@ if [ "$BUILDTARG" != "x86_64" ]; then
     fi
 fi
 
+if [ ! -d vyos-build ]; then
+    echo "I: Cloning vyos-build"
+    git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
+fi
+
 if docker image inspect $IMGNAME > /dev/null 2>&1; then
     # Docker image exists, but is it up to date?
     P=$(basename $0)
-    if $ROOTDIR/bin/checkDockerImageUptodate.py $IMGNAME Dockerfile-$(arch)
+    if $ROOTDIR/bin/checkDockerImageUptodate.py $IMGNAME \
+            Dockerfile-$ARCH vyos-build/docker/entrypoint.sh
     then
         echo "$P: $IMGNAME exists and is up to date; skipping rebuild."
         echo "$P: To force a rebuild type:"
@@ -32,10 +38,6 @@ if docker image inspect $IMGNAME > /dev/null 2>&1; then
     fi
 fi
 
-if [ ! -d vyos-build ]; then
-    echo "I: Cloning vyos-build"
-    git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
-fi
 cd vyos-build
 
 DF=${ROOTDIR}/Dockerfile-$ARCH

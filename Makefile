@@ -104,7 +104,7 @@ endef
 
 # Build the arm64 VyOS building container image
 $(CONT_TARG):
-	@echo ### Making build container image ($@)'
+	@echo '### Making build container image ($@)'
 	./buildvyoscontainer.sh
 	@touch $@
 
