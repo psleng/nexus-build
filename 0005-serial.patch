@@ -452,7 +452,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250.h linux-6.6.69/drivers/tty
 +
 
 --- linux-6.6.93/drivers/tty/serial/8250/8250_port.c	2025-06-04 08:42:26.000000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/8250/8250_port.c	2025-07-09 13:42:35.733495227 -0400
++++ linux-6.6.93changed/drivers/tty/serial/8250/8250_port.c	2025-07-11 16:12:46.882574503 -0400
 @@ -51,6 +51,8 @@
  #define DEBUG_AUTOCONF(fmt...)	do { } while (0)
  #endif
@@ -1097,10 +1097,9 @@ diff -ur linux-6.6.69ori/include/linux/tty_port.h linux-6.6.69/include/linux/tty
  	struct mutex		mutex;
  	struct mutex		buf_mutex;
  	unsigned char		*xmit_buf;
-diff -ur linux-6.6.69ori/include/uapi/asm-generic/ioctls.h linux-6.6.69/include/uapi/asm-generic/ioctls.h
---- linux-6.6.69ori/include/uapi/asm-generic/ioctls.h	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/include/uapi/asm-generic/ioctls.h	2025-02-19 14:02:44.489376580 -0500
-@@ -117,5 +117,93 @@
+--- linux-6.6.93/include/uapi/asm-generic/ioctls.h	2025-06-04 08:42:26.000000000 -0400
++++ linux-6.6.93changed/include/uapi/asm-generic/ioctls.h	2025-07-10 10:56:24.090547611 -0400
+@@ -117,5 +117,94 @@
  #define TIOCPKT_IOCTL		64
  
  #define TIOCSER_TEMT	0x01	/* Transmitter physically empty */
@@ -1165,6 +1164,7 @@ diff -ur linux-6.6.69ori/include/uapi/asm-generic/ioctls.h linux-6.6.69/include/
 +#define TIOCM_LOOP	0x8000
 +
 +/* c_lflag bits */
++#if 0 //Defined in termbits.h
 +#define ISIG	0000001
 +#define ICANON	0000002
 +#define XCASE	0000004
@@ -1181,8 +1181,8 @@ diff -ur linux-6.6.69ori/include/uapi/asm-generic/ioctls.h linux-6.6.69/include/
 +#define PENDIN	0040000
 +#define IEXTEN	0100000
 +#define EXTPROC	0200000
++#endif
 +#define NO_XLATE 01000000
-+
 +
 +#define FANOUT_IOC_MAGIC        'k'
 +#define FANOUT_IOCT_FLUSH       _IO(FANOUT_IOC_MAGIC, 0x80)
@@ -1194,6 +1194,7 @@ diff -ur linux-6.6.69ori/include/uapi/asm-generic/ioctls.h linux-6.6.69/include/
 +#define TRPT_ON		0x0001			// report mode on
 +// Perle end for trueport
  #endif /* __ASM_GENERIC_IOCTLS_H */
+
 diff -ur linux-6.6.69ori/include/uapi/asm-generic/termbits.h linux-6.6.69/include/uapi/asm-generic/termbits.h
 --- linux-6.6.69ori/include/uapi/asm-generic/termbits.h	2025-01-02 04:32:11.000000000 -0500
 +++ linux-6.6.69/include/uapi/asm-generic/termbits.h	2025-02-19 14:02:44.489376580 -0500
@@ -2001,8 +2002,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 
 --- /dev/null	2025-07-09 10:46:32.756000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-07-09 13:41:30.858719641 -0400
-@@ -0,0 +1,4299 @@
++++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-07-14 15:15:41.240263724 -0400
+@@ -0,0 +1,4338 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 +* 8250-core based driver for the OMAP internal UART
@@ -2220,11 +2221,21 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +static void push_char_frame(struct uart_8250_port *up, unsigned char ch, unsigned char st);
 +static void push_char_end(struct uart_8250_port *up, unsigned char ch, unsigned char st);
 +static void store_char(struct uart_8250_port *up, unsigned char ch, unsigned char st);
-+static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl);
++static void fix_port_mctrl_from_mcr(struct uart_8250_port *up);
++// static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl);
 +static inline void __perle_stop_tx(struct uart_8250_port *p);
 +#ifdef CONFIG_SERIAL_8250_DMA
 +static int omap_8250_rx_dma(struct uart_8250_port *p);
 +#endif
++
++static inline void perleserial8250_out_MCR(struct uart_8250_port *up, int value)
++{
++	serial_out(up, UART_MCR, value);
++    up->last_mcr_written=value;
++    fix_port_mctrl_from_mcr(up);
++	if (up->gpios)
++		mctrl_gpio_set(up->gpios, serial8250_MCR_to_TIOCM(value));
++}
 +
 +int set_modem_info(struct uart_8250_port *up, unsigned int cmd, unsigned int arg)
 +{
@@ -2317,8 +2328,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        printk_deferred("%s()@%d: or %x  xor %x new_mcr %x\n",__FUNCTION__,__LINE__,or, xor,new_mcr);
 +        new_mcr = (new_mcr & up->mcr_mask) | up->mcr_force | up->mcr;   // copied from serial8250_do_set_mctrl
 +        printk_deferred("%s()@%d: new_mcr %x  mcr_mask %x  force %x mcr %x\n",__FUNCTION__,__LINE__,new_mcr , up->mcr_mask, up->mcr_force , up->mcr);
-+        serial8250_out_MCR(up,new_mcr);
-+        //serial_out_mcr(up, new_mcr);
++        perleserial8250_out_MCR(up,new_mcr);
++        // serial_out_mcr(up, new_mcr);
 +    }
 +    return 0;
 +}
@@ -2327,6 +2338,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +{
 +    serial_out(up, UART_MCR, value);
 +    up->last_mcr_written=value;
++    fix_port_mctrl_from_mcr(up);
 +}
 +EXPORT_SYMBOL(serial_out_mcr);
 +
@@ -3613,7 +3625,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +{
 +    unsigned long flags;
 +    struct uart_8250_port *up = up_to_u8250p(port);
-+    struct mctrl_gpios *gpios = up->gpios;
++    // struct mctrl_gpios *gpios = up->gpios;
 +    struct sigscan sigCopy;
 +    int returnCode=0;
 +
@@ -3796,7 +3808,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +{
 +    struct uart_8250_port *up = up_to_u8250p(port);
 +    printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
-+    unsigned char mcr;
++    // unsigned char mcr;
 +
 +    //mcr = serial8250_TIOCM_to_MCR(mctrl);
 +
@@ -4337,7 +4349,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    int max_count = 256;
 +// Perle start for trueport
 +    char flag;
-+    unsigned char ignore_this_byte=0;
++
 +// Perle end for trueport
 +    do {
 +// Perle start for trueport
@@ -5263,6 +5275,34 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    }
 +}
 +
++// fixup mctrl in port structure for serial_core.c, otherwise TIOCMGET will
++// not return the correct state of RTS for 485/422 mode because
++// the omap_serial.c driver can change RTS for these modes
++// this is also necessary in 232 mode, because other ioctls can change RTS and DTR
++static void fix_port_mctrl_from_mcr(struct uart_8250_port *up)
++{
++    unsigned int setbits=0;
++    unsigned int clearbits=0;
++
++    if (up->last_mcr_written & UART_MCR_RTS)
++    {
++        setbits|=TIOCM_RTS;
++    }
++    else
++    {
++        clearbits|=TIOCM_RTS;
++    }
++
++    if (up->last_mcr_written & UART_MCR_DTR)
++    {
++        setbits|=TIOCM_DTR;
++    }
++    else
++    {
++        clearbits|=TIOCM_DTR;
++    }
++    up->port.mctrl = (up->port.mctrl & (~clearbits)) | setbits;
++}
 +
 +static unsigned int perle_serial8250_do_get_mctrl(struct uart_port *port)
 +{
@@ -5356,8 +5396,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        if(up->port.rs485.flags & SER_RS485_ECHO_SUPPRESSION)
 +            up->port.rs485_txing_no_echo = 1;
 +
-+            port->icount.tx++;
-+            port->x_char = 0;
++        port->icount.tx++;
++        port->x_char = 0;
 +        // uart_xchar_out(port, UART_TX);
 +        // Perle end for trueport
 +        return;
