@@ -2507,8 +2507,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +# Perle end
 
 --- /dev/null	2025-07-09 10:46:32.756000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-07-15 17:25:11.583714351 -0400
-@@ -0,0 +1,4559 @@
++++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-07-16 12:10:19.329573573 -0400
+@@ -0,0 +1,4579 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 +* 8250-core based driver for the OMAP internal UART
@@ -2638,6 +2638,23 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +/* RX FIFO occupancy indicator */
 +#define UART_OMAP_RX_LVL        0x19
 +
++#define SER_RS485_HDX               (1 << 16)       // 0x00010000, half duplex if enabled
++#define SER_RS485_ECHO_SUPPRESSION  (1 << 17)       // 0x00020000, echo suppression for half duplex only
++#define SER_RS4XX_LINE_TERMINATION  (1 << 18)       // 0x00040000, line termination
++#define SER_RS485_DRIVERCTL_AUTO    (1 << 19)       // 0x00080000, driver controls RTS (TX envelope for 485 hdx and fdx only. for 422 RTS is always active)
++#define SER_RS422_ENABLED           (1 << 20)       // 0x00100000, 422 enabled
++#define SER_RS4XX_INVERT_RTS        (1 << 21)       // 0x00200000, invert RTS when accessing the MCR because the transceiver uses an inverted RTS signal to control the TX
++                                                    //           normally MCR[RTS]=1, causes 0V from the UART and results in RTS high
++                                                    //                    MCR[RTS]=0, causes 3.3V from the UART and results in RTS low
++                                                    //           with RS4XX
++                                                    //                    MCR[RTS]=1, causes 0V from the UART and results in RTS low (TX off)
++                                                    //                    MCR[RTS]=0, causes 3.3V from the UART and results in RTS high (TX on)
++#define SER_RSXXX_IGNORE_LINE_ERRORS    (1 << 22)   // 0x00400000, ignore line errors (parity and framing)
++#define SER_RSXXX_SINGLE_CHAR_INTERRUPT (1 << 23)   // 0x00800000, single char interrupt
++#define SER_RSXXX_SIGNALCTL_MANUAL      (1 << 24)   // 0x01000000, manual signal control
++#define SER_RSXXX_SIGNALCTL_INACTIVE    (1 << 25)   // 0x02000000, DTR and RTS inactive
++#define SER_RSXXX_FIFO_DIRECT           (1 << 26)   // 0x04000000, fifo direct mode
++#define SER_RS232_ENABLED               (1 << 27)   // 0x08000000, 232 enabled
 +struct perleomap8250_priv {
 +    void __iomem *membase;
 +    int line;
@@ -6607,6 +6624,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    up.rs485_stop_tx = serial8250_em485_stop_tx;
 +    up.port.has_sysrq = IS_ENABLED(CONFIG_SERIAL_8250_CONSOLE);
 +    up.port.ops = &omap_port_ops;
++    up.port.rs485_supported.flags = SER_RS232_ENABLED|SER_RS422_ENABLED|SER_RS4XX_INVERT_RTS|SER_RS485_ENABLED|SER_RS485_DRIVERCTL_AUTO|SER_RS485_HDX \
++    |SER_RS485_ECHO_SUPPRESSION|SER_RS4XX_LINE_TERMINATION|SER_RSXXX_IGNORE_LINE_ERRORS|SER_RSXXX_SINGLE_CHAR_INTERRUPT|SER_RSXXX_SIGNALCTL_MANUAL \
++    |SER_RSXXX_SIGNALCTL_INACTIVE|SER_RSXXX_FIFO_DIRECT;
 +
 +    ret = of_alias_get_id(np, "serial");
 +    if (ret < 0) {
