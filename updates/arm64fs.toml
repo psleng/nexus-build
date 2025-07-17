@@ -9,6 +9,7 @@ packages = [
   "qemu-guest-agent",
   "python3-pip",
   "python3-venv",
+  "tpm2-openssl",
   # "vyos-xe-guest-utilities",
 ]
 
