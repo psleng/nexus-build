@@ -2507,8 +2507,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +# Perle end
 
 --- /dev/null	2025-07-09 10:46:32.756000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-07-16 12:10:19.329573573 -0400
-@@ -0,0 +1,4579 @@
++++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-07-17 17:41:39.034595251 -0400
+@@ -0,0 +1,4589 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 +* 8250-core based driver for the OMAP internal UART
@@ -3877,6 +3877,15 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +                mod_timer(&up->sigscan_delay_timer, jiffies + delay);
 +            }
 +            break;
++        case PROCSS_DELAY:
++        printk("%s %d %x\n",__FUNCTION__,__LINE__,up->sigScan.sigmask);
++            if((data & up->sigScan.sigmask) == up->sigScan.sigmask)
++            {
++                del_timer(&up->sigscan_delay_timer);
++                setProcSigScan(up->sigScan.line, PROCSS_START);
++                send_signal(pid, SIGUSR1, 1);
++            }
++            break;    
 +        }
 +        break;
 +    default:
@@ -5217,6 +5226,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            send_signal(up->rpt_pid, SIGUSR1, 1);
 +        }
 +
++        if (status & (UART_MSR_DDCD|UART_MSR_DDSR))
 +        fsmSigScan(up, FSMSS_TIOCM, serial8250_MSR_to_TIOCM((unsigned char)status),5);
 +        // up->last_msr_read = (unsigned char)status;
 +// Perle end for trueport
