@@ -47,11 +47,11 @@ help:
 
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
-IGOS_PKGS='vpp vyos-1x vyatta-bash vyos-user-utils vyatta-biosdevname \
-        libvyosconfig vyatta-cfg vyos-http-api-tools vyos-utils \
-        ipaddrcheck hvinfo \
-        libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
-        tacacs live-boot'
+IGOS_PKGS='psl-progs vpp vyos-1x vyatta-bash vyos-user-utils \
+           vyatta-biosdevname libvyosconfig vyatta-cfg vyos-http-api-tools \
+           vyos-utils ipaddrcheck hvinfo \
+           libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
+           tacacs live-boot'
 
 # target build: TI TMDS64EVM board (default)
 # BUILDTYPE is a builds entry from ti-bdebstrap/builds.toml
@@ -104,7 +104,7 @@ endef
 
 # Build the arm64 VyOS building container image
 $(CONT_TARG):
-	@echo ### Making build container image ($@)'
+	@echo '### Making build container image ($@)'
 	./buildvyoscontainer.sh
 	@touch $@
 
@@ -118,7 +118,7 @@ ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
 	@touch $@
 else
-	@$(call DOCKRUN,$@,./buildiGOSti.sh $(BUILDTYPE) --ubootonly)
+	@$(call DOCKRUN,uboot,./buildiGOSti.sh $(BUILDTYPE) --ubootonly)
 endif
 
 # Build the root filesystem

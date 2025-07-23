@@ -326,6 +326,9 @@ def do_tomldiff() -> None:
     # vyos_path = Path('../vyos-build/scripts/package-build')
     vyos_path = Path(f'{WORKDIR}/vyos-build/scripts/package-build')
 
+    print(f'"<" is relative to {igos_path}')
+    print(f'">" is relative to {vyos_path}')
+
     # For each iGOS package, compare the package.toml with VyOS's
     for pkg in igos_pkgs:
         igos_toml = Path(igos_path, pkg, TOML)

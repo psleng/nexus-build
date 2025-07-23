@@ -74,10 +74,17 @@ do
     REPOGIT=$REPODIR/$repo.git
     test -d $REPOGIT && continue # already here
 
-    #echo "*** Copying $repo/.git to $REPOGIT ..."
-    #cp -pr $repo/.git $REPOGIT
     echo "*** Making bare copy of $repo to $REPOGIT"
     (
+        # Ensure the psl-master branch will be available
+        cd $repo
+        cur=$(git branch --show-current)
+        git switch -q psl-master
+        git switch -q $cur
+    )
+
+    (
+        # Copy it
         cd $REPODIR
         git clone --mirror --no-hardlinks ../$repo
         cd $repo.git
