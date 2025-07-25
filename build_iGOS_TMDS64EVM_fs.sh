@@ -139,8 +139,6 @@ if [ ! -f "$BLT" ]; then
         echo "Symlinking package: $a"
         ln -vrfs $a $ROOTDIR/vyos-build/packages/
     done
-
-    cp $ROOTDIR/packages/* $ROOTDIR/vyos-build/packages/
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP $TSK ($BLT exists)"
