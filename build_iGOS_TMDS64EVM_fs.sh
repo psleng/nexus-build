@@ -274,10 +274,6 @@ if [ ! -f "$BLT" ]; then
     sudo cp -rf updates/model-info $FS/usr/share/vyos/
     sudo cp -rf updates/product.env $FS/etc/
 
-    # Copy the iolan service that performs monitoring start and stop services on serial ports
-    sudo cp updates/iolan.service $FS/lib/systemd/system
-    sudo ln -s /lib/systemd/system/iolan.service $FS/etc/systemd/system/multi-user.target.wants/iolan.service
-
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"
 
