@@ -53,6 +53,8 @@ LABEL authors="VyOS Maintainers <maintainers@vyos.io>" \
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN /bin/echo -e 'APT::Install-Recommends "0";\nAPT::Install-Suggests "0";' > /etc/apt/apt.conf.d/01norecommends
+# Clean cache after each apt-get install command so that it is not stored in the image
+RUN /bin/echo -e 'DPkg::Post-Invoke {"/bin/rm -f /var/cache/apt/archives/*.deb /var/lib/apt/lists/* || true";};' > /etc/apt/apt.conf.d/clean
 
 RUN apt-get update && apt-get install -y \
       dialog \
@@ -90,7 +92,8 @@ RUN apt-get update && apt-get install -y \
       jq \
       less \
       socat \
-      python-is-python3
+      python-is-python3 \
+      apt-transport-https
 
 # Packages needed for vyos-build
 RUN apt-get update && apt-get install -y \
@@ -143,10 +146,8 @@ RUN dpkg-reconfigure ca-certificates; \
 RUN curl https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh \
       --output /tmp/opam_install.sh --retry 10 --retry-delay 5 && \
     sed -i 's/read_tty BINDIR/BINDIR=""/' /tmp/opam_install.sh && sh /tmp/opam_install.sh && \
-    opam init --root=/opt/opam --comp=${OCAML_VERSION} --disable-sandboxing --no-setup
-
-# RUN eval $(opam env --root=/opt/opam --set-root) && \
-#     opam pin add pcre https://github.com/mmottl/pcre-ocaml.git#0c4ca03a -y
+    opam init --root=/opt/opam --comp=${OCAML_VERSION} --disable-sandboxing --no-setup \
+    && rm /tmp/opam_install.sh
 
 RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
       re \
@@ -166,7 +167,8 @@ RUN apt-get update && apt-get install -y \
 # Install open-vmdk
 RUN wget -O /tmp/open-vmdk-master.zip https://github.com/vmware/open-vmdk/archive/master.zip && \
     unzip -d /tmp/ /tmp/open-vmdk-master.zip && \
-    cd /tmp/open-vmdk-master/ && make && make install
+    cd /tmp/open-vmdk-master/ && make && make install && \
+    cd /tmp && rm -rf /tmp/open-vmdk-master/ && rm /tmp/open-vmdk-master.zip
 
 # Packages need for build live-build
 RUN apt-get update && apt-get install -y \
@@ -179,7 +181,9 @@ RUN git clone https://salsa.debian.org/live-team/live-build.git /tmp/live-build 
     patch -p1 < /tmp/0001-save-package-info.patch && \
     dch -n "Applying fix for save package info" && \
     dpkg-buildpackage -us -uc && \
-    dpkg -i ../live-build*.deb
+    dpkg -i ../live-build*.deb && \
+    rm -rf /tmp/live-build
+
 #
 # live-build: building in docker fails with mounting /proc | /sys
 #
@@ -194,7 +198,9 @@ RUN wget https://salsa.debian.org/klausenbusk-guest/debootstrap/commit/a9a603b17
     patch -p1 < /tmp/a9a603b17cadbf52cb98cde0843dc9f23a08b0da.patch && \
     dch -n "Applying fix for docker image compile" && \
     dpkg-buildpackage -us -uc && \
-    sudo dpkg -i ../debootstrap*.deb
+    sudo dpkg -i ../debootstrap*.deb \
+    && rm /tmp/a9a603b17cadbf52cb98cde0843dc9f23a08b0da.patch \
+    && rm -rf /tmp/debootstrap
 
 # Packages needed for Linux Kernel
 # cmake required by accel-ppp
@@ -226,11 +232,16 @@ RUN apt-get update && apt-get install -y \
       build-essential
 RUN gem install --no-document fpm
 
+# Add vyos package repo
+COPY vyos-dev.list /etc/apt/sources.list.d/vyos-dev.list
+COPY vyos-dev.key /usr/share/keyrings/vyos-dev-archive-keyring.gpg
+RUN apt-key add /usr/share/keyrings/vyos-dev-archive-keyring.gpg
+
 # Packages needed for vyos-1x
-RUN pip install --break-system-packages \
+RUN pip --no-cache --no-cache-dir install --break-system-packages \
       git+https://github.com/aristanetworks/j2lint.git@341b5d5db86 \
-      pyhumps==3.8.0 && \
-    apt-get update && apt-get install -y \
+      pyhumps==3.8.0; \
+    sudo apt-get update && apt-get install -y \
       build-essential \
       dh-python \
       fakeroot \
@@ -258,6 +269,15 @@ RUN pip install --break-system-packages \
       python3-protobuf \
       python3-tabulate \
       python3-zmq \
+      python3-vici \
+      python3-fastapi \
+      python3-pyudev \
+      python3-systemd \
+      python3-certbot-nginx \
+      python3-pam \
+      python3-dbus \
+      python3-pyroute2 \
+      python3-voluptuous \
       pylint \
       quilt \
       whois \
@@ -364,13 +384,13 @@ RUN apt-get update && apt-get install -y \
       libnl-genl-3-dev \
       libxtables-dev
 
-# Packages needed for OWAMP - JF
+# PSL: Packages needed for OWAMP - JF
 RUN apt-get update && apt-get install -y \
 	dh-apparmor \
 	dh-exec \
 	libcap-dev
 
-# Packages needed for Strongswan - JF
+# PSL: Packages needed for Strongswan - JF
 RUN apt-get update && apt-get install -y \
 	bison \
 	bzip2 \
@@ -405,11 +425,11 @@ RUN apt-get update && apt-get install -y \
 	libsystemd-dev \
 	systemd
 
-# Packages needed for failed make of Vyos - JF
+# PSL: Packages needed for failed make of Vyos - JF
 RUN apt-get update && apt-get install -y \
 	kpartx
 	
-# Packages needed for frr - JF
+# PSL: Packages needed for frr - JF
 # DK	libsnmp-dev removed, it  will be installed when net-snmp is installed BEFORE frr is built - order dependency
 # And for building libyan2-dev https://docs.frrouting.org/projects/dev-guide/en/latest/building-frr-for-debian12.html#install-required-packages -JF
 RUN apt-get update && apt-get install -y \
@@ -442,20 +462,20 @@ RUN apt-get update && apt-get install -y \
 	lsof \
 	logrotate
 
-# Packages needed for net-snmp - DK
+# PSL: Packages needed for net-snmp - DK
 RUN apt-get update && apt-get install -y \
 	perl-xs-dev \
 	default-libmysqlclient-dev
 
-# Packages needed for debconf preseed selection of vpp - DK
+# PSL: Packages needed for debconf preseed selection of vpp - DK
 RUN apt-get update && apt-get install -y \
 	debconf-utils
 
 # Packages needed for keepalived
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     libipset-dev libnfnetlink-dev libnftnl-dev libnl-nf-3-dev libpopt-dev
 
-#Packages needed for TI Boot Environment
+# PSL: Packages needed for TI Boot Environment
 RUN apt-get update && apt-get install -y \
 	pigz \
 	expect \
@@ -473,7 +493,7 @@ RUN pip install --break-system-packages \
 	toml-cli \
 	yamllint
 
-# Environment variables needed - JF
+# PSL: Environment variables needed - JF
 ENV DEBEMAIL="psleng@perle.com"
 ENV EMAIL=${DEBEMAIL}
 
@@ -502,12 +522,18 @@ RUN sed -i 's/UID_MAX\t\t\t60000/UID_MAX\t\t\t2000000000/g' /etc/login.defs
 # Cleanup
 RUN rm -rf /tmp/*
 
+# Remove cleanup script so that in-container apt-get install uses cache
+RUN rm /etc/apt/apt.conf.d/clean
+
+# Add cache once as it is needed by some builds in GitHub Actions
+RUN apt-get update
+
 # Disable mouse in vim
 RUN printf "set mouse=\nset ttymouse=\n" > /etc/vim/vimrc.local
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
-# Install apt pubkey and sources.list.d file for psleng.github.io
+# PSL: Install apt pubkey and sources.list.d file for psleng.github.io
 RUN echo "deb [signed-by=/etc/apt/keyrings/psleng.key] https://psleng.github.io current main" >> /etc/apt/sources.list.d/psleng.list
 COPY psleng.key /etc/apt/keyrings/
 
