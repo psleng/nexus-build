@@ -504,6 +504,7 @@ RUN apt-get update && apt-get install -y \
 # Packages needed for iolan
 RUN apt-get update && apt-get install -y \
       libc6-dev \
+      ppp-dev \
       libnetfilter-queue-dev
 
 # Allow password-less 'sudo' for all users in group 'sudo'
