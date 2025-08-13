@@ -247,6 +247,11 @@ if [ ! -f "$BLT" ]; then
     sudo cp -p updates/run-live-config $FS/usr/lib/live/
     sudo chroot $FS bash -c usr/lib/live/run-live-config
 
+    # Change owner/group of /opt/flask if exist
+    if test -d /opt/flask; then
+      sudo chown -R igos:users /opt/flask
+    fi 
+
     # Copy the perle-init once service that performs /lib/live/boot/* tasks
     sudo cp updates/perle-init.service $FS/lib/systemd/system
     sudo ln -s /lib/systemd/system/perle-init.service $FS/etc/systemd/system/multi-user.target.wants/perle-init.service
