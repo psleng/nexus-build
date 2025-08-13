@@ -530,8 +530,8 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  obj-$(CONFIG_SERIAL_8250_LPC18XX)	+= 8250_lpc18xx.o
  obj-$(CONFIG_SERIAL_8250_MT6577)	+= 8250_mtk.o
 
---- linux-6.6.93/drivers/tty/serial/serial_core.c	2025-06-04 08:42:26.000000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/serial_core.c	2025-06-25 15:57:33.452142876 -0400
+--- linux-6.6.100/drivers/tty/serial/serial_core.c	2025-07-24 02:53:22.000000000 -0400
++++ linux-6.6.100changed/drivers/tty/serial/serial_core.c	2025-08-12 14:53:09.498708303 -0400
 @@ -33,7 +33,7 @@
  #include <linux/uaccess.h>
  
@@ -572,7 +572,46 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
   check_and_exit:
  	retval = 0;
  	if (uport->type == PORT_UNKNOWN)
-@@ -1593,7 +1606,16 @@
+@@ -1491,6 +1504,8 @@
+ 	int ret;
+ 	unsigned long flags;
+ 
++	printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
++
+ 	if (!(port->rs485_supported.flags & SER_RS485_ENABLED))
+ 		return -ENOTTY;
+ 
+@@ -1500,9 +1515,13 @@
+ 	ret = uart_check_rs485_flags(port, &rs485);
+ 	if (ret)
+ 		return ret;
+-	uart_sanitize_serial_rs485(port, &rs485);
+-	uart_set_rs485_termination(port, &rs485);
+-	uart_set_rs485_rx_during_tx(port, &rs485);
++	if (rs485.flags & SER_RS485_ENABLED)
++	{	
++		printk_deferred("%s()@%d: value \n",__FUNCTION__,__LINE__);
++		uart_sanitize_serial_rs485(port, &rs485);
++		uart_set_rs485_termination(port, &rs485);
++		uart_set_rs485_rx_during_tx(port, &rs485);
++	}
+ 
+ 	spin_lock_irqsave(&port->lock, flags);
+ 	ret = port->rs485_config(port, &tty->termios, &rs485);
+@@ -1512,6 +1531,12 @@
+ 		/* Reset RTS and other mctrl lines when disabling RS485 */
+ 		if (!(rs485.flags & SER_RS485_ENABLED))
+ 			port->ops->set_mctrl(port, port->mctrl);
++
++		if ((rs485.flags & SER_RS422_ENABLED))
++		{
++			printk_deferred("%s()@%d: 422:Force RTS \n",__FUNCTION__,__LINE__);
++			port->ops->set_mctrl(port, UART_MCR_RTS);
++		}	
+ 	}
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ 	if (ret) {
+@@ -1593,7 +1618,16 @@
  	void __user *uarg = (void __user *)arg;
  	int ret = -ENOIOCTLCMD;
  
@@ -590,7 +629,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  	/*
  	 * These ioctls don't rely on the hardware to be present.
  	 */
-@@ -1830,6 +1852,13 @@
+@@ -1830,6 +1864,13 @@
  		uart_port_deref(port);
  		return;
  	}
@@ -604,7 +643,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  
  	/*
  	 * Set the check interval to be 1/5 of the estimated time to
-@@ -2014,7 +2043,10 @@
+@@ -2014,7 +2055,10 @@
  	uport = uart_port_check(state);
  	if (!uport || uport->flags & UPF_DEAD)
  		return -ENXIO;
@@ -616,7 +655,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  	/*
  	 * Start up the serial port.
  	 */
-@@ -3137,6 +3169,9 @@
+@@ -3137,6 +3181,9 @@
  	.attrs = tty_dev_attrs,
  };
  
@@ -626,7 +665,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  /**
   * serial_core_add_one_port - attach a driver-defined port structure
   * @drv: pointer to the uart low level driver structure for this port
-@@ -3184,6 +3219,13 @@
+@@ -3184,6 +3231,13 @@
  		ret = -ENOMEM;
  		goto out;
  	}
@@ -640,7 +679,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  
  	/*
  	 * If this port is in use as a console then the spinlock is already
-@@ -3226,6 +3268,9 @@
+@@ -3226,6 +3280,9 @@
  		dev_err(uport->dev, "Cannot register tty device on line %d\n",
  		       uport->line);
  	}
@@ -2506,9 +2545,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +obj-y +=  uart_trace.o
 +# Perle end
 
---- /dev/null	2025-07-09 10:46:32.756000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/8250/8250_perleomap.c	2025-07-17 17:41:39.034595251 -0400
-@@ -0,0 +1,4589 @@
+--- /dev/null	2025-08-12 14:42:43.932000000 -0400
++++ linux-6.6.100changed/drivers/tty/serial/8250/8250_perleomap.c	2025-08-12 14:53:51.657781539 -0400
+@@ -0,0 +1,4601 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 +* 8250-core based driver for the OMAP internal UART
@@ -2753,6 +2792,18 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +static inline void perleserial8250_out_MCR(struct uart_8250_port *up, int value)
 +{
++
++    printk_deferred("%s()@%d: value %x\n",__FUNCTION__,__LINE__,value);
++    
++    if (up->port.rs485.flags & SER_RS422_ENABLED)
++    {
++        value |= UART_MCR_RTS;
++        printk_deferred("%s()@%d: forcing rts in 422 value %x\n",__FUNCTION__,__LINE__,value);
++    }
++
++
++
++    
 +	serial_out(up, UART_MCR, value);
 +    up->last_mcr_written=value;
 +    fix_port_mctrl_from_mcr(up);
