@@ -2545,9 +2545,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +obj-y +=  uart_trace.o
 +# Perle end
 
---- /dev/null	2025-08-12 14:42:43.932000000 -0400
-+++ linux-6.6.100changed/drivers/tty/serial/8250/8250_perleomap.c	2025-08-12 14:53:51.657781539 -0400
-@@ -0,0 +1,4601 @@
+--- /dev/null	2025-08-18 10:21:00.256000000 -0400
++++ linux-6.6.100changed/drivers/tty/serial/8250/8250_perleomap.c	2025-08-18 10:41:29.722160701 -0400
+@@ -0,0 +1,4625 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 +* 8250-core based driver for the OMAP internal UART
@@ -5633,6 +5633,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    u32 fixed_delay_rts_before_send = 0;
 +    u32 fixed_delay_rts_after_send = 0;
 +    unsigned int baud;
++    int mcr_new;
 +
 +    /*
 +    * There is a fixed delay of 3 bit clock cycles after the TX shift
@@ -5689,6 +5690,29 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +    serial_out(up, UART_OMAP_MDR3, priv->mdr3);
 +
++   	mcr_new = serial_in(up,UART_MCR);     // get the current value before applying changes
++
++    if (rs485->flags & SER_RSXXX_SIGNALCTL_INACTIVE)
++    {
++        mcr_new &= (~UART_MCR_DTR);     // inactive DTR
++        mcr_new &= (~UART_MCR_RTS);     // inactive RTS
++    }
++    else if (!(rs485->flags & SER_RSXXX_SIGNALCTL_MANUAL))      // auto signal control
++    {
++        {
++            if (up->rs232_rts_toggle)
++                mcr_new &= (~UART_MCR_RTS);     // inactive RTS
++            else
++                mcr_new |= UART_MCR_RTS;    // flow control - allow peer to send
++        }
++        if (rs485->flags & SER_RS232_ENABLED)  // rs232 mode?
++        {
++            mcr_new |= UART_MCR_DTR;    // DTR on
++        }
++
++    }
++    serial_out_mcr(up, mcr_new);
++ 
 +    return 0;
 +}
 +
