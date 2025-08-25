@@ -94,11 +94,13 @@ TSK=iolan_apps
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
-# Clone the repository if it doesn't exist or was cleaned
+
     cd vyos-build/scripts
-if [ ! -d "$REPO_NAME" ]; then
-    git clone -b main --single-branch "$IOL_REPO_URL"
+# Get the latest all the time
+if [ -d "$IOL_REPO_NAME" ]; then
+    rm -rf "$IOL_REPO_NAME"
 fi
+    git clone -b main --single-branch "$IOL_REPO_URL"
     cd ../..
     ./package-build.py --dir $TSK --include
     touch "$BLT" # build success
