@@ -2,7 +2,6 @@
 name = "libpam-radius-auth"
 commit_id = "psl-master"
 scm_url = "https://github.com/psleng/libpam-radius-auth"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"
 
 [dependencies]
 packages = [

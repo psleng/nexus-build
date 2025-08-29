@@ -39,13 +39,20 @@ if [ ! -d "$REPO_NAME" ]; then
     git clone -b psl-master --single-branch "$REPO_URL"
 fi
 
-# Install package scripts directory
+# Copy package-build-iGOS/ to vyos-build/scripts/ now that it's there
 SRCDIR=package-build-iGOS
 DSTDIR=vyos-build/scripts/
 if [ ! -d $DSTDIR/$SRCDIR ]; then
     echo "=== I: $0: Copying $ROOTDIR/$SRCDIR into $DSTDIR"
     cp -rf $SRCDIR $DSTDIR
     echo "These files were copied from $ROOTDIR/$SRCDIR" > $DSTDIR/$SRCDIR/README-PSL
+    # Borrow the vyos-build build.py if package-build-iGOS had none
+    BUILDPY=$DSTDIR/$SRCDIR/build.py
+    if [ ! -f $BUILDPY ]; then
+        echo "=== I: $0: Symlink VyOS build.py to $BUILDPY"
+        ln -rvfs $DSTDIR/package-build/build.py $BUILDPY
+    fi
+    unset BUILDPY
 fi
 
 # Install build_flavor
@@ -129,7 +136,10 @@ if [ ! -f "$BLT" ]; then
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;
-        */accel-ppp.deb)  # Duplicates
+        */_CPack_Packages/*.deb)  # .deb build artifacts (duplicates)
+            continue
+            ;;
+        */accel-ppp_*.deb)  # Obsolete accel-ppp (replaced by accel-ppp-ng)
             continue
             ;;
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
