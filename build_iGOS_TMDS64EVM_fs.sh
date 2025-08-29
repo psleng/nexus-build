@@ -108,8 +108,9 @@ if [ -d "$IOL_REPO_NAME" ]; then
     rm -rf "$IOL_REPO_NAME"
 fi
     git clone -b main --single-branch "$IOL_REPO_URL"
-    cd ../..
-    ./package-build.py --dir $TSK --include
+    cd $TSK
+    ./all-build.py
+    cd ../../..
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
