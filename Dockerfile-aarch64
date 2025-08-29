@@ -158,7 +158,11 @@ RUN eval $(opam env --root=/opt/opam --set-root) && opam install -y \
       ctypes-build \
       containers \
       fileutils \
-      xml-light
+      xml-light \
+      mustache \
+      yojson \
+      fmt \
+      logs
 
 # Packages needed for open-vmdk
 RUN apt-get update && apt-get install -y \
