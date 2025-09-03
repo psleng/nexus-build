@@ -43,7 +43,7 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned, and remove the existing repo binaries for adding new ones
 if [ ! -d "$REPO_NAME" ]; then
-    git clone "$REPO_URL"
+    git clone -q "$REPO_URL"
 fi
 
 # Directories to compare
@@ -55,61 +55,71 @@ chksumdbfile="$ROOTDIR/psleng.github.io/db/checksums.db"
 # Variable to track if a difference is found
 files_differ=false
 
-echo $dir1
-echo $dir2
+echo "Newly built packages: $dir1"
+echo "   Existing packages: $dir2"
 
 # remove the db/checksum.db file and a reprepro check to rebuild to fixup database
 rm -f $chksumdbfile
 reprepro -b $REPO_NAME check
 
-# Loop thru each .deb file in directory
-for file1 in $(find $dir1 -name "*.deb"); do
-    # Check if it's a regular file (skip directories)
-    if [[ "$file1" ]]; then
-        # Extract filename from the full path
-        filename=$(basename "$file1")
-        # Extract deb package name from the file
-        pkgname=`dpkg-deb -f $file1 Package`
-        if [ -z "$pkgname" ]; then
-            echo "ERROR: Cannot get package name from $file1; skipping"
-            continue;
-        fi
-        echo source file: $file1
-        archname=`dpkg-deb -I $file1 | grep "Architecture:" | awk '{print $2}'`
-        echo architecture: $archname
-        # Search for the file in dir2 and its subdirectories
-        found=false
-        for file2 in $(find "$dir2" -name "$filename"); do
-            # Compare the files
-            if ! ./debcmp "$file1" "$file2"; then
-                # If the files differ, set the flag to true and stop further searching
-                files_differ=true
-                echo "Files $file1 and $file2 differ"
-                echo "Removing package: $file1 from apt repo $REPO_NAME"
-                if [ "$archname" = "all" ]; then
-                    reprepro -b $REPO_NAME remove current $pkgname
-                else
-                    reprepro -A $archname -b $REPO_NAME remove current $pkgname
-                fi
-                echo "Adding package: $file1 to apt repo $REPO_NAME"
-                reprepro -b $REPO_NAME includedeb current $file1 || {
-                    echo "ERROR: cannot add $file1, giving up"
-                    exit 1
-                }
-            fi
-            found=true
-        done
+reprepro_rm_pkg()
+{
+    # Remove filename $1 from repo $2 architecture $3 pkgname $4
+    echo "Removing package: $1 from apt repo $2"
+    if [ "$3" = "all" ]; then
+        reprepro         -b "$2" remove current "$4"
+    else
+        reprepro -A "$3" -b "$2" remove current "$4"
+    fi
+}
 
-        # If the file from dir1 is not found in dir2, we can skip comparison
-        if ! $found; then
-            echo "File $filename not found in $dir2... "
+# Loop thru each .deb file in directory
+for file1 in $(find -L $dir1 -type f -a -name "*.deb"); do
+    # Get the corresponding filename that should be in $dir2
+    filename=$(dpkg-deb --showformat '${Package}_${Version}_${Architecture}.deb' -W $file1)
+    # Extract deb package name from the file
+    pkgname=`dpkg-deb -f $file1 Package`
+    if [ -z "$pkgname" ]; then
+        echo "ERROR: Cannot get package name from $file1; skipping"
+        continue
+    fi
+    echo source file: $file1
+    echo package name: $pkgname
+    archname=`dpkg-deb -I $file1 | grep "Architecture:" | awk '{print $2}'`
+    echo architecture: $archname
+    # Search for the file in dir2 and its subdirectories
+    found=false
+    for file2 in $(find "$dir2" -name "$filename"); do
+        # Compare the files
+        if ! ./debcmp "$file1" "$file2"; then
+            # If the files differ, set the flag to true and stop further searching
+            files_differ=true
+            echo "Files $file1 and $file2 differ"
+            reprepro_rm_pkg $file1 $REPO_NAME $archname $pkgname
             echo "Adding package: $file1 to apt repo $REPO_NAME"
             reprepro -b $REPO_NAME includedeb current $file1 || {
                 echo "ERROR: cannot add $file1, giving up"
                 exit 1
             }
-            files_differ=true
         fi
+        found=true
+    done
+
+    # If the file from dir1 is not found in dir2, we can skip comparison
+    if ! $found; then
+        echo "File $filename not found in $dir2... "
+        pkgname=`dpkg-deb -f $file1 Package`
+        # Remove it just in case just so we do not fail out on the add.
+        reprepro_rm_pkg $file1 $REPO_NAME $archname $pkgname \
+                > /dev/null 2>&1 && {
+            echo "WARNING: $pkgname removed but was not expected to exist."
+        }
+        echo "Adding new package=$pkgname file=$file1 to apt repo $REPO_NAME"
+        reprepro -b $REPO_NAME includedeb current $file1 || {
+            echo "ERROR: cannot add $file1, giving up"
+            exit 1
+        }
+        files_differ=true
     fi
 done
 
@@ -138,7 +148,7 @@ cp -rf ../_psleng.github.io/dists .
 cp -rf ../_psleng.github.io/pool .
 git add .
 git commit -a -m "Updating the Perle iGOS debian binary packages"
-git push --force
+git push --force -q
 cd -
 
 touch "$REPO_DIFF"          # apt repo has been updated
