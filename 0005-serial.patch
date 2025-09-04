@@ -576,7 +576,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  	int ret;
  	unsigned long flags;
  
-+	printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
++	////printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
 +
  	if (!(port->rs485_supported.flags & SER_RS485_ENABLED))
  		return -ENOTTY;
@@ -590,7 +590,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
 -	uart_set_rs485_rx_during_tx(port, &rs485);
 +	if (rs485.flags & SER_RS485_ENABLED)
 +	{	
-+		printk_deferred("%s()@%d: value \n",__FUNCTION__,__LINE__);
++		////printk_deferred("%s()@%d: value \n",__FUNCTION__,__LINE__);
 +		uart_sanitize_serial_rs485(port, &rs485);
 +		uart_set_rs485_termination(port, &rs485);
 +		uart_set_rs485_rx_during_tx(port, &rs485);
@@ -605,7 +605,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
 +
 +		if ((rs485.flags & SER_RS422_ENABLED))
 +		{
-+			printk_deferred("%s()@%d: 422:Force RTS \n",__FUNCTION__,__LINE__);
++			////printk_deferred("%s()@%d: 422:Force RTS \n",__FUNCTION__,__LINE__);
 +			port->ops->set_mctrl(port, UART_MCR_RTS);
 +		}	
  	}
@@ -725,7 +725,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  		}
  	}
 -
-+	printk_deferred("(%s,%d) mctrl = %x\n",__FUNCTION__,__LINE__,*mctrl);
++	////printk_deferred("(%s,%d) mctrl = %x\n",__FUNCTION__,__LINE__,*mctrl);
 +	up->mctrl_prev = *mctrl;
  	return *mctrl;
  }
@@ -736,7 +736,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  
 +static int send_signal_DEBUG(int pid, int sig, int priv, const char *func, int line)
 +{
-+	printk_deferred("send_signal(%d,%d,%d) caller: %s()@%d\n", pid, sig, priv, func, line);
++	////printk_deferred("send_signal(%d,%d,%d) caller: %s()@%d\n", pid, sig, priv, func, line);
 +    return(kill_pid(find_vpid(pid), sig, priv));
 +}
 +#define send_signal(pid, sig, priv) send_signal_DEBUG(pid, sig, priv, __FUNCTION__, __LINE__)
@@ -754,8 +754,8 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  
  	mctrl_gpio_get(gpios, &mctrl);
 -
-+    printk_deferred("(%s,%d) mctrl  %x \n",__FUNCTION__,__LINE__, mctrl);
-+    printk_deferred("(%s,%d) mctrl ^ gpios->mctrl_prev %x \n",__FUNCTION__,__LINE__, mctrl ^ gpios->mctrl_prev);
++    ////printk_deferred("(%s,%d) mctrl  %x \n",__FUNCTION__,__LINE__, mctrl);
++    ////printk_deferred("(%s,%d) mctrl ^ gpios->mctrl_prev %x \n",__FUNCTION__,__LINE__, mctrl ^ gpios->mctrl_prev);
 +    //printk("(%s,%d) irq %d\n",__FUNCTION__,__LINE__, irq);
  	spin_lock_irqsave(&port->lock, flags);
  
@@ -833,7 +833,7 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/t
  			continue;
  
  		ret = gpiod_to_irq(gpios->gpio[i]);
-+    printk_deferred("(%s,%d)corresponding irq for %s (idx=%d, ret=%d)\n",__FUNCTION__,__LINE__,mctrl_gpios_desc[i].name, idx, ret);
++    ////printk_deferred("(%s,%d)corresponding irq for %s (idx=%d, ret=%d)\n",__FUNCTION__,__LINE__,mctrl_gpios_desc[i].name, idx, ret);
  		if (ret < 0) {
  			dev_err(port->dev,
  				"failed to find corresponding irq for %s (idx=%d, err=%d)\n",
@@ -2735,8 +2735,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +};
 +// Perle start for trueport
 +typedef struct mctrl_gpios;
-+#define SERIAL_DEBUG_SEND_SIGNAL 1
-+#define SERIAL_DEBUG_RTSTOGGLE 1
+////#define SERIAL_DEBUG_SEND_SIGNAL 1
+////+#define SERIAL_DEBUG_RTSTOGGLE 1
 +#define SERIAL_DEBUG_FORWARDING 0
 +
 +extern char procSigScan[];    // one for each port
@@ -2793,12 +2793,12 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +static inline void perleserial8250_out_MCR(struct uart_8250_port *up, int value)
 +{
 +
-+    printk_deferred("%s()@%d: value %x\n",__FUNCTION__,__LINE__,value);
++    ////printk_deferred("%s()@%d: value %x\n",__FUNCTION__,__LINE__,value);
 +    
 +    if (up->port.rs485.flags & SER_RS422_ENABLED)
 +    {
 +        value |= UART_MCR_RTS;
-+        printk_deferred("%s()@%d: forcing rts in 422 value %x\n",__FUNCTION__,__LINE__,value);
++        ////printk_deferred("%s()@%d: forcing rts in 422 value %x\n",__FUNCTION__,__LINE__,value);
 +    }
 +
 +
@@ -2819,7 +2819,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +{
 +    unsigned char or, xor, mask=0, outs;
 +
-+    printk_deferred("%s()@%d: arg %x\n",__FUNCTION__,__LINE__,arg);
++    ////printk_deferred("%s()@%d: arg %x\n",__FUNCTION__,__LINE__,arg);
 +
 +
 +    or = xor = 0;
@@ -2853,7 +2853,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            mask = UART_MCR_RTS;
 +            break;
 +    }
-+    printk_deferred("%s()@%d: or %x  xor %x  mask %x\n",__FUNCTION__,__LINE__,or,xor,mask);
++    ////printk_deferred("%s()@%d: or %x  xor %x  mask %x\n",__FUNCTION__,__LINE__,or,xor,mask);
 +    switch (cmd)
 +    {
 +
@@ -2872,14 +2872,14 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            else
 +                up->out2 &= ~mask;
 +            or = xor = 0;
-+            printk_deferred("%s()@%d: mcr %x  out1 %x  out2 %x\n",__FUNCTION__,__LINE__,up->mcr,up->out1,up->out2);
++            ////printk_deferred("%s()@%d: mcr %x  out1 %x  out2 %x\n",__FUNCTION__,__LINE__,up->mcr,up->out1,up->out2);
 +            break;
 +        case TIOCMSET:
 +        case TIOCMBIS:
 +        case TIOCMBIC:
-+        printk_deferred("%s()@%d: before MCRmap %x\n",__FUNCTION__,__LINE__,up->MCRmap);
++        ////printk_deferred("%s()@%d: before MCRmap %x\n",__FUNCTION__,__LINE__,up->MCRmap);
 +            up->MCRmap = (up->MCRmap | or) ^ xor;   // save new MCR pattern
-+        printk_deferred("%s()@%d: after MCRmap %x\n",__FUNCTION__,__LINE__,up->MCRmap);    
++        ////printk_deferred("%s()@%d: after MCRmap %x\n",__FUNCTION__,__LINE__,up->MCRmap);    
 +            break;
 +
 +    }
@@ -2888,13 +2888,13 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    {
 +        or |= up->out1;
 +        xor = (xor | up->out1) ^ (up->MCRmap & UART_MCR_OUT1 ? up->out1 : 0);
-+        printk_deferred("%s()@%d: out1  or %x xor %x\n",__FUNCTION__,__LINE__,or, xor);
++        ////printk_deferred("%s()@%d: out1  or %x xor %x\n",__FUNCTION__,__LINE__,or, xor);
 +    }
 +    if(up->out2)                                // re-map OUT2
 +    {
 +        or |= up->out2;
 +        xor = (xor | up->out2) ^ (up->MCRmap & UART_MCR_OUT2 ? up->out2 : 0);
-+        printk_deferred("%s()@%d: out2  or %x xor %x\n",__FUNCTION__,__LINE__,or, xor);
++        ////printk_deferred("%s()@%d: out2  or %x xor %x\n",__FUNCTION__,__LINE__,or, xor);
 +    }
 +
 +    {
@@ -2903,9 +2903,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        or &= ~(UART_MCR_OUT1|UART_MCR_OUT2);
 +        xor &= ~(UART_MCR_OUT1|UART_MCR_OUT2);
 +        new_mcr = (up->last_mcr_written | or) ^ xor;
-+        printk_deferred("%s()@%d: or %x  xor %x new_mcr %x\n",__FUNCTION__,__LINE__,or, xor,new_mcr);
++        ////printk_deferred("%s()@%d: or %x  xor %x new_mcr %x\n",__FUNCTION__,__LINE__,or, xor,new_mcr);
 +        new_mcr = (new_mcr & up->mcr_mask) | up->mcr_force | up->mcr;   // copied from serial8250_do_set_mctrl
-+        printk_deferred("%s()@%d: new_mcr %x  mcr_mask %x  force %x mcr %x\n",__FUNCTION__,__LINE__,new_mcr , up->mcr_mask, up->mcr_force , up->mcr);
++        ////printk_deferred("%s()@%d: new_mcr %x  mcr_mask %x  force %x mcr %x\n",__FUNCTION__,__LINE__,new_mcr , up->mcr_mask, up->mcr_force , up->mcr);
 +        perleserial8250_out_MCR(up,new_mcr);
 +        // serial_out_mcr(up, new_mcr);
 +    }
@@ -2920,7 +2920,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    if(up->traceMask & TRACE_BITS_SIGNALS)
 +    {
 +        int value1 = up->last_msr_read;
-+        printk_deferred("%s()@%d: value1=0x%x\n",__FUNCTION__,__LINE__, value1);
++        ////printk_deferred("%s()@%d: value1=0x%x\n",__FUNCTION__,__LINE__, value1);
 +        uartTraceAddSignals(up->tracePortIndex, &up->traceSignals, value, value1);
 +    }
 +}
@@ -2936,7 +2936,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    else
 +        up->last_msr_read &= ~UART_MSR_CTS;
 +
-+    printk_deferred("%s()@%d: value=0x%x\n",__FUNCTION__,__LINE__, value);
++    ////printk_deferred("%s()@%d: value=0x%x\n",__FUNCTION__,__LINE__, value);
 +
 +    int sig_gpios = 0;
 +    if (up->gpios)
@@ -3834,7 +3834,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +#ifdef SERIAL_DEBUG_SEND_SIGNAL
 +static int send_signal_DEBUG(int pid, int sig, int priv, const char *func, int line)
 +{
-+    printk_deferred("send_signal(%d,%d,%d) caller: %s()@%d\n", pid, sig, priv, func, line);
++    ////printk_deferred("send_signal(%d,%d,%d) caller: %s()@%d\n", pid, sig, priv, func, line);
 +    return(kill_pid(find_vpid(pid), sig, priv));
 +}
 +#define send_signal(pid, sig, priv) send_signal_DEBUG(pid, sig, priv, __FUNCTION__, __LINE__)
@@ -3872,7 +3872,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +
 +    proc = getProcSigScan(up->sigScan.line);
-+  printk_deferred("%s()@%d: pid=%d line=%d event=%d data=%x proc=%d caller=%d\n",__FUNCTION__,__LINE__, pid, up->sigScan.line, event, data, proc, caller );
++  ////printk_deferred("%s()@%d: pid=%d line=%d event=%d data=%x proc=%d caller=%d\n",__FUNCTION__,__LINE__, pid, up->sigScan.line, event, data, proc, caller );
 +    if(proc < 0)
 +        return(-1);
 +
@@ -3897,7 +3897,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        switch(proc)
 +        {
 +        case PROCSS_SCAN:
-+        printk("%s %d %x\n",__FUNCTION__,__LINE__,up->sigScan.sigmask);
++        ////printk("%s %d %x\n",__FUNCTION__,__LINE__,up->sigScan.sigmask);
 +            if((data & up->sigScan.sigmask) == up->sigScan.sigmask)
 +            {
 +                setProcSigScan(up->sigScan.line, PROCSS_START);
@@ -3929,7 +3929,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            }
 +            break;
 +        case PROCSS_DELAY:
-+        printk("%s %d %x\n",__FUNCTION__,__LINE__,up->sigScan.sigmask);
++        ////printk("%s %d %x\n",__FUNCTION__,__LINE__,up->sigScan.sigmask);
 +            if((data & up->sigScan.sigmask) == up->sigScan.sigmask)
 +            {
 +                del_timer(&up->sigscan_delay_timer);
@@ -4312,7 +4312,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +            fsmSigScan(up, FSMSS_TIOCM, up->mctrl_prev,4);
 +            //fsmSigScan(up, FSMSS_TIOCM, MSR2TIOCM((unsigned char)up->last_msr_read),4);
 +            //fsmSigScan(up, FSMSS_TIOCM, (unsigned char)up->last_msr_read,4);
-+            printk_deferred("%s,%d: mctrl_prev %x \n", __func__, __LINE__, up->mctrl_prev);
++            ////printk_deferred("%s,%d: mctrl_prev %x \n", __func__, __LINE__, up->mctrl_prev);
 +        }
 +        // else if(sigCopy.sigdrop)    // allow drop only function
 +        // {
@@ -4469,7 +4469,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        case TIOCMAPDTR:
 +        case TIOCMAPRTS:
 +            ret=tiocmapXXX_handler(port,arg,cmd);
-+            printk("%s,%d: TIOCMAPRTS  TIOCMAPDTR ret %d\n", __func__, __LINE__, ret);
++            ////printk("%s,%d: TIOCMAPRTS  TIOCMAPDTR ret %d\n", __func__, __LINE__, ret);
 +            break;
 +        case TRACECONTROL:
 +            ret=tracecontrol_handler(port,arg);
@@ -4481,26 +4481,26 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +
 +        case TIOCOSARMDS:
 +            tiocosarmds_handler(port);
-+            printk("%s,%d: TIOCOSARMDS ret %d\n", __func__, __LINE__, ret);
++            ////printk("%s,%d: TIOCOSARMDS ret %d\n", __func__, __LINE__, ret);
 +            break;
 +
 +        case TRESETCOUNT:
 +            ret=tresetcount_handler(port,arg);
-+            printk("%s,%d: TRESETCOUNT ret %d\n", __func__, __LINE__, ret);
++            ////printk("%s,%d: TRESETCOUNT ret %d\n", __func__, __LINE__, ret);
 +            break;
 +
 +        case TSIGSCAN:
 +            ret=tsigscan_handler(port,arg);
-+            printk("%s,%d: TSIGSCAN ret %d\n", __func__, __LINE__, ret);
++            ////printk("%s,%d: TSIGSCAN ret %d\n", __func__, __LINE__, ret);
 +            break;
 +
 +        case TIOCCICOUNT:
 +            tioccicount_handler(port,arg);
-+            printk("%s,%d: TIOCCICOUNT ret %d\n", __func__, __LINE__, ret);
++            ////printk("%s,%d: TIOCCICOUNT ret %d\n", __func__, __LINE__, ret);
 +            break;
 +        case TRTSCONTROL:
 +            ret=perle_set_rts_toggle(port,arg);
-+            // printk("%s,%d: TRTSCONTROL ret %d\n", __func__, __LINE__, ret);
++            ////printk("%s,%d: TRTSCONTROL ret %d\n", __func__, __LINE__, ret);
 +            break;
 +
 +        default:
@@ -4534,7 +4534,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +static void perle_serial8250_do_set_mctrl(struct uart_port *port, unsigned int mctrl)
 +{
 +    struct uart_8250_port *up = up_to_u8250p(port);
-+    printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
++    ////printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
 +    // unsigned char mcr;
 +
 +    //mcr = serial8250_TIOCM_to_MCR(mctrl);
@@ -4554,7 +4554,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    struct uart_8250_port *up = up_to_u8250p(port);
 +    struct perleomap8250_priv *priv = up->port.private_data;
 +    u8 lcr;
-+    printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
++    ////printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
 +    perle_serial8250_do_set_mctrl(port, mctrl);
 +
 +    if (!mctrl_gpio_to_gpiod(up->gpios, UART_GPIO_RTS)) {
@@ -4577,7 +4577,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +static void perleomap8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 +{
 +    int err;
-+    printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
++    ////printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
 +    err = pm_runtime_resume_and_get(port->dev);
 +    if (err)
 +        return;
@@ -5103,7 +5103,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        * just force the read character to be 0
 +        */
 +        ch = 0;
-+    // printk("(%s,%d):serial8250_read_char starting,ch = %c\n",__FUNCTION__,__LINE__, ch);
++    ////printk("(%s,%d):serial8250_read_char starting,ch = %c\n",__FUNCTION__,__LINE__, ch);
 +    port->icount.rx++;
 +
 +    lsr |= up->lsr_saved_flags;
@@ -5281,7 +5281,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        fsmSigScan(up, FSMSS_TIOCM, serial8250_MSR_to_TIOCM((unsigned char)status),5);
 +        // up->last_msr_read = (unsigned char)status;
 +// Perle end for trueport
-+  printk_deferred("%s()@%d: status=%d\n",__FUNCTION__,__LINE__, status);
++  ////printk_deferred("%s()@%d: status=%d\n",__FUNCTION__,__LINE__, status);
 +    if (status & UART_MSR_ANY_DELTA && up->ier & UART_IER_MSI &&
 +        port->state != NULL) {
 +        if (status & UART_MSR_TERI)
@@ -5311,7 +5311,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    //printk("(%s,%d)\n",__FUNCTION__,__LINE__);
 +    if (iir & UART_IIR_NO_INT)
 +        return 0;
-+    printk_deferred("(%s,%d)\n",__FUNCTION__,__LINE__);
++    ////printk_deferred("(%s,%d)\n",__FUNCTION__,__LINE__);
 +    spin_lock_irqsave(&port->lock, flags);
 +
 +    status = serial_lsr_in(up);
@@ -5428,7 +5428,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    struct perleomap8250_priv *priv = port->private_data;
 +    struct uart_8250_dma *dma = &priv->perleomap8250_dma;
 +    int ret;
-+    printk_deferred("%s, %d:  port->line %d\n", __FUNCTION__, __LINE__, port->line);
++    ////printk_deferred("%s, %d:  port->line %d\n", __FUNCTION__, __LINE__, port->line);
 +    if (priv->wakeirq) {
 +        ret = dev_pm_set_dedicated_wake_irq(port->dev, priv->wakeirq);
 +        if (ret)
@@ -5520,7 +5520,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +static void omap_8250_shutdown(struct uart_port *port)
 +{
 +    struct uart_8250_port *up = up_to_u8250p(port);
-+    printk_deferred("%s, %d:  port->line %d\n", __FUNCTION__, __LINE__, port->line);
++    ////printk_deferred("%s, %d:  port->line %d\n", __FUNCTION__, __LINE__, port->line);
 +    struct perleomap8250_priv *priv = port->private_data;
 +    unsigned long flags;
 +    pm_runtime_get_sync(port->dev);
@@ -6643,7 +6643,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    int irq, ret;
 +
 +    irq = platform_get_irq(pdev, 0);
-+    printk_deferred("(%s,%d): probe irq %d\n", __FUNCTION__,__LINE__, irq);
++    ////printk_deferred("(%s,%d): probe irq %d\n", __FUNCTION__,__LINE__, irq);
 +    if (irq < 0)
 +        return irq;
 +
