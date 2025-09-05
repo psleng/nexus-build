@@ -2735,9 +2735,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +};
 +// Perle start for trueport
 +typedef struct mctrl_gpios;
-////#define SERIAL_DEBUG_SEND_SIGNAL 1
-////+#define SERIAL_DEBUG_RTSTOGGLE 1
-+#define SERIAL_DEBUG_FORWARDING 0
++////#define SERIAL_DEBUG_SEND_SIGNAL 1
++////#define SERIAL_DEBUG_RTSTOGGLE 1
++////#define SERIAL_DEBUG_FORWARDING 0
 +
 +extern char procSigScan[];    // one for each port
 +
