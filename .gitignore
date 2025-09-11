@@ -2,6 +2,8 @@
 /.*.built
 /.defs.mk
 /.mypy_cache
+/_REPO_UPDATED
+/_psleng.github.io
 /build
 /builds.toml
 /configs
@@ -11,6 +13,7 @@
 /images
 /logs
 /nohup.out
+/psleng.github.io
 /scripts
 /ti-bdebstrap
 /tools

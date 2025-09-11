@@ -30,7 +30,7 @@ system {
         device ttyS0 {
             speed 115200
         }
-        device ttyS0 {
+        device ttyS3 {
             speed 115200
         }
     }
