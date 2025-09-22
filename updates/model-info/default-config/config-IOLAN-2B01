@@ -36,12 +36,20 @@ system {
     }
     host-name Iolan-2b
     login {
+        operator-group default {
+            command-policy {
+                allow "*"
+            }
+        }
         user igos {
             authentication {
                 encrypted-password '$6$rounds=656000$BQclSwEm9YgVuKw.$mugiIKLMpB/rS2p2iaed7Y/PSJBhe117lmkbBnMfEi9A2KjogKsvn9eSfEEeor1J0KRk8gluPhCdstvc7o5yY.'
                 plaintext-password ""
             }
         }
+    }
+    option {
+        reboot-on-upgrade-failure 5
     }
     syslog {
         local {
