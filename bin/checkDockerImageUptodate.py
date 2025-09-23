@@ -7,8 +7,8 @@ from subprocess import run
 
 def main(img: str, dockerfile: str, entrypoint: str) -> int:
     '''
-    Compare docker image "img" to dockerfile "dockerfile".
-    Returns 0 if the image is newer than the dockerfile, else 1.
+    Compare docker image "img" to dockerfile and entrypoint.
+    Returns 0 if the image is newer than both, else 1.
     '''
     time.tzset()
 
@@ -25,13 +25,11 @@ def main(img: str, dockerfile: str, entrypoint: str) -> int:
         img_mtime = time.mktime(imgst)
 
     # Check paths up to date compared to image
+    ret = 0
+    needs = "does NOT need"
     for f in (dockerfile, entrypoint):
         # Get timestamp
-        df_mtime = Path(f).stat().st_mtime
-        if (img_mtime - df_mtime) > 0:
-            needs = "does NOT need"
-            ret = 0
-        else:
+        if (img_mtime - Path(f).stat().st_mtime) <= 0:
             print(f'{f} is newer than docker image')
             needs = "DOES need"
             ret = 1
