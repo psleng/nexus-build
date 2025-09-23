@@ -258,7 +258,7 @@ RUN pip --no-cache --no-cache-dir install --break-system-packages \
       python3-inotify \
       python3-xmltodict \
       python3-lxml \
-      python3-nose \
+      python3-nose2 \
       python3-netifaces \
       python3-jinja2 \
       python3-jmespath \
@@ -287,17 +287,15 @@ RUN pip --no-cache --no-cache-dir install --break-system-packages \
       whois \
       python3-cracklib
 
-# Go required for telegraf and prometheus exporters build.
-# PSL NOTE: Upstream 1.23.1 does NOT work under qemu.
-ENV GO_VERSION_INSTALL="1.22.8"
-RUN if [ "$ARCH" = "arm64v8" ]; then \
+# Go required for telegraf and prometheus exporters build
+RUN GO_VERSION_INSTALL="1.23.2" ; \
+    if [ "$ARCH" = "arm64v8" ]; then \
         wget -O /tmp/go${GO_VERSION_INSTALL}.linux-arm64.tar.gz https://go.dev/dl/go${GO_VERSION_INSTALL}.linux-$(dpkg-architecture -qDEB_HOST_ARCH).tar.gz ; \
     else \
         wget -O /tmp/go${GO_VERSION_INSTALL}.linux-amd64.tar.gz https://go.dev/dl/go${GO_VERSION_INSTALL}.linux-$(dpkg-architecture -qDEB_HOST_ARCH).tar.gz ; \
     fi && \
-    tar -C /opt -xzf /tmp/go${GO_VERSION_INSTALL}.linux-*.tar.gz && \
-    rm /tmp/go${GO_VERSION_INSTALL}.linux-*.tar.gz
-
+    tar -C /opt -xzf /tmp/go*.tar.gz && \
+    rm /tmp/go*.tar.gz
 RUN echo "export PATH=/opt/go/bin:$PATH" >> /etc/bash.bashrc
 
 # Packages needed for Qemu test-suite
@@ -432,7 +430,7 @@ RUN apt-get update && apt-get install -y \
 # PSL: Packages needed for failed make of Vyos - JF
 RUN apt-get update && apt-get install -y \
 	kpartx
-	
+
 # PSL: Packages needed for frr - JF
 # DK	libsnmp-dev removed, it  will be installed when net-snmp is installed BEFORE frr is built - order dependency
 # And for building libyan2-dev https://docs.frrouting.org/projects/dev-guide/en/latest/building-frr-for-debian12.html#install-required-packages -JF
@@ -538,9 +536,5 @@ COPY psleng.key /etc/apt/keyrings/
 
 # PSL: Extend secure_path for sudo
 RUN sudo sed -i 's|Defaults\s\+secure_path=\"\(.*\)\"|Defaults secure_path=\"\1:/opt/go/bin\"|' /etc/sudoers
-
-# PSL: Modify entrypoint.sh to use sudo instead of gosu, since gosu has
-# issues of randomly hanging when run with qemu in a VM.
-RUN sed -i 's/exec gosu/exec sudo -u/' /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

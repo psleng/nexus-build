@@ -47,8 +47,13 @@ help:
 
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
+<<<<<<< HEAD
 IGOS_PKGS='apnscripts psl-progs vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname libvyosconfig vyatta-cfg vyos-http-api-tools \
+=======
+IGOS_PKGS='psl-progs vyos-1x vyatta-bash vyos-user-utils \
+           vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
+>>>>>>> psl-master
            vyos-utils ipaddrcheck hvinfo \
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
            tacacs live-boot'
@@ -97,7 +102,7 @@ all: $(DEFS) $(IMAGE_TARG)
 # Run a docker session.
 define DOCKRUN
 	@echo "### $$(date --iso-8601=s): Making $(1) using $(2) for target $@. Check $(1).ERR for status."
-	./rundocker.sh script -e -c '$(2) --repo $(REPO)' $(1).ERR
+	stdbuf -i0 -oL -e0 ./rundocker.sh /bin/sh -c '$(2) --repo $(REPO)' 2>&1 | tee $(1).ERR
 	@echo "### $$(date --iso-8601=s): Making $(1) using $(2) for target $@ COMPLETED"
 	@touch $@
 endef
@@ -139,6 +144,7 @@ else
 	@$(call DOCKRUN,image,./buildiGOSti.sh $(BUILDTYPE))
 	@ls -l images/$(BUILDTYPE)/tisdk*.squashfs
 	@echo '### Making uSDcard image COMPLETED'
+	@echo '### Type "bin/buildlog" to check for errors'
 	@echo '### Type "make sdcard" to write to an uSD card'
 	@touch $@
 endif
