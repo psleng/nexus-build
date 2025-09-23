@@ -47,13 +47,8 @@ help:
 
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
-<<<<<<< HEAD
-IGOS_PKGS='apnscripts psl-progs vyos-1x vyatta-bash vyos-user-utils \
-           vyatta-biosdevname libvyosconfig vyatta-cfg vyos-http-api-tools \
-=======
 IGOS_PKGS='psl-progs vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
->>>>>>> psl-master
            vyos-utils ipaddrcheck hvinfo \
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
            tacacs live-boot'
