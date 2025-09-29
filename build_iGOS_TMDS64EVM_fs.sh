@@ -36,7 +36,7 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b psl-master --single-branch "$REPO_URL"
+    git clone  -b nxp-imx8dxl --single-branch "$REPO_URL"
 fi
 
 # Copy package-build-iGOS/ to vyos-build/scripts/ now that it's there
@@ -162,6 +162,8 @@ if [ ! -f "$BLT" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
         elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*j7200*.deb $ROOTDIR/vyos-build/packages/
+        elif [ "$BUILDTYPE" = "bookworm-imx8dxl-evm" ]; then
+            ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
         else
             echo "=== E: $0: Undefined BUILDTARG:BUILDTYPE ($BUILDTARG:$BUILDTYPE)"
             exit 1
@@ -211,11 +213,11 @@ cd $ROOTDIR
 # This will populate ./build/fs/
 TSK=ti-evm-fs-build
 BLT=.filesystem.$TSK.built
-if [ "$BUILDTARG" != "ti-evm" ]; then
-    # Not TI.
-    echo "=== I: $0: Skipping $TSK because $BUILDTARG != ti-evm"
-    touch $BLT
-fi
+#if [ "$BUILDTARG" != "ti-evm" ]; then
+#    # Not TI.
+#    echo "=== I: $0: Skipping $TSK because $BUILDTARG != ti-evm"
+#    touch $BLT
+#fi
 
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"

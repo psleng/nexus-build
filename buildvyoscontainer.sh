@@ -18,7 +18,7 @@ fi
 
 if [ ! -d vyos-build ]; then
     echo "I: Cloning vyos-build"
-    git clone -b psl-master --single-branch https://github.com/psleng/vyos-build
+    git clone -b nxp-imx8dxl --single-branch https://github.com/psleng/vyos-build
 fi
 
 if docker image inspect $IMGNAME > /dev/null 2>&1; then

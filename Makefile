@@ -23,9 +23,10 @@ IMAGE_TARG    = .image.built
 help:
 	@echo First select a build type.  Valid types are:
 	@echo
-	@echo '    make targ-ti-am64x # TI AM64x evaluation module (default)'
-	@echo '    make targ-ti-j7200 # TI J7200 evaluation module'
-	@echo '    make targ-x86      # x86'
+	@echo '    make targ-ti-am64x      # TI AM64x evaluation module (default)'
+	@echo '    make targ-ti-j7200      # TI J7200 evaluation module'
+	@echo '    make targ-nxp-imx8dxl   # NXP IMX8DXL evaluation module'
+	@echo '    make targ-x86           # x86'
 	@echo
 	@echo 'Then type "make all".  Type "make clean" for a clean start.'
 	@echo 'You will have to reselect the build type after doing that.'
@@ -78,6 +79,13 @@ targ-x86:
 	@echo BUILDTARG=x86_64 >> $(DEFS)
 	@echo IGOS_PKGS="$(IGOS_PKGS)" >> $(DEFS)
 
+# target build: NXP IMX8DXL board
+targ-nxp-imx8dxl:
+	@test `arch` = aarch64 || { echo "WARNING: building for this target on this machine (`arch`) is not supported" >&2; }
+	@echo "$(AUTOGEN)" > $(DEFS)
+	@echo BUILDTARG=nxp-evm >> $(DEFS)
+	@echo BUILDTYPE=bookworm-imx8dxl-evm >> $(DEFS)
+	@echo IGOS_PKGS="$(IGOS_PKGS)" >> $(DEFS)
 
 # Base repository to use for all container build recipes.
 REPO := https://github.com/psleng
