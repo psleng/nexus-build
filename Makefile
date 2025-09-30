@@ -51,7 +51,7 @@ IGOS_PKGS='apnscripts psl-progs vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            vyos-utils ipaddrcheck hvinfo \
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
-           tacacs live-boot'
+           ssh-tpm-agent tacacs live-boot'
 
 # target build: TI TMDS64EVM board (default)
 # BUILDTYPE is a builds entry from ti-bdebstrap/builds.toml

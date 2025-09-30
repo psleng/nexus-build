@@ -1,0 +1,5 @@
+[[packages]]
+name = "ssh-tpm-agent"
+commit_id = "debianize-v080"
+scm_url = "https://github.com/psleng/ssh-tpm-agent"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
