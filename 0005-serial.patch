@@ -409,9 +409,9 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250_core.c linux-6.6.69/driver
  
  		if (uart->port.type != PORT_8250_CIR) {
  			if (serial8250_isa_config != NULL)
-diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250.h linux-6.6.69/drivers/tty/serial/8250/8250.h
---- linux-6.6.69ori/drivers/tty/serial/8250/8250.h	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/tty/serial/8250/8250.h	2025-02-19 14:02:44.479376801 -0500
+
+--- linux-6.6.106/drivers/tty/serial/8250/8250.h	2025-09-11 11:20:28.000000000 -0400
++++ linux-6.6.106changed/drivers/tty/serial/8250/8250.h	2025-10-06 11:17:53.828945299 -0400
 @@ -19,7 +19,10 @@
  	int (*rx_dma)(struct uart_8250_port *p);
  	void (*prepare_tx_dma)(struct uart_8250_port *p);
@@ -424,20 +424,21 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250.h linux-6.6.69/drivers/tty
  	/* Filter function */
  	dma_filter_fn		fn;
  	/* Parameter to the filter function */
-@@ -268,7 +271,12 @@
- 
+@@ -269,6 +272,13 @@
  	return tiocm;
  }
+ 
 +// Perle start for trueport
 +// void perle_serial8250_do_set_mctrl(struct uart_port *port, unsigned int mctrl);
 +
- 
++void perle_serial8250_break_ctl(struct uart_port *port, int break_state);
 +void serial_out_mcr(struct uart_8250_port *up, int value);
 +// Perle end for trueport
++
  static inline void serial8250_out_MCR(struct uart_8250_port *up, int value)
  {
  	serial_out(up, UART_MCR, value);
-@@ -277,6 +285,7 @@
+@@ -277,6 +287,7 @@
  		mctrl_gpio_set(up->gpios, serial8250_MCR_to_TIOCM(value));
  }
  
@@ -445,14 +446,14 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250.h linux-6.6.69/drivers/tty
  static inline int serial8250_in_MCR(struct uart_8250_port *up)
  {
  	int mctrl;
-@@ -420,3 +429,4 @@
+@@ -422,3 +433,4 @@
  {
  	return port->minor - 64;
  }
 +
 
---- linux-6.6.93/drivers/tty/serial/8250/8250_port.c	2025-06-04 08:42:26.000000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/8250/8250_port.c	2025-07-14 15:39:46.408986920 -0400
+--- linux-6.6.106/drivers/tty/serial/8250/8250_port.c	2025-09-11 11:20:28.000000000 -0400
++++ linux-6.6.106changed/drivers/tty/serial/8250/8250_port.c	2025-10-06 11:16:16.101768213 -0400
 @@ -51,6 +51,8 @@
  #define DEBUG_AUTOCONF(fmt...)	do { } while (0)
  #endif
@@ -488,7 +489,16 @@ diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250.h linux-6.6.69/drivers/tty
  }
  EXPORT_SYMBOL_GPL(serial8250_do_set_mctrl);
  
-@@ -3281,6 +3287,10 @@
+@@ -3264,7 +3270,7 @@
+ 	.unthrottle	= serial8250_unthrottle,
+ 	.stop_rx	= serial8250_stop_rx,
+ 	.enable_ms	= serial8250_enable_ms,
+-	.break_ctl	= serial8250_break_ctl,
++	.break_ctl	= perle_serial8250_break_ctl,
+ 	.startup	= serial8250_startup,
+ 	.shutdown	= serial8250_shutdown,
+ 	.flush_buffer	= serial8250_flush_buffer,
+@@ -3280,6 +3286,10 @@
  	.poll_get_char = serial8250_get_poll_char,
  	.poll_put_char = serial8250_put_poll_char,
  #endif
@@ -2545,9 +2555,9 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +obj-y +=  uart_trace.o
 +# Perle end
 
---- /dev/null	2025-08-18 10:21:00.256000000 -0400
-+++ linux-6.6.100changed/drivers/tty/serial/8250/8250_perleomap.c	2025-08-18 10:41:29.722160701 -0400
-@@ -0,0 +1,4625 @@
+--- /dev/null	2025-10-06 10:58:53.468000000 -0400
++++ linux-6.6.106changed/drivers/tty/serial/8250/8250_perleomap.c	2025-10-06 11:12:30.827629186 -0400
+@@ -0,0 +1,4627 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 +* 8250-core based driver for the OMAP internal UART
@@ -5233,7 +5243,7 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    return lsr;
 +}
 +
-+static void perle_serial8250_break_ctl(struct uart_port *port, int break_state)
++void perle_serial8250_break_ctl(struct uart_port *port, int break_state)
 +{
 +        struct uart_8250_port *up = up_to_u8250p(port);
 +        unsigned long flags;
@@ -5251,6 +5261,8 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +        spin_unlock_irqrestore(&port->lock, flags);
 +        serial8250_rpm_put(up);
 +}
++EXPORT_SYMBOL_GPL(perle_serial8250_break_ctl);
++
 +/* Caller holds uart port lock */
 +static unsigned int perle_serial8250_modem_status(struct uart_8250_port *up)
 +{
