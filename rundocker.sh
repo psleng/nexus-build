@@ -45,6 +45,7 @@ fi
 
 docker run --rm $DFLAGS \
   --privileged --sysctl net.ipv6.conf.lo.disable_ipv6=0 \
+  -e PATH=/opt/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   -h vyos-build \
   -v $(pwd):/vyos -v /dev:/dev -v /etc/fstab:/etc/fstab \
   $GITMNT $SSHMNT -w /vyos \
