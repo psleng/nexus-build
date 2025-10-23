@@ -1,6 +1,6 @@
 [[packages]]
 name = "libpam-radius-auth"
-commit_id = "psl-master"
+commit_id = "iolan"
 scm_url = "https://github.com/psleng/libpam-radius-auth"
 
 [dependencies]
