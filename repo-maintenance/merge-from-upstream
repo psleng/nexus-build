@@ -68,7 +68,7 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
         return None
 
     print(f' I: Cloning {url} for {name}')
-    run(['git', 'clone', '-q', '--recurse-submodules',
+    run(['git', 'clone', '-q',
         url, workdir], check=True)
     # commit = dpkg['commit_id']
     # print(f' I: Checkout commit_id {commit} for {name}')
@@ -210,9 +210,9 @@ def do_merge() -> None:
     # Special cases: vyos-build (does not use package.toml).
     #
     # Also vyos1x-config and vyconf which are explicitly referred
-    # to by libvyosconfig/build.sh .  We use the default branch
+    # to by vyos-1x/libvyosconfig/Makefile .  We use the default branch
     # as commit_id for these so the merge happens to the correct place.
-    # The above build.sh uses a commit hash so the psl-master
+    # The above Makefile uses commit hashes so the psl-master branch
     # does not actually get used.
     #
     # Cook up what the parsed package.toml parts would look like.
@@ -302,7 +302,7 @@ def do_merge() -> None:
 def dodiff(diff: str, igos_toml: Path, vyos_toml: Path) -> None:
     'Perform a diff using given tool'
     sys.stdout.flush()
-    os.system(f'{diff} {igos_toml} {vyos_toml}')
+    os.system(f'{diff} -w {igos_toml} {vyos_toml}')
     sys.stdout.flush()
 
 
