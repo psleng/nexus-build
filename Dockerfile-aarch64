@@ -238,14 +238,13 @@ RUN gem install --no-document fpm
 
 # Add vyos package repo
 COPY vyos-dev.list /etc/apt/sources.list.d/vyos-dev.list
-COPY vyos-dev.key /usr/share/keyrings/vyos-dev-archive-keyring.gpg
-RUN apt-key add /usr/share/keyrings/vyos-dev-archive-keyring.gpg
+COPY vyos-dev.key /usr/share/keyrings/vyos-dev-archive-keyring.asc
 
 # Packages needed for vyos-1x
 RUN pip --no-cache --no-cache-dir install --break-system-packages \
       git+https://github.com/aristanetworks/j2lint.git@341b5d5db86 \
       pyhumps==3.8.0; \
-    sudo apt-get update && apt-get install -y \
+    apt-get update && apt-get install -y \
       build-essential \
       dh-python \
       fakeroot \
