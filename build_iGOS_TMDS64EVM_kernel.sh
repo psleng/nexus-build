@@ -35,8 +35,8 @@ if [ ! -d "$REPO_NAME" ]; then
     git clone --single-branch "$REPO_URL"
 fi
 
-cp -rf ${ROOTDIR}/0005* ${ROOTDIR}/${REPO_NAME}/scripts/package-build/linux-kernel/patches/kernel
-rm -f ${ROOTDIR}/${REPO_NAME}/scripts/package-build/linux-kernel/platform/ti-evm/bookworm-am64xx-evm/patches/kernel/*
+cp -rf ${ROOTDIR}/0005-serial.patch ${ROOTDIR}/${REPO_NAME}/scripts/package-build/linux-kernel/platform/ti-evm/bookworm-am64xx-evm/patches/kernel/
+
 
 # Make Kernel and associated packages
 ./package-build.py --dir package-build --include linux-kernel

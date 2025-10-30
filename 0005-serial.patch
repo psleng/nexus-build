@@ -1,164 +1,6 @@
-diff -ur linux-6.6.87ori/arch/arm64/boot/dts/ti/k3-am642-evm.dts 6.6.87/arch/arm64/boot/dts/ti/k3-am642-evm.dts
---- linux-6.6.87ori/arch/arm64/boot/dts/ti/k3-am642-evm.dts	2025-04-10 08:37:44.000000000 -0400
-+++ linux-6.6.87/arch/arm64/boot/dts/ti/k3-am642-evm.dts	2025-04-30 18:07:53.076753780 -0400
-@@ -22,9 +22,9 @@
- 	};
- 
- 	aliases {
--		serial0 = &mcu_uart0;
--		serial1 = &main_uart1;
--		serial2 = &main_uart0;
-+		serial0 = &main_uart0;
-+		serial1 = &mcu_uart0;
-+		serial2 = &main_uart1;
- 		serial3 = &main_uart3;
- 		i2c0 = &main_i2c0;
- 		i2c1 = &main_i2c1;
-@@ -248,13 +248,20 @@
- 
- 	main_uart1_pins_default: main-uart1-default-pins {
- 		pinctrl-single,pins = <
--			AM64X_IOPAD(0x0248, PIN_INPUT, 0)		/* (D16) UART1_CTSn */
--			AM64X_IOPAD(0x024c, PIN_OUTPUT, 0)		/* (E16) UART1_RTSn */
-+			/* AM64X_IOPAD(0x0248, PIN_INPUT, 0)		 (D16) UART1_CTSn */
-+			/* AM64X_IOPAD(0x024c, PIN_OUTPUT, 0)		 (E16) UART1_RTSn */
- 			AM64X_IOPAD(0x0240, PIN_INPUT, 0)		/* (E15) UART1_RXD */
- 			AM64X_IOPAD(0x0244, PIN_OUTPUT, 0)		/* (E14) UART1_TXD */
- 		>;
- 	};
- 
-+    main_uart3_pins_default: main-uart3-default-pins {
-+            pinctrl-single,pins = <
-+                    AM64X_IOPAD(0x0248, PIN_INPUT, 4)               /* (D16) UART3_RXD */
-+                    AM64X_IOPAD(0x024c, PIN_OUTPUT, 4)              /* (E16) UART3_TXD */
-+            >;
-+    };
-+
- 	main_uart0_pins_default: main-uart0-default-pins {
- 		bootph-all;
- 		pinctrl-single,pins = <
-@@ -262,6 +269,10 @@
- 			AM64X_IOPAD(0x023c, PIN_OUTPUT, 0) /* (A16) UART0_RTSn */
- 			AM64X_IOPAD(0x0230, PIN_INPUT, 0) /* (D15) UART0_RXD */
- 			AM64X_IOPAD(0x0234, PIN_OUTPUT, 0) /* (C16) UART0_TXD */
-+            AM64X_IOPAD(0x01B4, PIN_OUTPUT, 7) /* (W2) GPIO1_21 => UART0_DTRn */
-+            AM64X_IOPAD(0x01B0, PIN_INPUT, 7) /* (Y2) GPIO1_20 => UART0_DCDn */
-+            AM64X_IOPAD(0x0170, PIN_INPUT, 7) /* (AA2) GPIO1_4 => UART0_RIn */
-+            AM64X_IOPAD(0x0190, PIN_INPUT, 7) /* (AA3) GPIO1_12 => UART0_DSRn */
- 		>;
- 	};
- 
-@@ -290,6 +301,14 @@
- 		>;
- 	};
- 
-+    /* Digital IOs */
-+    main_gpio0_digital_pins: main-gpio0-digital-pins {
-+            pinctrl-single,pins = <
-+                    /* AM64X_IOPAD(0x0030, PIN_INPUT, 7)  (L18) GPIO0_12 */
-+                    AM64X_IOPAD(0x0034, PIN_OUTPUT, 7) /* (K17) GPIO0_13 */
-+            >;
-+    };
-+
- 	mdio1_pins_default: mdio1-default-pins {
- 		bootph-all;
- 		pinctrl-single,pins = <
-@@ -390,14 +409,28 @@
- 	status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&main_uart0_pins_default>;
-+        dcd-gpios = <&main_gpio1 20 GPIO_ACTIVE_LOW>;
-+        dsr-gpios = <&main_gpio1 12 GPIO_ACTIVE_LOW>;
-+        dtr-gpios = <&main_gpio1 21 GPIO_ACTIVE_LOW>;
-+        rng-gpios = <&main_gpio1 4 GPIO_ACTIVE_LOW>;
- 	current-speed = <115200>;
- };
- 
- /* main_uart1 is reserved for firmware usage */
- &main_uart1 {
--	status = "reserved";
--	pinctrl-names = "default";
--	pinctrl-0 = <&main_uart1_pins_default>;
-+        bootph-all;
-+        status = "okay";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&main_uart1_pins_default>;
-+        current-speed = <115200>;
-+};
-+
-+&main_uart3 {
-+        bootph-all;
-+        status = "okay";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&main_uart3_pins_default>;
-+        current-speed = <115200>;
- };
- 
- &main_i2c0 {
-@@ -456,7 +489,57 @@
- };
- 
- &main_gpio0 {
--	bootph-all;
-+        status = "okay";
-+        bootph-all;
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&main_gpio0_digital_pins>;
-+        gpio-line-names =
-+                "", "", "", "", /* 0-3 */
-+                "", "", "", "", /* 4-7 */
-+                "", "", "", "", /* 8-11 */
-+                "VTT_EN", "OSPI_RSTn", "", "", /* 12-15 */
-+                "", "", "", "", /* 16-19 */
-+                "", "", "", "", /* 20-23 */
-+                "", "", "", "", /* 24-27 */
-+                "", "", "", "", /* 28-31 */
-+                "", "", "", "", /* 32-35 */
-+                "", "", "", "", /* 36-39 */
-+                "", "", "", "", /* 40-43 */
-+                "", "", "", "", /* 44-47 */
-+                "", "", "", "", /* 48-51 */
-+                "", "", "", "", /* 52-55 */
-+                "", "", "", "", /* 56-59 */
-+                "", "", "", "", /* 60-63 */
-+                "", "", "", "", /* 64-67 */
-+                "", "", "", "", /* 68-71 */
-+                "", "", "", "", /* 72-75 */
-+                "", "", "", "", /* 76-79 */
-+                "", "", "", "", /* 80-83 */
-+                "", "", "";     /* 84-86 */
-+};
-+
-+&main_gpio1 {
-+        gpio-line-names =
-+                "", "", "", "", /* 0-3 */
-+                "UART0_RIn", "", "", "", /* 4-7 */
-+                "", "", "", "", /* 8-11 */
-+                "UART0_DSRn", "", "", "", /* 12-15 */
-+                "", "", "", "", /* 16-19 */
-+                "UART0_DCDn", "UART0_DTRn", "", "", /* 20-23 */
-+                "", "", "", "", /* 24-27 */
-+                "", "", "", "", /* 28-31 */
-+                "", "", "", "", /* 32-35 */
-+                "", "", "", "", /* 36-39 */
-+                "", "", "", "GPIO1_43_INTn", /* 40-43 */
-+                "", "", "", "", /* 44-47 */
-+                "", "", "", "", /* 48-51 */
-+                "", "", "", "", /* 52-55 */
-+                "", "", "", "", /* 56-59 */
-+                "", "", "", "", /* 60-63 */
-+                "", "", "", "", /* 64-67 */
-+                "", "", "RGMII_INT", "", /* 68-71 */
-+                "", "", "", "", /* 72-75 */
-+                "", "", "IO_EXP_INTn", ""; /* 76-79 */
- };
- 
- /* mcu_gpio0 is reserved for mcu firmware usage */
-
-diff -ur linux-6.6.69ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi linux-6.6.69/arch/arm64/boot/dts/ti/k3-am64-main.dtsi
---- linux-6.6.69ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/arch/arm64/boot/dts/ti/k3-am64-main.dtsi	2025-02-19 14:02:44.476376867 -0500
-@@ -371,29 +371,29 @@
+--- linux-6.6.114ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi	2025-10-30 17:24:51.381713369 -0400
++++ linux-6.6.114/arch/arm64/boot/dts/ti/k3-am64-main.dtsi	2025-10-30 17:24:54.197675160 -0400
+@@ -371,7 +371,7 @@
  	};
  
  	main_uart0: serial@2800000 {
@@ -167,11 +9,7 @@ diff -ur linux-6.6.69ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi linux-6.6.69/a
  		reg = <0x00 0x02800000 0x00 0x100>;
  		interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
  		clock-frequency = <48000000>;
- 		power-domains = <&k3_pds 146 TI_SCI_PD_EXCLUSIVE>;
- 		clocks = <&k3_clks 146 0>;
- 		clock-names = "fclk";
--		status = "disabled";
-+		status = "okay";
+@@ -382,7 +382,7 @@
  	};
  
  	main_uart1: serial@2810000 {
@@ -180,11 +18,7 @@ diff -ur linux-6.6.69ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi linux-6.6.69/a
  		reg = <0x00 0x02810000 0x00 0x100>;
  		interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
  		clock-frequency = <48000000>;
- 		power-domains = <&k3_pds 152 TI_SCI_PD_EXCLUSIVE>;
- 		clocks = <&k3_clks 152 0>;
- 		clock-names = "fclk";
--		status = "disabled";
-+		status = "okay";
+@@ -393,7 +393,7 @@
  	};
  
  	main_uart2: serial@2820000 {
@@ -193,7 +27,7 @@ diff -ur linux-6.6.69ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi linux-6.6.69/a
  		reg = <0x00 0x02820000 0x00 0x100>;
  		interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
  		clock-frequency = <48000000>;
-@@ -404,18 +404,18 @@
+@@ -404,7 +404,7 @@
  	};
  
  	main_uart3: serial@2830000 {
@@ -202,11 +36,7 @@ diff -ur linux-6.6.69ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi linux-6.6.69/a
  		reg = <0x00 0x02830000 0x00 0x100>;
  		interrupts = <GIC_SPI 181 IRQ_TYPE_LEVEL_HIGH>;
  		clock-frequency = <48000000>;
- 		power-domains = <&k3_pds 154 TI_SCI_PD_EXCLUSIVE>;
- 		clocks = <&k3_clks 154 0>;
- 		clock-names = "fclk";
--		status = "disabled";
-+		status = "okay";
+@@ -415,7 +415,7 @@
  	};
  
  	main_uart4: serial@2840000 {
@@ -233,15 +63,6 @@ diff -ur linux-6.6.69ori/arch/arm64/boot/dts/ti/k3-am64-main.dtsi linux-6.6.69/a
  		reg = <0x00 0x02860000 0x00 0x100>;
  		interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
  		clock-frequency = <48000000>;
-@@ -591,7 +591,7 @@
- 			     <183>, <184>, <185>;
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
--		ti,ngpio = <88>;
-+		ti,ngpio = <80>;
- 		ti,davinci-gpio-unbanked = <0>;
- 		power-domains = <&k3_pds 78 TI_SCI_PD_EXCLUSIVE>;
- 		clocks = <&k3_clks 78 0>;
 
 diff -ur linux-6.6.69ori/drivers/char/Kconfig linux-6.6.69/drivers/char/Kconfig
 --- linux-6.6.69ori/drivers/char/Kconfig	2025-01-02 04:32:11.000000000 -0500
