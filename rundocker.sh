@@ -31,6 +31,14 @@ else
     SSHMNT=''
 fi
 
+# Any other extra args
+COV=/usr/local/cov-analysis
+if [ -d $COV ]; then
+    echo 'Coverity enabled'
+    EXTRA_ARGS="-v $COV:$COV"
+    EXTRA_PATH=":$COV/bin"
+fi
+
 . ./.defs.mk
 if [ "$BUILDTARG" = "x86_64" ]; then
     TAG=latest
@@ -43,10 +51,17 @@ else
     fi
 fi
 
+#
+# Run the container image.
+#
+# - disable_ipv6 to prevent trying downloads that way since it rarely works.
+# - Add /opt/go/bin so we get the correct version of go when noninteractive.
+# - hostname vyos-build to prevent confusion.
+#
 docker run --rm $DFLAGS \
   --privileged --sysctl net.ipv6.conf.lo.disable_ipv6=0 \
-  -e PATH=/opt/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  -e PATH=/opt/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin$EXTRA_PATH \
   -h vyos-build \
   -v $(pwd):/vyos -v /dev:/dev -v /etc/fstab:/etc/fstab \
-  $GITMNT $SSHMNT -w /vyos \
+  $GITMNT $SSHMNT $EXTRA_ARGS -w /vyos \
   vyos/vyos-build:$TAG "$@"
