@@ -64,7 +64,7 @@ echo "$H Possible failures in $FILES"
 
 # egrep for errors followed by removing known false positives
 cat $FILES 2> /dev/null | \
-    egrep '(fatal:| error:|^\*\*\*|dpkg: error )' |
+    egrep '(fatal:| error:|^\*\*\*|dpkg:.*error)' |
     egrep -v '(Linking the executable xfrmi|libstrongswan-kernel-netlink.so is not portable|unable to read /etc/init.d/iperf3|/usr/sbin/grub-probe|bash-completion-test-subject.deb|NOTE: Filtering of link-warnings enabled)'
 echo $H
 
