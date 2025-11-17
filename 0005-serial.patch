@@ -92,7 +92,7 @@ diff -ur linux-6.6.69ori/drivers/char/Kconfig linux-6.6.69/drivers/char/Kconfig
 +	int "Major device number for the fanout device"
 +	depends on FANOUT
 +	range 0 254
-+	default "0"
++	default "200"
 +	help
 +	  The major device number to use for this device.  0 means allocate the
 +	  major device number dynamically.  At run time you can determine the
