@@ -123,6 +123,9 @@ if [ ! -f "$BLT" ]; then
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
+        */libyang3*.deb|*/libyang-*_3*.deb)  # libyang3 Cannot be used since libyang2 will be installed
+            continue
+            ;;
         esac
 
         test -f "$a" || continue
