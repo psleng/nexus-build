@@ -1,5 +1,0 @@
-[[packages]]
-name = "conntrack-tools"
-commit_id = "psl-master"
-scm_url = "https://github.com/psleng/conntrack-tools"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"
