@@ -40,6 +40,9 @@ help:
 	@echo 'make mostlyclean    # clean build artifacts'
 	@echo 'make containerclean # remove build container image.'
 	@echo
+	@echo 'make sdcard         # flash sdcard with the built image'
+	@echo 'make dfuimg         # create DFU images to \"dfu-images\" folder'
+	@echo
 	@if [ -s "$(DEFS)" ]; then \
 	    echo "The current build settings ($(DEFS)) are:"; \
 	    cat $(DEFS); \
@@ -151,6 +154,16 @@ ifeq ($(BUILDTARG),x86_64)
 else
 	@echo '### Making $@'
 	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE)
+	@echo '### Making $@ COMPLETED'
+endif
+
+# Create DFU Images.
+dfuimg: $(IMAGE_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+else
+	@echo '### Making $@'
+	@./build-dfu-image.sh
 	@echo '### Making $@ COMPLETED'
 endif
 
