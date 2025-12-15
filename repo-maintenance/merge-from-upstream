@@ -322,8 +322,7 @@ def do_tomldiff() -> None:
     missingdir: list[Path] = []
     missingtoml: list[Path] = []
     TOML = Path('package.toml')
-    igos_path = Path('../package-build-iGOS')
-    # vyos_path = Path('../vyos-build/scripts/package-build')
+    igos_path = IGOSPATH
     vyos_path = Path(f'{WORKDIR}/vyos-build/scripts/package-build')
 
     print(f'"<" is relative to {igos_path}')
@@ -360,10 +359,14 @@ def do_tomldiff() -> None:
     else:
         print(f'(skipped because {dockerfile} missing)')
 
+    #
+    # Sanity checks
+    #
+
     if missingdir:
         # Probably means VyOS builds them manually on demand.
         print()
-        print(f'The following directories are missing in {vyos_path}/')
+        print(f'== The following directories are missing in {vyos_path}/')
         print(f'but exist in {igos_path}/ so there is no package.toml')
         print('to compare against.  It is likely that VyOS are building')
         print('these manually via "dpkg-buildpackage -uc -us -tc -b"')
@@ -374,12 +377,28 @@ def do_tomldiff() -> None:
     if missingtoml:
         # VyOS has it but the build part is apparently disabled.
         print()
-        print(f'The following package.toml files are missing in {vyos_dir}/')
+        print(f'== The following package.toml files are missing in {vyos_dir}/')
         print(f'but exist in {igos_path}/')
         print('Should we even be building it?')
         print()
         for p in missingtoml:
             print(p)
+
+    # Check for apparently abandoned directories in igos_path, i.e. they
+    # have a package.toml but are not listed in igos_pkgs hence not building.
+    # Typically this means we don't want our custom version anymore.
+    igos_dirs = set([d for d in os.listdir(igos_path)
+                       if os.path.exists(os.path.join(igos_path, d,
+                                         'package.toml'))])
+    unused_igos_dirs = list(igos_dirs.difference(set(igos_pkgs)))
+    if unused_igos_dirs:
+        print()
+        print(f'== The following directories exist in {igos_path}/ and have')
+        print('   a package.toml but are not build enabled so they are likely')
+        print('   abandoned. Remove the package.toml if this is ok.')
+        print()
+        for pkg in sorted(unused_igos_dirs):
+            print(pkg)
 
 
 if __name__ == '__main__':

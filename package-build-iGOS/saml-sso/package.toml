@@ -1,5 +1,5 @@
 [[packages]]
 name = "saml-sso"
 commit_id = "master"
-scm_url = "https://github.com/Perle-Systems-Limited/saml-sso.git"
+scm_url = "git@github.com:Perle-Systems-Limited/saml-sso.git"
 build_cmd = "make all"
