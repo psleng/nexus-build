@@ -301,8 +301,10 @@ def do_merge() -> None:
 
 def dodiff(diff: str, igos_toml: Path, vyos_toml: Path) -> None:
     'Perform a diff using given tool'
+    cmd = f'{diff} {igos_toml} {vyos_toml}'
+    print('#', cmd)
     sys.stdout.flush()
-    os.system(f'{diff} -w {igos_toml} {vyos_toml}')
+    os.system(cmd)
     sys.stdout.flush()
 
 
@@ -315,9 +317,12 @@ def do_tomldiff() -> None:
 
     # A bit crude.  If any argument provided, use vimdiff instead of diff
     if len(sys.argv) > 1:
+        if not os.isatty(sys.stdout.fileno()):
+            print('ERROR: stdout is not a tty', file=sys.stderr)
+            exit(1)
         diff = 'vimdiff'
     else:
-        diff = 'diff'
+        diff = 'diff -w'
 
     missingdir: list[Path] = []
     missingtoml: list[Path] = []

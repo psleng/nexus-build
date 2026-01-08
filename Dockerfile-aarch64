@@ -369,6 +369,12 @@ RUN git clone -b 4.4.6 https://github.com/perfsonar/i2util.git /tmp/i2util && \
       dpkg-buildpackage -uc -us -tc -b && \
       dpkg -i /tmp/*i2util*_$(dpkg-architecture -qDEB_HOST_ARCH).deb
 
+# Package needed for building Kea
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" \
+      > /etc/apt/sources.list.d/bookworm-backports.list \
+      && apt-get update \
+      && apt install -y -t bookworm-backports meson
+
 # Creating image for embedded systems needs this utilities to prepare a image file
 RUN apt-get update && apt-get install -y \
       parted \
