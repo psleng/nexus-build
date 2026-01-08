@@ -68,7 +68,7 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir $TSK --include \
-        ethtool telegraf owamp net-snmp frr frr_exporter strongswan \
+        ethtool telegraf owamp net-snmp frr frr_exporter isc-kea strongswan \
         openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
         podman ddclient dropbear hostap kea keepalived netfilter \
         pmacct radvd isc-dhcp ndppd hsflowd pyhumps bash-completion \
@@ -110,6 +110,8 @@ if [ ! -f "$BLT" ]; then
         *libvppinfra-dev*)  # Needed for vpp and vyos-1x
             ;;
         *vpp-dev_*64.deb)  # Needed for vpp and vyos-1x
+            ;;
+        *isc-kea-doc*)  # isc-kea insists on this
             ;;
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
