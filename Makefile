@@ -20,6 +20,8 @@ UBOOT_TARG    = .uboot.built
 FS_TARG       = .filesystem.built
 IMAGE_TARG    = .image.built
 
+DATECODE = $(shell date +%Y%m%d%H%M%S00)
+
 help:
 	@echo First select a build type.  Valid types are:
 	@echo
@@ -40,6 +42,11 @@ help:
 	@echo 'make mostlyclean    # clean build artifacts'
 	@echo 'make containerclean # remove build container image.'
 	@echo
+	@echo 'make sdcard         # flash sdcard with the built image'
+	@echo 'make sdcard-squashfs# flash sdcard with squash image in ./iso-images<buildtype/stage-iso'
+	@echo 'make live-iso       # create iso in ./iso-images/<buildtype>'
+	@echo 'make dfuimg         # create DFU images to \"dfu-images\" folder'
+	@echo
 	@if [ -s "$(DEFS)" ]; then \
 	    echo "The current build settings ($(DEFS)) are:"; \
 	    cat $(DEFS); \
@@ -47,7 +54,7 @@ help:
 
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
-IGOS_PKGS='apnscripts psl-progs vyos-1x vyatta-bash vyos-user-utils \
+IGOS_PKGS='apnscripts psl-progs saml-sso vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            vyos-utils ipaddrcheck hvinfo libgpiod \
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
@@ -90,7 +97,7 @@ else
 	IMGTAG := latest
 endif
 
-.PHONY: help all sdcard status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless
+.PHONY: help all sdcard sdcard-squashfs live-iso status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless
 
 all: $(DEFS) $(IMAGE_TARG)
 
@@ -140,17 +147,60 @@ else
 	@ls -l images/$(BUILDTYPE)/tisdk*.squashfs
 	@echo '### Making uSDcard image COMPLETED'
 	@echo '### Type "bin/buildlog" to check for errors'
-	@echo '### Type "make sdcard" to write to an uSD card'
+	@echo '### Type "make sdcard" to write bootloader and flat rootfs to an uSD card'
+	@echo '### Type "make sdcard-squashfs" to write bootloader and squashed rootfs to an uSD card'
+	@echo '### Type "make live-iso" to create a live iso under /iso_images'
 	@touch $@
 endif
 
-# Write to a uSDcard.
+# Write bootloader and flat rootfs to a uSDcard.
 sdcard: $(IMAGE_TARG)
 ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
 else
 	@echo '### Making $@'
 	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE)
+	@echo '### Making $@ COMPLETED'
+endif
+
+# Write bootloader and squashfs rootfs to a uSDcard.
+sdcard-squashfs: $(IMAGE_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+else
+	@echo '### Making $@'
+	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE) squashfs
+	@echo '### Making $@ COMPLETED'
+endif
+
+# Create a live ISO from the iso_image/$(BUILDTYPE)/stage_iso/*
+live-iso: $(IMAGE_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+else
+	@echo '### Making $@'
+	@command -v xorriso >/dev/null 2>&1 || { \
+		echo "Error: xorriso is not installed."; \
+		echo "Please install it by running: sudo apt install xorriso"; \
+		exit 1; \
+	}
+	# create an iso with the igos updates using the same iso attributes
+	sudo xorriso -as mkisofs -R -r -J -joliet-long -l -cache-inodes -iso-level 3 -A "iGOS" \
+  -p "live-build ${DATECODE}; https://salsa.debian.org/live-team/live-build" \
+  -publisher "psleng@perle.com" -V "iGOS" --modification-date="${DATECODE}" \
+  -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -isohybrid-apm-hfsplus \
+  -o iso-images/$(BUILDTYPE)/"igos-live-${DATECODE}-arm64.iso" iso-images/$(BUILDTYPE)/stage_iso
+
+	@echo '### Making $@ COMPLETED'
+endif
+
+# Create DFU Images.
+dfuimg: $(IMAGE_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+else
+	@echo '### Making $@'
+	@./build-dfu-image.sh
 	@echo '### Making $@ COMPLETED'
 endif
 

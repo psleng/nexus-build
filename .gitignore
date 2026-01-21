@@ -11,6 +11,7 @@
 /debian-repos
 /drivers
 /images
+/iso-images
 /logs
 /nohup.out
 /psleng.github.io
@@ -19,3 +20,4 @@
 /tools
 /typescript
 /vyos-build
+/dfu-images

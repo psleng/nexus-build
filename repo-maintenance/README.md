@@ -13,7 +13,7 @@ a chance to go each one of them and do the `git commit` and
 then switch to `psl-master` (typically) and do a `git merge current`
 (typically).
 
-However, see below before doing a `git push` on them.
+However, see below before doing a `git push --all` on them.
 
 NOTE: There will be a a `work/TODO` file created that contains
 these instructions.
@@ -56,10 +56,17 @@ The easiest workaround is to simply "git clone" it using the above 10.10.x.x
 ./gitserv address just before doing a "make all", because the build system
 will not try to re-clone the working tree if it already exists.
 
-NOTE: Beware that libvyosconfig/build.sh has commit hashes that VyOS changes
-every now and then.  We have to change the "vyos" to "psleng" in that
-script to get our version of the repositories.  These are referred to
-in the dict "extrapkgs" in `merge-from-upstream` .
+NOTE: Beware that vyos-1x/libvyosconfig/Makefile has commit hashes that
+VyOS changes every now and then ("opam pin" of vyos1x-config and vyconf).
+
+If either hash and either of those repos have been updated, then the
+corresponding URL in that file also have to be modified to use the
+10.10.x.x format in the corresponding work.copy directory that ./gitserv
+creates and checked in temporarily to get our version of the repositories.
+This hack-checkin is safe because you will never actually push from
+"work.copy", only from "work".
+
+These are also referred to in the dict "extrapkgs" in `merge-from-upstream` .
 
 If you are using ./gitserv for test building you can can check out a
 copy of libvyosconfig somewhere using the local git:// URL, hack the

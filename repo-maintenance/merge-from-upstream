@@ -68,7 +68,7 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
         return None
 
     print(f' I: Cloning {url} for {name}')
-    run(['git', 'clone', '-q', '--recurse-submodules',
+    run(['git', 'clone', '-q',
         url, workdir], check=True)
     # commit = dpkg['commit_id']
     # print(f' I: Checkout commit_id {commit} for {name}')
@@ -210,9 +210,9 @@ def do_merge() -> None:
     # Special cases: vyos-build (does not use package.toml).
     #
     # Also vyos1x-config and vyconf which are explicitly referred
-    # to by libvyosconfig/build.sh .  We use the default branch
+    # to by vyos-1x/libvyosconfig/Makefile .  We use the default branch
     # as commit_id for these so the merge happens to the correct place.
-    # The above build.sh uses a commit hash so the psl-master
+    # The above Makefile uses commit hashes so the psl-master branch
     # does not actually get used.
     #
     # Cook up what the parsed package.toml parts would look like.
@@ -301,8 +301,10 @@ def do_merge() -> None:
 
 def dodiff(diff: str, igos_toml: Path, vyos_toml: Path) -> None:
     'Perform a diff using given tool'
+    cmd = f'{diff} {igos_toml} {vyos_toml}'
+    print('#', cmd)
     sys.stdout.flush()
-    os.system(f'{diff} {igos_toml} {vyos_toml}')
+    os.system(cmd)
     sys.stdout.flush()
 
 
@@ -315,15 +317,17 @@ def do_tomldiff() -> None:
 
     # A bit crude.  If any argument provided, use vimdiff instead of diff
     if len(sys.argv) > 1:
+        if not os.isatty(sys.stdout.fileno()):
+            print('ERROR: stdout is not a tty', file=sys.stderr)
+            exit(1)
         diff = 'vimdiff'
     else:
-        diff = 'diff'
+        diff = 'diff -w'
 
     missingdir: list[Path] = []
     missingtoml: list[Path] = []
     TOML = Path('package.toml')
-    igos_path = Path('../package-build-iGOS')
-    # vyos_path = Path('../vyos-build/scripts/package-build')
+    igos_path = IGOSPATH
     vyos_path = Path(f'{WORKDIR}/vyos-build/scripts/package-build')
 
     print(f'"<" is relative to {igos_path}')
@@ -360,10 +364,14 @@ def do_tomldiff() -> None:
     else:
         print(f'(skipped because {dockerfile} missing)')
 
+    #
+    # Sanity checks
+    #
+
     if missingdir:
         # Probably means VyOS builds them manually on demand.
         print()
-        print(f'The following directories are missing in {vyos_path}/')
+        print(f'== The following directories are missing in {vyos_path}/')
         print(f'but exist in {igos_path}/ so there is no package.toml')
         print('to compare against.  It is likely that VyOS are building')
         print('these manually via "dpkg-buildpackage -uc -us -tc -b"')
@@ -374,12 +382,28 @@ def do_tomldiff() -> None:
     if missingtoml:
         # VyOS has it but the build part is apparently disabled.
         print()
-        print(f'The following package.toml files are missing in {vyos_dir}/')
+        print(f'== The following package.toml files are missing in {vyos_dir}/')
         print(f'but exist in {igos_path}/')
         print('Should we even be building it?')
         print()
         for p in missingtoml:
             print(p)
+
+    # Check for apparently abandoned directories in igos_path, i.e. they
+    # have a package.toml but are not listed in igos_pkgs hence not building.
+    # Typically this means we don't want our custom version anymore.
+    igos_dirs = set([d for d in os.listdir(igos_path)
+                       if os.path.exists(os.path.join(igos_path, d,
+                                         'package.toml'))])
+    unused_igos_dirs = list(igos_dirs.difference(set(igos_pkgs)))
+    if unused_igos_dirs:
+        print()
+        print(f'== The following directories exist in {igos_path}/ and have')
+        print('   a package.toml but are not build enabled so they are likely')
+        print('   abandoned. Remove the package.toml if this is ok.')
+        print()
+        for pkg in sorted(unused_igos_dirs):
+            print(pkg)
 
 
 if __name__ == '__main__':
