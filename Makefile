@@ -221,12 +221,12 @@ spotless: clean containerclean
 
 # Clean everything.
 clean: mostlyclean
-	sudo rm -rf images
+	sudo rm -rf images dfu-images
 
 # Clean build artifacts only (but not built images).
 mostlyclean:
 	rm -f *.ERR .*.built $(DEFS)
-	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml
+	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml create-sdcardiGOS.sh
 
 # Clean the container image.  It rarely needs rebuilding.
 containerclean:
