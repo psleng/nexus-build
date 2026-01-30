@@ -1,5 +1,5 @@
 [[packages]]
 name = "vyos-1x"
-commit_id = "wwan_dev_nexus"
+commit_id = "psl-master"
 scm_url = "https://github.com/psleng/vyos-1x.git"
 build_cmd = "../brand.sh && dpkg-buildpackage -uc -us -tc -b"
