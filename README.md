@@ -341,7 +341,7 @@ The U-Boot environment is now loaded in RAM. This step partitions the eMMC and r
 2. **Set DFU Configuration for eMMC:** Set the environment variable to define the eMMC-specific DFU alt-info.
 
 ```
-	setenv dfu_alt_info ${duf_alt_info_emmc}
+	setenv dfu_alt_info ${dfu_alt_info_emmc}
 ```
 
 3. **Enter eMMC Flashing DFU Mode:** Start the DFU process within U-Boot, which exposes the eMMC partitions over USB.
