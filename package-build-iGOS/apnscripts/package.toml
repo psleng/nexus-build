@@ -1,0 +1,6 @@
+[[packages]]
+name = "apnscripts"
+commit_id = "psl-master"
+scm_url = "git@github.com:Perle-Systems-Limited/wwan-mod.git"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
+pre_build_hook = "cp -r apnscripts/* ."
