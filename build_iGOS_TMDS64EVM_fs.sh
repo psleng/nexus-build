@@ -104,6 +104,8 @@ if [ ! -f "$BLT" ]; then
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")\
              $ROOTDIR/ti-bdebstrap/*.deb
     do
+        test -s "$a" || continue  # Skip zero length junk
+
         case "$a" in
         *libsnmp-dev_*64.deb)  # Needed for frr (despite -dev_ pattern)
             ;;
@@ -123,9 +125,6 @@ if [ ! -f "$BLT" ]; then
             continue
             ;;
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
-            continue
-            ;;
-        */libyang3*.deb|*/libyang-*_3*.deb)  # libyang3 Cannot be used since libyang2 will be installed
             continue
             ;;
         esac
