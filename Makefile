@@ -54,7 +54,7 @@ help:
 
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
-IGOS_PKGS='apnscripts psl-progs saml-sso vyos-1x vyatta-bash vyos-user-utils \
+IGOS_PKGS='flask-react-web apnscripts psl-progs saml-sso vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            vyos-utils ipaddrcheck hvinfo libgpiod \
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
