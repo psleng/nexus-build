@@ -1,8 +1,34 @@
 interfaces {
+    bridge br1 {
+        address 192.168.1.1/24
+        member {
+            interface wlan0 {
+            }
+            interface wlan1 {
+            }
+        }
+    }
     loopback lo {
     }
 }
 service {
+    dhcp-server {
+        listen-interface br1
+        shared-network-name wifi-dhcp {
+            subnet 192.168.1.0/24 {
+                lease 86400
+                option {
+                    default-router 192.168.1.1
+                    name-server 192.168.1.1
+                }
+                range range_1 {
+                    start 192.168.1.1
+                    stop 192.168.1.250
+                }
+                subnet-id 1
+            }
+        }
+    }
     https {
         api {
             graphql {
