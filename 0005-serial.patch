@@ -63,1252 +63,6 @@
  		reg = <0x00 0x02860000 0x00 0x100>;
  		interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
  		clock-frequency = <48000000>;
-
-diff -ur linux-6.6.69ori/drivers/char/Kconfig linux-6.6.69/drivers/char/Kconfig
---- linux-6.6.69ori/drivers/char/Kconfig	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/char/Kconfig	2025-02-19 15:19:47.115605330 -0500
-@@ -7,6 +7,46 @@
- 
- source "drivers/tty/Kconfig"
- 
-+config FANOUT
-+	tristate "Fanout circular queue"
-+	default y
-+	help
-+	  If you say Y here, you will get support for a circular queue.
-+	  
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called fanout.
-+
-+config FANOUT_BUF_SZ
-+	int "Size of the circular queue for the fanout device"
-+	depends on FANOUT
-+	range 10 262144
-+	default "4096"
-+	help
-+	  The size of the circular queue for the fanout device
-+
-+config FANOUT_MAJOR_DEV
-+	int "Major device number for the fanout device"
-+	depends on FANOUT
-+	range 0 254
-+	default "200"
-+	help
-+	  The major device number to use for this device.  0 means allocate the
-+	  major device number dynamically.  At run time you can determine the
-+	  actualmajor device number used by parsing the /proc/devices file for
-+	  the "fanout" device
-+
-+config FANOUT_DEBUG_LVL
-+	int "Debug level for the fanout device driver"
-+	depends on FANOUT
-+	range 0 4
-+	default "2"
-+	help
-+	  The debug level for the fanout driver.
-+	    0 = no printk at all
-+	    1 = printk on error only
-+	    2 = printk on errors and on init/remove
-+	    3 = debug prink to trace calls into fanout
-+	    4 = debug trace inside of fanout calls
- config TTY_PRINTK
- 	tristate "TTY driver to output user messages via printk"
- 	depends on EXPERT && TTY
-diff -ur linux-6.6.69ori/drivers/char/Makefile linux-6.6.69/drivers/char/Makefile
---- linux-6.6.69ori/drivers/char/Makefile	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/char/Makefile	2025-02-19 15:20:11.576212395 -0500
-@@ -2,7 +2,7 @@
- #
- # Makefile for the kernel character device drivers.
- #
--
-+obj-$(CONFIG_FANOUT)		+= fanout.o
- obj-y				+= mem.o random.o
- obj-$(CONFIG_TTY_PRINTK)	+= ttyprintk.o
- obj-y				+= misc.o
-diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250_core.c linux-6.6.69/drivers/tty/serial/8250/8250_core.c
---- linux-6.6.69ori/drivers/tty/serial/8250/8250_core.c	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/tty/serial/8250/8250_core.c	2025-02-19 14:02:44.478376823 -0500
-@@ -35,6 +35,9 @@
- #include <linux/string_helpers.h>
- #include <linux/uaccess.h>
- #include <linux/io.h>
-+// Perle start for trueport
-+#include <linux/version.h>
-+// Perle end for trueport
- #ifdef CONFIG_SPARC
- #include <linux/sunserialcore.h>
- #endif
-@@ -287,7 +290,12 @@
- 	}
- 
- 	if (!(iir & UART_IIR_NO_INT))
--		serial8250_tx_chars(up);
-+    // Perle start for trueport
-+    {
-+        perle_serial8250_tx_chars(up);
-+    }
-+		// serial8250_tx_chars(up);
-+// Perle end for trueport
- 
- 	if (up->port.irq)
- 		serial_out(up, UART_IER, ier);
-@@ -559,7 +567,9 @@
- 		port->membase  = old_serial_port[i].iomem_base;
- 		port->iotype   = old_serial_port[i].io_type;
- 		port->regshift = old_serial_port[i].iomem_reg_shift;
--
-+// Perle start for trueport
-+serial8250_set_defaults(up);	/* PERLE */
-+// Perle end for trueport
- 		port->irqflags |= irqflag;
- 		if (serial8250_isa_config != NULL)
- 			serial8250_isa_config(i, &up->port, &up->capabilities);
-@@ -1066,6 +1076,14 @@
- 		uart->rs485_stop_tx	= up->rs485_stop_tx;
- 		uart->lsr_save_mask	= up->lsr_save_mask;
- 		uart->dma		= up->dma;
-+// Perle start for trueport
-+		uart->uart_port_index	= up->uart_port_index;
-+		uart->set_media_type	= up->set_media_type;
-+		uart->mcr_mask			= up->mcr_mask;
-+		uart->port.get_mstatus	= up->port.get_mstatus;
-+		uart->port.set_termios	= up->port.set_termios;		// duplicate below
-+		uart->port.set_mctrl	= up->port.set_mctrl;		// duplicate below
-+// Perle end for trueport
- 
- 		/* Take tx_loadsz from fifosize if it wasn't set separately */
- 		if (uart->port.fifosize && !uart->tx_loadsz)
-@@ -1129,6 +1147,50 @@
- 			uart->dl_read = up->dl_read;
- 		if (up->dl_write)
- 			uart->dl_write = up->dl_write;
-+// Perle start for trueport
-+        {
-+            uart->char_buf_ptr = &uart->char_buf[0];
-+            uart->flag_buf_ptr = &uart->flag_buf[0];
-+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
-+            init_timer(&uart->forward_idle_timer);
-+            uart->forward_idle_timer.function = serial8250_forward_idle_timer;
-+            uart->forward_idle_timer.data = (unsigned long)uart;
-+
-+            init_timer(&uart->forward_force_timer);
-+            uart->forward_force_timer.function = serial8250_forward_force_timer;
-+            uart->forward_force_timer.data = (unsigned long)uart;
-+
-+            init_timer(&uart->forward_send_timer);
-+            uart->forward_send_timer.function = serial8250_forward_send_timer;
-+            uart->forward_send_timer.data = (unsigned long)uart;
-+
-+            init_timer(&uart->sigscan_delay_timer);
-+            uart->sigscan_delay_timer.function = serial8250_sigscan_delay_timer;
-+            uart->sigscan_delay_timer.data = (unsigned long)uart;
-+
-+            init_timer(&uart->rs232_rts_toggle_timer);
-+            uart->rs232_rts_toggle_timer.function = serial8250_rs232_rts_toggle_timer;
-+            uart->rs232_rts_toggle_timer.data = (unsigned long)uart;
-+
-+            init_timer(&uart->rs232_rts_toggle_initial_timer);
-+            uart->rs232_rts_toggle_initial_timer.function = serial8250_rs232_rts_toggle_initial_timer;
-+            uart->rs232_rts_toggle_initial_timer.data = (unsigned long)uart;
-+			
-+            init_timer(&uart->signal_timer);
-+            uart->signal_timer.function = serial8250_signal_timer;
-+            uart->signal_timer.data = (unsigned long)uart;
-+	
-+#else
-+            timer_setup(&uart->forward_idle_timer            , serial8250_forward_idle_timer            , 0);
-+            timer_setup(&uart->forward_force_timer           , serial8250_forward_force_timer           , 0);
-+            timer_setup(&uart->forward_send_timer            , serial8250_forward_send_timer            , 0);
-+            timer_setup(&uart->sigscan_delay_timer           , serial8250_sigscan_delay_timer           , 0);
-+            timer_setup(&uart->rs232_rts_toggle_timer        , serial8250_rs232_rts_toggle_timer        , 0);
-+            timer_setup(&uart->rs232_rts_toggle_initial_timer, serial8250_rs232_rts_toggle_initial_timer, 0);
-+            timer_setup(&uart->signal_timer                  , serial8250_signal_timer                  , 0);
-+#endif
-+        }
-+// Perle end for trueport
- 
- 		if (uart->port.type != PORT_8250_CIR) {
- 			if (serial8250_isa_config != NULL)
-
---- linux-6.6.106/drivers/tty/serial/8250/8250.h	2025-09-11 11:20:28.000000000 -0400
-+++ linux-6.6.106changed/drivers/tty/serial/8250/8250.h	2025-10-06 11:17:53.828945299 -0400
-@@ -19,7 +19,10 @@
- 	int (*rx_dma)(struct uart_8250_port *p);
- 	void (*prepare_tx_dma)(struct uart_8250_port *p);
- 	void (*prepare_rx_dma)(struct uart_8250_port *p);
--
-+// Perle start for trueport
-+	unsigned int (*handle_rx_dma)(struct uart_8250_port *p, u8 iir,
-+				      unsigned char status);
-+// Perle end for trueport
- 	/* Filter function */
- 	dma_filter_fn		fn;
- 	/* Parameter to the filter function */
-@@ -269,6 +272,13 @@
- 	return tiocm;
- }
- 
-+// Perle start for trueport
-+// void perle_serial8250_do_set_mctrl(struct uart_port *port, unsigned int mctrl);
-+
-+void perle_serial8250_break_ctl(struct uart_port *port, int break_state);
-+void serial_out_mcr(struct uart_8250_port *up, int value);
-+// Perle end for trueport
-+
- static inline void serial8250_out_MCR(struct uart_8250_port *up, int value)
- {
- 	serial_out(up, UART_MCR, value);
-@@ -277,6 +287,7 @@
- 		mctrl_gpio_set(up->gpios, serial8250_MCR_to_TIOCM(value));
- }
- 
-+
- static inline int serial8250_in_MCR(struct uart_8250_port *up)
- {
- 	int mctrl;
-@@ -422,3 +433,4 @@
- {
- 	return port->minor - 64;
- }
-+
-
---- linux-6.6.106/drivers/tty/serial/8250/8250_port.c	2025-09-11 11:20:28.000000000 -0400
-+++ linux-6.6.106changed/drivers/tty/serial/8250/8250_port.c	2025-10-06 11:16:16.101768213 -0400
-@@ -51,6 +51,8 @@
- #define DEBUG_AUTOCONF(fmt...)	do { } while (0)
- #endif
- 
-+int set_modem_info(struct uart_8250_port *up, unsigned int cmd, unsigned int arg);
-+
- /*
-  * Here we define the default xmit fifo size used for each type of UART.
-  */
-@@ -1909,6 +1911,7 @@
- 	unsigned long flags;
- 	u16 status;
- 
-+    // printk("(%s,%d)\n",__FUNCTION__,__LINE__);
- 	if (iir & UART_IIR_NO_INT)
- 		return 0;
- 
-@@ -2039,11 +2042,14 @@
- 	struct uart_8250_port *up = up_to_u8250p(port);
- 	unsigned char mcr;
- 
--	mcr = serial8250_TIOCM_to_MCR(mctrl);
-+	//mcr = serial8250_TIOCM_to_MCR(mctrl);
- 
--	mcr |= up->mcr;
-+	//mcr |= up->mcr;
-+	
-+
-+	//serial8250_out_MCR(up, mcr);
-+	set_modem_info(up,TIOCMSET,mctrl);
- 
--	serial8250_out_MCR(up, mcr);
- }
- EXPORT_SYMBOL_GPL(serial8250_do_set_mctrl);
- 
-@@ -3264,7 +3270,7 @@
- 	.unthrottle	= serial8250_unthrottle,
- 	.stop_rx	= serial8250_stop_rx,
- 	.enable_ms	= serial8250_enable_ms,
--	.break_ctl	= serial8250_break_ctl,
-+	.break_ctl	= perle_serial8250_break_ctl,
- 	.startup	= serial8250_startup,
- 	.shutdown	= serial8250_shutdown,
- 	.flush_buffer	= serial8250_flush_buffer,
-@@ -3280,6 +3286,10 @@
- 	.poll_get_char = serial8250_get_poll_char,
- 	.poll_put_char = serial8250_put_poll_char,
- #endif
-+//perle
-+    .ioctl = serial8250_ioctl,
-+    .get_rs232_rts_toggle=serial8250_get_rs232_rts_toggle,
-+    .uart_trace_add_ioctl=serial8250_uart_trace_add_ioctl,
- };
- 
- void serial8250_init_port(struct uart_8250_port *up)
-
-diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Kconfig linux-6.6.69/drivers/tty/serial/8250/Kconfig
---- linux-6.6.69ori/drivers/tty/serial/8250/Kconfig	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/tty/serial/8250/Kconfig	2025-02-19 14:02:44.481376757 -0500
-@@ -466,6 +466,14 @@
- 	  not booting kernel because the serial console remains silent in case
- 	  they forgot to update the command line.
- 
-+config SERIAL_8250_PERLE_OMAP
-+    tristate "Custom Perle 8250 omap serial port modularized support"
-+    depends on SERIAL_8250
-+    default y
-+    help
-+      This option replace 8250_omap serial driver.
-+
-+
- config SERIAL_8250_LPC18XX
- 	tristate "NXP LPC18xx/43xx serial port support"
- 	depends on SERIAL_8250 && OF && (ARCH_LPC18XX || COMPILE_TEST)
-diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/tty/serial/8250/Makefile
---- linux-6.6.69ori/drivers/tty/serial/8250/Makefile	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/tty/serial/8250/Makefile	2025-02-19 14:02:44.482376734 -0500
-@@ -35,6 +35,7 @@
- obj-$(CONFIG_SERIAL_8250_EM)		+= 8250_em.o
- obj-$(CONFIG_SERIAL_8250_IOC3)		+= 8250_ioc3.o
- obj-$(CONFIG_SERIAL_8250_OMAP)		+= 8250_omap.o
-+obj-$(CONFIG_SERIAL_8250_PERLE_OMAP) += 8250_perleomap.o
- obj-$(CONFIG_SERIAL_8250_RT288X)	+= 8250_rt288x.o
- obj-$(CONFIG_SERIAL_8250_LPC18XX)	+= 8250_lpc18xx.o
- obj-$(CONFIG_SERIAL_8250_MT6577)	+= 8250_mtk.o
-
---- linux-6.6.100/drivers/tty/serial/serial_core.c	2025-07-24 02:53:22.000000000 -0400
-+++ linux-6.6.100changed/drivers/tty/serial/serial_core.c	2025-08-12 14:53:09.498708303 -0400
-@@ -33,7 +33,7 @@
- #include <linux/uaccess.h>
- 
- #include "serial_base.h"
--
-+#include <linux/serial_8250.h>
- /*
-  * This is used to lock changes in serial line configuration.
-  */
-@@ -656,7 +656,17 @@
- 	unsigned int ret;
- 
- 	port = uart_port_lock(state, flags);
--	ret = uart_circ_chars_pending(&state->xmit);
-+// Perle start for trueport
-+	if (state->uart_port->drain_flag)
-+	{
-+	    ret=0;
-+	}
-+	else
-+	{
-+		ret = uart_circ_chars_pending(&state->xmit);
-+	}
-+	// ret = uart_circ_chars_pending(&state->xmit);
-+// Perle end for trueport
- 	uart_port_unlock(port, flags);
- 	return ret;
- }
-@@ -1014,7 +1024,10 @@
- 	port->closing_wait    = closing_wait;
- 	if (new_info->xmit_fifo_size)
- 		uport->fifosize = new_info->xmit_fifo_size;
--
-+    // // Perle start for trueport
-+	// port->low_latency = (uport->flags & UPF_LOW_LATENCY) ? 1 : 0;
-+	// port->perle_iolan = (uport->flags & UPF_PERLE_IOLAN) ? 1 : 0;
-+    // // Perle end for trueport
-  check_and_exit:
- 	retval = 0;
- 	if (uport->type == PORT_UNKNOWN)
-@@ -1491,6 +1504,8 @@
- 	int ret;
- 	unsigned long flags;
- 
-+	////printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
-+
- 	if (!(port->rs485_supported.flags & SER_RS485_ENABLED))
- 		return -ENOTTY;
- 
-@@ -1500,9 +1515,13 @@
- 	ret = uart_check_rs485_flags(port, &rs485);
- 	if (ret)
- 		return ret;
--	uart_sanitize_serial_rs485(port, &rs485);
--	uart_set_rs485_termination(port, &rs485);
--	uart_set_rs485_rx_during_tx(port, &rs485);
-+	if (rs485.flags & SER_RS485_ENABLED)
-+	{	
-+		////printk_deferred("%s()@%d: value \n",__FUNCTION__,__LINE__);
-+		uart_sanitize_serial_rs485(port, &rs485);
-+		uart_set_rs485_termination(port, &rs485);
-+		uart_set_rs485_rx_during_tx(port, &rs485);
-+	}
- 
- 	spin_lock_irqsave(&port->lock, flags);
- 	ret = port->rs485_config(port, &tty->termios, &rs485);
-@@ -1512,6 +1531,12 @@
- 		/* Reset RTS and other mctrl lines when disabling RS485 */
- 		if (!(rs485.flags & SER_RS485_ENABLED))
- 			port->ops->set_mctrl(port, port->mctrl);
-+
-+		if ((rs485.flags & SER_RS422_ENABLED))
-+		{
-+			////printk_deferred("%s()@%d: 422:Force RTS \n",__FUNCTION__,__LINE__);
-+			port->ops->set_mctrl(port, UART_MCR_RTS);
-+		}	
- 	}
- 	spin_unlock_irqrestore(&port->lock, flags);
- 	if (ret) {
-@@ -1593,7 +1618,16 @@
- 	void __user *uarg = (void __user *)arg;
- 	int ret = -ENOIOCTLCMD;
- 
--
-+// perle start
-+    {
-+        struct uart_port *uport = uart_port_check(state);
-+
-+        if (!!uport && uport->ops->uart_trace_add_ioctl)
-+        {
-+            uport->ops->uart_trace_add_ioctl(uport, cmd);
-+        }
-+    }
-+//perle end
- 	/*
- 	 * These ioctls don't rely on the hardware to be present.
- 	 */
-@@ -1830,6 +1864,13 @@
- 		uart_port_deref(port);
- 		return;
- 	}
-+// Perle start for trueport
-+    if(port->drain_flag)
-+    {
-+		uart_port_deref(port);
-+        return;
-+    }
-+// Perle end for trueport
- 
- 	/*
- 	 * Set the check interval to be 1/5 of the estimated time to
-@@ -2014,7 +2055,10 @@
- 	uport = uart_port_check(state);
- 	if (!uport || uport->flags & UPF_DEAD)
- 		return -ENXIO;
--
-+    // // Perle start for trueport
-+	// port->low_latency = (uport->flags & UPF_LOW_LATENCY) ? 1 : 0;
-+	// port->perle_iolan = (uport->flags & UPF_PERLE_IOLAN) ? 1 : 0;
-+    // // Perle end for trueport
- 	/*
- 	 * Start up the serial port.
- 	 */
-@@ -3137,6 +3181,9 @@
- 	.attrs = tty_dev_attrs,
- };
- 
-+// Perle start for trueport
-+int setProcSigScan(int dsline, int state);
-+// Perle end for trueport
- /**
-  * serial_core_add_one_port - attach a driver-defined port structure
-  * @drv: pointer to the uart low level driver structure for this port
-@@ -3184,6 +3231,13 @@
- 		ret = -ENOMEM;
- 		goto out;
- 	}
-+// Perle start for trueport
-+	/*
-+	 * save the major # for the device
-+	 * we need it for sigscan
-+	 */
-+	uport->major = drv->major;
-+// Perle end for trueport
- 
- 	/*
- 	 * If this port is in use as a console then the spinlock is already
-@@ -3226,6 +3280,9 @@
- 		dev_err(uport->dev, "Cannot register tty device on line %d\n",
- 		       uport->line);
- 	}
-+// Perle start for trueport
-+setProcSigScan(uport->line, 0);
-+// Perle end for trueport
- 
-  out:
- 	mutex_unlock(&port->mutex);
-
---- linux-6.6.93/drivers/tty/serial/serial_mctrl_gpio.c	2025-06-04 08:42:26.000000000 -0400
-+++ linux-6.6.93changed/drivers/tty/serial/serial_mctrl_gpio.c	2025-07-15 17:37:11.489204608 -0400
-@@ -13,9 +13,18 @@
- #include <linux/serial_core.h>
- #include <linux/module.h>
- #include <linux/property.h>
-+#include <linux/serial_8250.h>
- 
- #include "serial_mctrl_gpio.h"
-+#include "linux/uart_trace.h"
- 
-+// events for fsmSigScan
-+#define FSMSS_EXIT 0
-+#define FSMSS_TIMEOUT 1
-+#define FSMSS_SCAN 2
-+#define FSMSS_TIOCM 3
-+int fsmSigScan(struct uart_8250_port *up, int event, int data, int caller);
-+unsigned short MSR2TIOCM(unsigned char msr);
- struct mctrl_gpios {
- 	struct uart_port *port;
- 	struct gpio_desc *gpio[UART_GPIO_MAX];
-@@ -96,6 +105,8 @@
-  */
- unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
- {
-+	struct uart_port *port = gpios->port;
-+    struct uart_8250_port *up = up_to_u8250p(port);
- 	enum mctrl_gpio_idx i;
- 
- 	if (gpios == NULL)
-@@ -109,7 +120,8 @@
- 				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
- 		}
- 	}
--
-+	////printk_deferred("(%s,%d) mctrl = %x\n",__FUNCTION__,__LINE__,*mctrl);
-+	up->mctrl_prev = *mctrl;
- 	return *mctrl;
- }
- EXPORT_SYMBOL_GPL(mctrl_gpio_get);
-@@ -173,40 +185,77 @@
- }
- EXPORT_SYMBOL_GPL(mctrl_gpio_init_noauto);
- 
-+static int send_signal_DEBUG(int pid, int sig, int priv, const char *func, int line)
-+{
-+	////printk_deferred("send_signal(%d,%d,%d) caller: %s()@%d\n", pid, sig, priv, func, line);
-+    return(kill_pid(find_vpid(pid), sig, priv));
-+}
-+#define send_signal(pid, sig, priv) send_signal_DEBUG(pid, sig, priv, __FUNCTION__, __LINE__)
-+
-+
- #define MCTRL_ANY_DELTA (TIOCM_RI | TIOCM_DSR | TIOCM_CD | TIOCM_CTS)
- static irqreturn_t mctrl_gpio_irq_handle(int irq, void *context)
- {
- 	struct mctrl_gpios *gpios = context;
- 	struct uart_port *port = gpios->port;
-+    struct uart_8250_port *up = up_to_u8250p(port);
- 	u32 mctrl = gpios->mctrl_prev;
- 	u32 mctrl_diff;
- 	unsigned long flags;
- 
- 	mctrl_gpio_get(gpios, &mctrl);
--
-+    ////printk_deferred("(%s,%d) mctrl  %x \n",__FUNCTION__,__LINE__, mctrl);
-+    ////printk_deferred("(%s,%d) mctrl ^ gpios->mctrl_prev %x \n",__FUNCTION__,__LINE__, mctrl ^ gpios->mctrl_prev);
-+    //printk("(%s,%d) irq %d\n",__FUNCTION__,__LINE__, irq);
- 	spin_lock_irqsave(&port->lock, flags);
- 
- 	mctrl_diff = mctrl ^ gpios->mctrl_prev;
- 	gpios->mctrl_prev = mctrl;
-+	up->mctrl_prev = mctrl;
- 
--	if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
--		if ((mctrl_diff & mctrl) & TIOCM_RI)
--			port->icount.rng++;
-+	// if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
- 
--		if ((mctrl_diff & mctrl) & TIOCM_DSR)
--			port->icount.dsr++;
-+	// 	if ((mctrl_diff & mctrl) & TIOCM_RI)
-+	// 		port->icount.rng++;
- 
--		if (mctrl_diff & TIOCM_CD)
--			uart_handle_dcd_change(port, mctrl & TIOCM_CD);
-+	// 	if ((mctrl_diff & mctrl) & TIOCM_DSR)
-+	// 		port->icount.dsr++;
- 
--		if (mctrl_diff & TIOCM_CTS)
--			uart_handle_cts_change(port, mctrl & TIOCM_CTS);
-+	// 	if (mctrl_diff & TIOCM_CD)
-+	// 		uart_handle_dcd_change(port, mctrl & TIOCM_CD);
- 
--		wake_up_interruptible(&port->state->port.delta_msr_wait);
--	}
-+	// 	if (mctrl_diff & TIOCM_CTS)
-+	// 		uart_handle_cts_change(port, mctrl & TIOCM_CTS);
-+
-+	// 	wake_up_interruptible(&port->state->port.delta_msr_wait);
-+	// }
- 
- 	spin_unlock_irqrestore(&port->lock, flags);
- 
-+    if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL)
-+    {
-+        if ((up->rpt_mode == TRPT_ON) && (up->rpt_pid > 0))
-+        {
-+			send_signal(up->rpt_pid, SIGUSR1, 1);
-+        }
-+		fsmSigScan(up, FSMSS_TIOCM, mctrl,9);
-+
-+        if (mctrl & TIOCM_DSR)
-+            up->last_msr_read |= UART_MSR_DSR;
-+        else
-+            up->last_msr_read &= ~UART_MSR_DSR;
-+
-+        if (mctrl & TIOCM_CAR)
-+            up->last_msr_read |= UART_MSR_DCD;
-+        else
-+            up->last_msr_read &= ~UART_MSR_DCD;
-+
-+        if(up->traceMask & TRACE_BITS_SIGNALS)
-+        {
-+            uartTraceAddSignals(up->tracePortIndex, &up->traceSignals, up->last_mcr_written, up->last_msr_read);
-+        }
-+    }
-+
- 	return IRQ_HANDLED;
- }
- 
-@@ -229,7 +278,7 @@
- 	gpios = mctrl_gpio_init_noauto(port->dev, idx);
- 	if (IS_ERR(gpios))
- 		return gpios;
--
-+    //printk("(%s,%d)\n",__FUNCTION__,__LINE__);
- 	gpios->port = port;
- 
- 	for (i = 0; i < UART_GPIO_MAX; ++i) {
-@@ -239,6 +288,7 @@
- 			continue;
- 
- 		ret = gpiod_to_irq(gpios->gpio[i]);
-+    ////printk_deferred("(%s,%d)corresponding irq for %s (idx=%d, ret=%d)\n",__FUNCTION__,__LINE__,mctrl_gpios_desc[i].name, idx, ret);
- 		if (ret < 0) {
- 			dev_err(port->dev,
- 				"failed to find corresponding irq for %s (idx=%d, err=%d)\n",
-
-diff -ur linux-6.6.69ori/drivers/tty/tty_port.c linux-6.6.69/drivers/tty/tty_port.c
---- linux-6.6.69ori/drivers/tty/tty_port.c	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/drivers/tty/tty_port.c	2025-02-19 14:02:44.483376713 -0500
-@@ -521,12 +521,20 @@
- 	}
- 	if (filp == NULL || (filp->f_flags & O_NONBLOCK)) {
- 		/* Indicate we are open */
--		if (C_BAUD(tty))
--			tty_port_raise_dtr_rts(port);
-+// Perle start for trueport
-+		if(!port->perle_iolan)
-+		{
-+// Perle end for trueport
-+            if (C_BAUD(tty))
-+            {
-+             //   tty_port_raise_dtr_rts(port);
-+            }
-+// Perle start for trueport
-+        }
-+//Perle end for trueport
- 		tty_port_set_active(port, true);
- 		return 0;
- 	}
--
- 	if (C_CLOCAL(tty))
- 		do_clocal = 1;
-
---- linux-6.6.93/include/linux/serial_8250.h	2025-06-04 08:42:26.000000000 -0400
-+++ linux-6.6.93changed/include/linux/serial_8250.h	2025-06-26 13:04:46.702850381 -0400
-@@ -11,7 +11,9 @@
- #include <linux/serial_core.h>
- #include <linux/serial_reg.h>
- #include <linux/platform_device.h>
--
-+// Perle start for trueport
-+#include <linux/perle_serial.h>
-+// Perle end for trueport
- struct uart_8250_port;
- 
- /*
-@@ -133,6 +135,10 @@
- 	unsigned char		ier;
- 	unsigned char		lcr;
- 	unsigned char		mcr;
-+// Perle start for trueport
-+	unsigned char		mcr_mask;	/* mask of user bits */
-+	unsigned char		mcr_force;	/* mask of forced bits */
-+// Perle end for trueport
- 	unsigned char		cur_iotype;	/* Running I/O type */
- 	unsigned int		rpm_tx_active;
- 	unsigned char		canary;		/* non-zero during system sleep
-@@ -161,6 +167,127 @@
- 	void			(*dl_write)(struct uart_8250_port *up, u32 value);
- 
- 	struct uart_8250_em485 *em485;
-+// Perle start for trueport
-+	int uart_port_index;                                        // the index of port on the chips (master+slave)
-+	int baud;
-+	                                                            // on the iolan V, each serial port card has 2 exar chips in a master/slave configuration
-+	                                                            // the master ports are 0-7 and the slave ports are 8-15
-+#define SERIAL_8250_MEDIA_TYPE_TRISTATE	0
-+#define SERIAL_8250_MEDIA_TYPE_232		1
-+#define SERIAL_8250_MEDIA_TYPE_232_DCE	2
-+#define SERIAL_8250_MEDIA_TYPE_422		3
-+#define SERIAL_8250_MEDIA_TYPE_485_FULL	4
-+#define SERIAL_8250_MEDIA_TYPE_485_HALF	5
-+
-+#define SERIAL_8250_MEDIA_TYPE_MASK		0xf
-+
-+#define SERIAL_8250_MEDIA_TERMINATION		0x10
-+#define SERIAL_8250_MEDIA_FAST				0x20
-+
-+	void (*set_media_type)(struct uart_8250_port *,int);       // callback to 8250_pci.c to set the dce/dte mode on the uart port
-+	unsigned int media_type;
-+
-+	unsigned int prescaler;     // 1 or 4
-+	unsigned int mode8_16;      // 8=mode8x, 16=mode16x
-+	
-+	struct exar8250 *exar8250priv;	// back pointer
-+	
-+#if 0
-+    /*
-+     * GPIO signal support
-+     */
-+    int         DTR_gpio;
-+    int         DTR_inverted;
-+    int         DTR_present;
-+    int         DTR_active;     // used to track the current state of the DTR signal/gpio
-+                                // so we only write to the gpio if the state changes
-+    int         DCD_gpio;
-+    int         DCD_inverted;
-+    int         DCD_present;
-+    int         DSR_gpio;
-+    int         DSR_inverted;
-+    int         DSR_present;
-+    int         RI_gpio;
-+    int         RI_inverted;
-+    int         RI_present;
-+
-+    u8          gpio_msr;       // emulate MSR (modem status register) for GPIOs
-+                                // the delta and status bits for DCD, DSR and RI will be
-+                                // updated
-+#endif // if 0
-+    // these are used for serialt (uart trace)
-+    u8          last_mcr_written;
-+    u8          last_msr_read;
-+	u8			mcr_signal_flips;
-+    // used for signal notification
-+    unsigned short      rpt_mode;           // report mode   TRPT_(OFF,ON)
-+    int                 rpt_pid;            // process ID
-+    unsigned short      rpt_lsrmask;        // lsr mask      (TRPTSET >> 16)
-+    unsigned short      rpt_user_sigmask;   // signals mask - linux API bits to look for (TRPTSET & 0xffff). TIOCM_DSR ...
-+    unsigned short      rpt_sigmask;        // signals mask - uart bits to look for (TRPTSET & 0xffff). UART_MSR_DSR ...
-+    unsigned short      rpt_LSR;            // lsr status    UART_LSR_(FE,OE,PE,BI)
-+
-+    // forwarding config
-+    unsigned short      forwarding;        // options for packet forwarding
-+    unsigned short        start_transmit_rule;
-+    unsigned short        end_transmit_rule;
-+    unsigned short      packet_size;       // maximum packet size
-+    unsigned short      idle_time;         // idle time in msec
-+    unsigned short      force_time;        // time to force transmit in msec
-+    unsigned char       trigger_char1;     // transmit if char is encountered
-+    unsigned char       trigger_char2;     // transmit if char is encountered
-+    unsigned char       start_frame1;      // start of frame marker
-+    unsigned char       start_frame2;      // start of frame marker
-+    unsigned char       end_frame1;        // end of frame marker
-+    unsigned char       end_frame2;        // end of frame marker
-+    unsigned short      oneshot_config;    // oneshot forwarding config
-+    unsigned char       direct_trigger;    // direct mode trigger character
-+        // forwarding state info
-+    unsigned short      oneshot_forwarding;// oneshot forwarding options that may be cleared
-+    unsigned int        forward_state;     // state of forwarding
-+    unsigned int           base_state;       // starting state
-+    unsigned int           stored_char;      // was the char saved in the flip buf
-+    unsigned char          saved_ch;         // save char for later
-+    unsigned char          saved_st;         // save status for later
-+    unsigned long          last_idle_time;         // last time idle timer was set in jiffies
-+    // forwarding timers
-+    struct timer_list       forward_idle_timer;     // forward on idle timer
-+    struct timer_list       forward_force_timer;    // force forward timer
-+    struct timer_list       forward_send_timer;     // send to tty process timer
-+    struct timer_list       sigscan_delay_timer;    // signal scan delay timer
-+
-+    // forwarding flip buffer
-+    char            *char_buf_ptr;
-+    unsigned char   *flag_buf_ptr;
-+    int             count;
-+    char            *get_char_ptr;
-+    unsigned char   *get_flag_ptr;
-+    int             get_count;
-+    int             buf_num;
-+    unsigned char   char_buf[2*PERLE_SERIAL_DS_FLIPBUF_SIZE];
-+    char            flag_buf[2*PERLE_SERIAL_DS_FLIPBUF_SIZE];
-+
-+    unsigned char   MCRmap;     // MCR value when mapping is used
-+    unsigned char   out1;       // re-map for OUT1
-+    unsigned char   out2;       // re-map for OUT2
-+
-+    int             traceMask;
-+    int             traceSignals;
-+    int             tracePortIndex; // 0 based port index of iolan
-+    struct sigscan  sigScan;        // DSR/DCD signal scan
-+
-+    // rts toggle
-+    struct timer_list rs232_rts_toggle_timer;
-+    struct timer_list rs232_rts_toggle_initial_timer;
-+    int rs232_rts_toggle_char_timeout;
-+    int rs232_rts_toggle;
-+    unsigned short rts_toggle_initial_delay;
-+    unsigned short rts_toggle_final_delay;
-+    struct timer_list signal_timer;
-+    int signal_count;
-+    unsigned int mctrl_prev;
-+// Perle end for trueport
-+
- 	void			(*rs485_start_tx)(struct uart_8250_port *);
- 	void			(*rs485_stop_tx)(struct uart_8250_port *);
- 
-@@ -209,6 +336,24 @@
- 
- void serial8250_set_isa_configurator(void (*v)(int port, struct uart_port *up,
- 					       u32 *capabilities));
-+// Perle start for trueport
-+int serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg);
-+void perle_serial8250_tx_chars(struct uart_8250_port *up);
-+// void serial8250_enable_ms(struct uart_port *port);
-+int getProcSigScan(int dsline);
-+int setProcSigScan(int dsline, int state);
-+void forward_frame(struct uart_8250_port *up);
-+int serial8250_get_rs232_rts_toggle(struct uart_port *port);
-+int serial8250_uart_trace_add_ioctl(struct uart_port *port, int ioctl_cmd);
-+
-+void serial8250_forward_idle_timer(struct timer_list *t);
-+void serial8250_forward_force_timer(struct timer_list *t);
-+void serial8250_forward_send_timer(struct timer_list *t);
-+void serial8250_sigscan_delay_timer(struct timer_list *t);
-+void serial8250_rs232_rts_toggle_timer(struct timer_list *t);
-+void serial8250_rs232_rts_toggle_initial_timer(struct timer_list *t);
-+void serial8250_signal_timer(struct timer_list *t);
-+// Perle end for trueport
- 
- #ifdef CONFIG_SERIAL_8250_RT288X
- int rt288x_setup(struct uart_port *p);
-
---- linux-6.6.92/include/linux/serial_core.h	2025-05-22 08:12:26.000000000 -0400
-+++ linux-6.6.92changed/include/linux/serial_core.h	2025-06-25 13:17:29.215841277 -0400
-@@ -403,6 +403,11 @@
- 	void		(*poll_put_char)(struct uart_port *, unsigned char);
- 	int		(*poll_get_char)(struct uart_port *);
- #endif
-+// Perle start for trueport
-+    int    (*get_rs485)(struct uart_port *,struct serial_rs485 *);
-+    int    (*get_rs232_rts_toggle)(struct uart_port *);
-+    int    (*uart_trace_add_ioctl)(struct uart_port *, int);
-+// Perle end for trueport
- };
- 
- #define NO_POLL_CHAR		0x00ff0000
-@@ -470,6 +475,12 @@
- 	unsigned char		iotype;			/* io access style */
- 	unsigned char		quirks;			/* internal quirks */
- 
-+// Perle start for trueport
-+	unsigned int	(*get_mstatus)(struct uart_port *);
-+//	void (*get_logical_dcd)(struct uart_port *port);
-+//	void (*get_logical_dsr)(struct uart_port *port);
-+//	void (*get_logical_ri)(struct uart_port *port);
-+// Perle end for trueport
- #define UPIO_UNKNOWN		((unsigned char)~0U)	/* UCHAR_MAX */
- #define UPIO_PORT		(SERIAL_IO_PORT)	/* 8b I/O port access */
- #define UPIO_HUB6		(SERIAL_IO_HUB6)	/* Hub6 ISA card */
-@@ -516,6 +527,7 @@
- #define UPF_LOW_LATENCY		((__force upf_t) ASYNC_LOW_LATENCY    /* 13 */ )
- #define UPF_BUGGY_UART		((__force upf_t) ASYNC_BUGGY_UART     /* 14 */ )
- #define UPF_MAGIC_MULTIPLIER	((__force upf_t) ASYNC_MAGIC_MULTIPLIER /* 16 */ )
-+#define UPF_PERLE_IOLAN		((__force upf_t) ASYNC_PERLE_IOLAN    /* 17  */ )
- 
- #define UPF_NO_THRE_TEST	((__force upf_t) BIT_ULL(19))
- /* Port has hardware-assisted h/w flow control */
-@@ -587,6 +599,15 @@
- 	struct gpio_desc	*rs485_rx_during_tx_gpio; /* Output GPIO that sets the state of RS485 RX during TX */
- 	struct serial_iso7816   iso7816;
- 	void			*private_data;		/* generic platform data pointer */
-+// Perle start for trueport
-+    char             drain_flag;
-+    char        rs485_txing_no_echo;    // indicates when TXing for 485 hdx. this is used for echo suppression
-+	unsigned char		card_id;		/* Perle card_id */
-+	char		perle_unused;
-+    // uart_xr17v358_t uart_xr17v358_regs;
-+    unsigned int    major;      // save the major_id of the device. required for reporting sigscan info to userspace
-+                                // since uart port numbering in the kernel does not correspond to the physical ports on the iolan
-+// Perle end for trueport
- };
- 
- /**
-@@ -997,7 +1018,8 @@
- 
- #define uart_circ_chars_free(circ)	\
- 	(CIRC_SPACE((circ)->head, (circ)->tail, UART_XMIT_SIZE))
--
-+// Perle start for trueport
-+	#if 0
- static inline int uart_tx_stopped(struct uart_port *port)
- {
- 	struct tty_struct *tty = port->state->port.tty;
-@@ -1005,6 +1027,40 @@
- 		return 1;
- 	return 0;
- }
-+#else
-+/*
-+ * the code for this in kernel-3.14.0-rc2 was inline (drivers/tty/serial/serial_core.c)
-+ * and was referenced as:
-+ *
-+ * if (!uart_circ_empty(&state->xmit) && state->xmit.buf &&
-+ *          !tty->stopped && (!tty->hw_stopped || rts_toggle))
-+ *          port->ops->start_tx(port);
-+ *
-+ * tty->stopped        tty->hw_stopped     rts_toggle (1=start)        start result        stop result
-+ * 0                   0                   0                           1                   0
-+ * 0                   0                   1                           1                   0
-+ * 0                   1                   0                           0                   1
-+ * 0                   1                   1                           1                   0
-+ * 1                   0                   0                           0                   1
-+ * 1                   0                   1                           0                   1
-+ * 1                   1                   0                           0                   1
-+ * 1                   1                   1                           0                   1
-+ *
-+ */
-+static inline int uart_tx_stopped(struct uart_port *port)
-+{
-+    struct tty_struct *tty = port->state->port.tty;
-+    int rts_toggle = 0;
-+    if (port->ops->get_rs232_rts_toggle)
-+    {
-+        rts_toggle = port->ops->get_rs232_rts_toggle(port);
-+    }
-+    if ((tty && tty->flow.stopped) || (port->hw_stopped && (rts_toggle==0)))
-+        return 1;
-+    return 0;
-+}
-+#endif
-+// Perle end for trueport
- 
- static inline bool uart_cts_enabled(struct uart_port *uport)
- {
-
-diff -ur linux-6.6.69ori/include/linux/tty_port.h linux-6.6.69/include/linux/tty_port.h
---- linux-6.6.69ori/include/linux/tty_port.h	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/include/linux/tty_port.h	2025-02-19 14:02:44.486376646 -0500
-@@ -111,7 +111,11 @@
- 	wait_queue_head_t	delta_msr_wait;
- 	unsigned long		flags;
- 	unsigned long		iflags;
--	unsigned char		console:1;
-+	unsigned char		console:1,
-+// Perle start for trueport
-+	low_latency:1,	/* optional: tune for latency */
-+	perle_iolan:1;	/* option set from UPF_PERLE_IOLAN */
-+// Perle end for trueport
- 	struct mutex		mutex;
- 	struct mutex		buf_mutex;
- 	unsigned char		*xmit_buf;
---- linux-6.6.93/include/uapi/asm-generic/ioctls.h	2025-06-04 08:42:26.000000000 -0400
-+++ linux-6.6.93changed/include/uapi/asm-generic/ioctls.h	2025-07-10 10:56:24.090547611 -0400
-@@ -117,5 +117,94 @@
- #define TIOCPKT_IOCTL		64
- 
- #define TIOCSER_TEMT	0x01	/* Transmitter physically empty */
-+// Perle start for trueport
- 
-+#define TRPTSET		_IOW('t', 130, int)
-+#define TRPTGET		_IOR('t', 131, struct ttyrpt)
-+#define TRPTGETRST	_IOR('t', 132, struct ttyrpt)
-+#define TRPTSETPID	_IOW('t', 133, int)
-+#define TIOCSERDS	_IOW('t', 134, int)
-+#define TIOCFWDDS	_IOW('t', 135, struct fwdpkt)
-+#define TIOCMAPDTR	_IOW('t', 136, int)
-+#define TIOCMAPRTS	_IOW('t', 137, int)
-+#define TRACECONTROL _IOW('t', 138, int)
-+#define TRACEREAD    _IOR('t', 139, int)
-+#define TIOCOSARMDS	_IOW('t', 140, int)
-+#define TRESETCOUNT	_IOW('t', 141, int)
-+#define TSIGSCAN	_IOW('t', 142, struct sigscan)
-+#define TIOCCICOUNT _IOW('t', 143, int)             /* clear port stats like rx, tx counts */
-+#define TRTSCONTROL	_IOW('t', 144, struct rts_control)
-+#define TIOCSLEEP	_IOW('t', 145, int)
-+
-+// bit defs for arg to TIOCCICOUNT ioctl 
-+#define TIOCCICOUNT_CTS         0x0001
-+#define TIOCCICOUNT_DSR         0x0002
-+#define TIOCCICOUNT_RNG         0x0004
-+#define TIOCCICOUNT_DCD         0x0008
-+#define TIOCCICOUNT_TX          0x0010
-+#define TIOCCICOUNT_RX          0x0020
-+#define TIOCCICOUNT_FRAME       0x0040
-+#define TIOCCICOUNT_PARITY      0x0080
-+#define TIOCCICOUNT_OVERRUN     0x0100
-+#define TIOCCICOUNT_BRK         0x0200
-+#define TIOCCICOUNT_BUFOVERRUN  0x0400
-+#define TIOCCICOUNT_ALL         0xffff
-+
-+/*
-+ * These are the definitions for the Line Status Register
-+ */
-+#define TIOCSER_TEMPT           0x40  /* Transmitter empty */
-+#define TIOCSER_THRE            0x20  /* Transmit-hold-register empty */
-+#define TIOCSER_BI              0x10  /* Break interrupt indicator */
-+#define TIOCSER_FE              0x08  /* Frame error indicator */
-+#define TIOCSER_PE              0x04  /* Parity error indicator */
-+#define TIOCSER_OE              0x02  /* Overrun error indicator */
-+#define TIOCSER_DR              0x01  /* Receiver data ready */
-+
-+/* modem lines */
-+#define TIOCM_LE	0x001
-+#define TIOCM_DTR	0x002
-+#define TIOCM_RTS	0x004
-+#define TIOCM_ST	0x008
-+#define TIOCM_SR	0x010
-+#define TIOCM_CTS	0x020
-+#define TIOCM_CAR	0x040
-+#define TIOCM_RNG	0x080
-+#define TIOCM_DSR	0x100
-+#define TIOCM_CD	TIOCM_CAR
-+#define TIOCM_RI	TIOCM_RNG
-+#define TIOCM_OUT1	0x2000
-+#define TIOCM_OUT2	0x4000
-+#define TIOCM_LOOP	0x8000
-+
-+/* c_lflag bits */
-+#if 0 //Defined in termbits.h
-+#define ISIG	0000001
-+#define ICANON	0000002
-+#define XCASE	0000004
-+#define ECHO	0000010
-+#define ECHOE	0000020
-+#define ECHOK	0000040
-+#define ECHONL	0000100
-+#define NOFLSH	0000200
-+#define TOSTOP	0000400
-+#define ECHOCTL	0001000
-+#define ECHOPRT	0002000
-+#define ECHOKE	0004000
-+#define FLUSHO	0010000
-+#define PENDIN	0040000
-+#define IEXTEN	0100000
-+#define EXTPROC	0200000
-+#endif
-+#define NO_XLATE 01000000
-+
-+#define FANOUT_IOC_MAGIC        'k'
-+#define FANOUT_IOCT_FLUSH       _IO(FANOUT_IOC_MAGIC, 0x80)
-+#define FANOUT_IOCT_READMARK    _IO(FANOUT_IOC_MAGIC, 0x81)
-+
-+/* the following bits represent the requested report mode */
-+/* this is the data that follows a TRPTSET ioclt */
-+#define TRPT_OFF	0x0000			// report mode off
-+#define TRPT_ON		0x0001			// report mode on
-+// Perle end for trueport
- #endif /* __ASM_GENERIC_IOCTLS_H */
-
-diff -ur linux-6.6.69ori/include/uapi/asm-generic/termbits.h linux-6.6.69/include/uapi/asm-generic/termbits.h
---- linux-6.6.69ori/include/uapi/asm-generic/termbits.h	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/include/uapi/asm-generic/termbits.h	2025-02-19 14:02:44.489376580 -0500
-@@ -146,4 +146,107 @@
- #define	TCSADRAIN	1
- #define	TCSAFLUSH	2
- 
-+// Perle start for trueport
-+#define CBAUDEX2 0020000
-+#define B1843200 0020001
-+#define B3686400 0020002
-+#define B28800   0020003
-+// Perle-end
-+
-+// Perle-start
-+#define PSPACE  00100000
-+#define CTSFLOW 00200000
-+#define RTSFLOW 00400000
-+#define PARMARK	01000000
-+#define CSTOP15 02000000
-+// Perle-end
-+// PERLE specific - start
-+/* the following bits represent the requested report mode */
-+/* this is the data that follows a TRPTSET ioclt */
-+#define TRPT_SPCD	0x80000000			// SPCD task (lsrmask)
-+#define TRPT_PRIVATE 	0xf0000000			// reserved (lsrmask)
-+
-+struct ttyrpt
-+{
-+	unsigned short lsrmask;		// lsr mask      (TRPTSET >> 16)
-+	unsigned short sigmask;		// signals mask	 (TRPTSET & 0xffff)
-+
-+	unsigned short signals;		// signal levels TIOCM_(DTR,RTS,CTS,DSR,RI,CD)
-+	unsigned short lsr;		// lsr status    TIOCSER_(FE,OE,PE,BI)
-+};
-+
-+/* the following bits represent the requested report mode */
-+/* this is the data that follows a TRPTSET ioclt */
-+#define TRPT_OFF	0x0000			// report mode off
-+#define TRPT_ON		0x0001			// report mode on
-+
-+#define DS_RS232_FD                 0x0001
-+#define DS_RS422_FD                 0x0002
-+#define DS_RS485_FD                 0x0004
-+#define DS_RS485_HD                 0x0008
-+#define DS_LINE_TERM                0x0010
-+#define DS_DRIVERCTL_AUTO           0x0020
-+#define DS_ECHO_SUPRESSION          0x0040
-+#define DS_SINGLE_CHAR_INTERRUPT    0x0080
-+#define DS_SLEW_RATE_LIMIT          0x0100
-+#define DS_SIGNALCTL_MANUAL         0x0200
-+#define DS_SIGNALCTL_INACTIVE       0x0400
-+#define DS_FIFO_DIRECT              0x0800
-+#define DS_IGNORE_LINE_ERRORS       0x1000
-+
-+
-+struct fwdpkt
-+{
-+        unsigned short		forwarding;        // options for packet forwarding
-+        unsigned short        start_transmit_rule;
-+        unsigned short        end_transmit_rule;
-+        unsigned short		packet_size;       // maximum packet size
-+        unsigned short		idle_time;         // idle time in msec
-+        unsigned short		force_time;        // time to force transmit in msec
-+        unsigned char		trigger_char1;     // transmit if char is encountered
-+        unsigned char		trigger_char2;     // transmit if char is encountered
-+        unsigned char		start_frame1;      // start of frame marker
-+        unsigned char		start_frame2;      // start of frame marker
-+        unsigned char		end_frame1;        // end of frame marker
-+        unsigned char		end_frame2;        // end of frame marker
-+		unsigned short		oneshot_config;	   // oneshot forwarding config
-+		unsigned char		direct_trigger;    // one-time filter for direct service types
-+};
-+
-+// forwarding field
-+#define DS_FORWARD_ON_COUNT        		0x0001
-+#define DS_FORWARD_ON_IDLE         		0x0002
-+#define DS_FORWARD_ON_TIME         		0x0004
-+#define DS_FORWARD_ON_CHAR1        		0x0010
-+#define DS_FORWARD_ON_CHAR2        		0x0020
-+#define DS_FORWARD_START_CHAR1     		0x0100
-+#define DS_FORWARD_START_CHAR2     		0x0200
-+#define DS_FORWARD_END_CHAR1   			0x1000
-+#define DS_FORWARD_END_CHAR2   			0x2000
-+
-+#define DS_ONESHOT_ON_DIRECT_TRIGGER	0x0001
-+
-+// transmit rules
-+#define DS_FORWARD_TRANS_STRIP     0
-+#define DS_FORWARD_TRANS_TRIG      1
-+#define DS_FORWARD_TRANS_TRIG_1    2
-+#define DS_FORWARD_TRANS_TRIG_2    3
-+
-+#define DS_FORWARD_PACKET_SIZE_MAX 1024
-+
-+struct sigscan {
-+	int		pid;					// pid of caller to signal
-+	unsigned short sigmask;		// handshake signals to scan
-+	unsigned short sigdrop;		// handshake signals to drop
-+	unsigned short msec;			// milliseconds to delay
-+	unsigned short line;			// line (port) number
-+};
-+
-+#define RTS_TOGGLE_ON	0x0001
-+struct rts_control {
-+    unsigned short flags;
-+    unsigned short initial_delay;
-+    unsigned short final_delay;
-+};
-+// Perle end for trueport
- #endif /* __ASM_GENERIC_TERMBITS_H */
-diff -ur linux-6.6.69ori/include/uapi/linux/serial.h linux-6.6.69/include/uapi/linux/serial.h
---- linux-6.6.69ori/include/uapi/linux/serial.h	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/include/uapi/linux/serial.h	2025-02-19 14:02:44.491376536 -0500
-@@ -149,6 +149,33 @@
- #define SER_RS485_ADDR_RECV		(1 << 7)
- #define SER_RS485_ADDR_DEST		(1 << 8)
- 
-+// Perle start for trueport
-+#define SER_RS485_USE_GPIO              (1 << 5)
-+#define SER_RS485_HDX               (1 << 16)       // 0x00010000, half duplex if enabled
-+#define SER_RS485_ECHO_SUPPRESSION  (1 << 17)       // 0x00020000, echo suppression for half duplex only
-+#define SER_RS4XX_LINE_TERMINATION  (1 << 18)       // 0x00040000, line termination
-+#define SER_RS485_DRIVERCTL_AUTO    (1 << 19)       // 0x00080000, driver controls RTS (TX envelope for 485 hdx and fdx only. for 422 RTS is always active)
-+#define SER_RS422_ENABLED           (1 << 20)       // 0x00100000, 422 enabled
-+#define SER_RS4XX_INVERT_RTS        (1 << 21)       // 0x00200000, invert RTS when accessing the MCR because the transceiver uses an inverted RTS signal to control the TX
-+                                                    //           normally MCR[RTS]=1, causes 0V from the UART and results in RTS high
-+                                                    //                    MCR[RTS]=0, causes 3.3V from the UART and results in RTS low
-+                                                    //           with RS4XX
-+                                                    //                    MCR[RTS]=1, causes 0V from the UART and results in RTS low (TX off)
-+                                                    //                    MCR[RTS]=0, causes 3.3V from the UART and results in RTS high (TX on)
-+#define SER_RSXXX_IGNORE_LINE_ERRORS    (1 << 22)   // 0x00400000, ignore line errors (parity and framing)
-+#define SER_RSXXX_SINGLE_CHAR_INTERRUPT (1 << 23)   // 0x00800000, single char interrupt
-+#define SER_RSXXX_SIGNALCTL_MANUAL      (1 << 24)   // 0x01000000, manual signal control
-+#define SER_RSXXX_SIGNALCTL_INACTIVE    (1 << 25)   // 0x02000000, DTR and RTS inactive
-+#define SER_RSXXX_FIFO_DIRECT           (1 << 26)   // 0x04000000, fifo direct mode
-+#define SER_RS232_ENABLED               (1 << 27)   // 0x08000000, 232 enabled
-+
-+#define SER_RSXXX_DTE_DCE_MODE_MASK     (3 << 28)
-+#define SER_RSXXX_DTE_DCE_MODE_DISABLED (0 << 28)
-+#define SER_RSXXX_DTE_DCE_MODE_DTE      (1 << 28)
-+#define SER_RSXXX_DTE_DCE_MODE_DCE      (2 << 28)			
-+
-+#define SER_RS232_DCE				    (1 << 28)	// 0x10000000, choose DCE (needs SER_RS232_ENABLED also)
-+// Perle end for trueport
- 	__u32	delay_rts_before_send;
- 	__u32	delay_rts_after_send;
- 
-diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uapi/linux/tty_flags.h
---- linux-6.6.69ori/include/uapi/linux/tty_flags.h	2025-01-02 04:32:11.000000000 -0500
-+++ linux-6.6.69/include/uapi/linux/tty_flags.h	2025-02-19 14:02:44.491376536 -0500
-@@ -32,6 +32,8 @@
- #define ASYNCB_AUTOPROBE	15 /* [x] Port was autoprobed by PCI/PNP code */
- #define ASYNCB_MAGIC_MULTIPLIER	16 /* Use special CLK or divisor */
- #define ASYNCB_LAST_USER	16
-+#define ASYNCB_PERLE_IOLAN	17	/* this is a Perle iolan port and needs special treatment */
-+
- 
- /*
-  * Internal flags used only by kernel (read-only)
-@@ -71,6 +73,9 @@
- #define ASYNC_BUGGY_UART	(1U << ASYNCB_BUGGY_UART)
- #define ASYNC_AUTOPROBE		(1U << ASYNCB_AUTOPROBE)
- #define ASYNC_MAGIC_MULTIPLIER	(1U << ASYNCB_MAGIC_MULTIPLIER)
-+// Perle start for trueport
-+#define ASYNC_PERLE_IOLAN	(1U << ASYNCB_PERLE_IOLAN)
-+// Perle end for trueport
- 
- #define ASYNC_FLAGS		((1U << (ASYNCB_LAST_USER + 1)) - 1)
- #define ASYNC_DEPRECATED	(ASYNC_SPLIT_TERMIOS | ASYNC_SESSION_LOCKOUT | \
-
---- linux-6.6.92/drivers/Makefile	2025-05-22 08:12:26.000000000 -0400
-+++ linux-6.6.92changed/drivers/Makefile	2025-06-13 18:36:54.070115970 -0400
-@@ -11,6 +11,8 @@
- MAKEFLAGS += --include-dir=$(srctree)
- endif
- 
-+obj-y += perle/
-+
- obj-y				+= cache/
- obj-y				+= irqchip/
- obj-y				+= bus/
-
---- /dev/null	2025-01-15 10:22:07.042000000 -0500
-+++ linux-6.6.69/include/linux/perle_serial.h	2025-01-15 14:20:16.206917130 -0500
-@@ -0,0 +1,31 @@
-+#ifndef _LINUX_PERLE_SERIAL_H
-+#define _LINUX_PERLE_SERIAL_H
-+
-+#if !defined(TRUE)
-+#define TRUE    1
-+#endif
-+#if !defined(FALSE)
-+#define FALSE   0
-+#endif
-+
-+// forwarding options
-+#define PERLE_SERIAL_FORWARD_ON_CHAR                    (DS_FORWARD_ON_CHAR1|DS_FORWARD_ON_CHAR2)
-+#define PERLE_SERIAL_FORWARD_ON_FRAME                   (DS_FORWARD_START_CHAR1|DS_FORWARD_START_CHAR2|DS_FORWARD_END_CHAR1|DS_FORWARD_END_CHAR2)
-+
-+#define PERLE_SERIAL_FORWARD_STATE_START_1OF1           0
-+#define PERLE_SERIAL_FORWARD_STATE_START_1OF2           1
-+#define PERLE_SERIAL_FORWARD_STATE_START_2OF2           2
-+#define PERLE_SERIAL_FORWARD_STATE_END_1OF1             3
-+#define PERLE_SERIAL_FORWARD_STATE_END_1OF2             4
-+#define PERLE_SERIAL_FORWARD_STATE_END_2OF2             5
-+#define PERLE_SERIAL_FORWARD_STATE_WAITING_1OF1         6
-+#define PERLE_SERIAL_FORWARD_STATE_WAITING_1OF2         7
-+#define PERLE_SERIAL_FORWARD_STATE_WAITING_2OF2         8
-+
-+#define PERLE_SERIAL_DS_FLIPBUF_SIZE                    1024
-+#define PERLE_SERIAL_FORWARD_SEND_TIMEOUT               (2 * HZ / 1000)
-+
-+//#define PERLE_SERIAL_DEBUG_RTSTOGGLE 1
-+
-+#endif  // _LINUX_PERLE_SERIAL_H
-+
-
 --- /dev/null	2025-02-19 10:39:48.396000000 -0500
 +++ linux-6.6.69/drivers/char/fanout.c	2025-02-19 15:18:41.776654822 -0500
 @@ -0,0 +1,409 @@
@@ -1721,7 +475,96 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +    }
 +}
 +
-
+diff -ur linux-6.6.69ori/drivers/char/Kconfig linux-6.6.69/drivers/char/Kconfig
+--- linux-6.6.69ori/drivers/char/Kconfig	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/drivers/char/Kconfig	2025-02-19 15:19:47.115605330 -0500
+@@ -7,6 +7,46 @@
+ 
+ source "drivers/tty/Kconfig"
+ 
++config FANOUT
++	tristate "Fanout circular queue"
++	default y
++	help
++	  If you say Y here, you will get support for a circular queue.
++	  
++	  To compile this driver as a module, choose M here: the
++	  module will be called fanout.
++
++config FANOUT_BUF_SZ
++	int "Size of the circular queue for the fanout device"
++	depends on FANOUT
++	range 10 262144
++	default "4096"
++	help
++	  The size of the circular queue for the fanout device
++
++config FANOUT_MAJOR_DEV
++	int "Major device number for the fanout device"
++	depends on FANOUT
++	range 0 254
++	default "200"
++	help
++	  The major device number to use for this device.  0 means allocate the
++	  major device number dynamically.  At run time you can determine the
++	  actualmajor device number used by parsing the /proc/devices file for
++	  the "fanout" device
++
++config FANOUT_DEBUG_LVL
++	int "Debug level for the fanout device driver"
++	depends on FANOUT
++	range 0 4
++	default "2"
++	help
++	  The debug level for the fanout driver.
++	    0 = no printk at all
++	    1 = printk on error only
++	    2 = printk on errors and on init/remove
++	    3 = debug prink to trace calls into fanout
++	    4 = debug trace inside of fanout calls
+ config TTY_PRINTK
+ 	tristate "TTY driver to output user messages via printk"
+ 	depends on EXPERT && TTY
+diff -ur linux-6.6.69ori/drivers/char/Makefile linux-6.6.69/drivers/char/Makefile
+--- linux-6.6.69ori/drivers/char/Makefile	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/drivers/char/Makefile	2025-02-19 15:20:11.576212395 -0500
+@@ -2,7 +2,7 @@
+ #
+ # Makefile for the kernel character device drivers.
+ #
+-
++obj-$(CONFIG_FANOUT)		+= fanout.o
+ obj-y				+= mem.o random.o
+ obj-$(CONFIG_TTY_PRINTK)	+= ttyprintk.o
+ obj-y				+= misc.o
+--- linux-6.6.92/drivers/Makefile	2025-05-22 08:12:26.000000000 -0400
++++ linux-6.6.92changed/drivers/Makefile	2025-06-13 18:36:54.070115970 -0400
+@@ -11,6 +11,8 @@
+ MAKEFLAGS += --include-dir=$(srctree)
+ endif
+ 
++obj-y += perle/
++
+ obj-y				+= cache/
+ obj-y				+= irqchip/
+ obj-y				+= bus/
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/drivers/perle/Kconfig	2025-06-13 18:22:45.653940253 -0400
+@@ -0,0 +1,4 @@
++config CONFIG_PERLE_HARDWARE
++    tristate "Perle sig scan"
++    default y
++
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/drivers/perle/Makefile	2025-06-13 17:18:11.417730200 -0400
+@@ -0,0 +1,7 @@
++#
++# Makefile for iolan driver
++#
++obj-y	+= perle_info.o
++#include $(TOPDIR)/Rules.make
++
++
 --- /dev/null	2025-06-13 16:46:25.248000000 -0400
 +++ linux-6.6.92changed/drivers/perle/perle_info.c	2025-06-16 12:10:23.445945793 -0400
 @@ -0,0 +1,153 @@
@@ -1878,504 +721,151 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +MODULE_AUTHOR("perle");
 +MODULE_DESCRIPTION("procfs for perle console server");
 +
-
---- /dev/null	2025-06-13 16:46:25.248000000 -0400
-+++ linux-6.6.92changed/drivers/perle/Makefile	2025-06-13 17:18:11.417730200 -0400
-@@ -0,0 +1,7 @@
-+#
-+# Makefile for iolan driver
-+#
-+obj-y	+= perle_info.o
-+#include $(TOPDIR)/Rules.make
-+
-+
---- /dev/null	2025-06-13 16:46:25.248000000 -0400
-+++ linux-6.6.92changed/drivers/perle/Kconfig	2025-06-13 18:22:45.653940253 -0400
-@@ -0,0 +1,4 @@
-+config CONFIG_PERLE_HARDWARE
-+    tristate "Perle sig scan"
-+    default y
-+
-
---- /dev/null	2025-06-13 16:46:25.248000000 -0400
-+++ linux-6.6.92changed/drivers/tty/serial/uart_trace.c	2025-06-24 10:56:41.307082613 -0400
-@@ -0,0 +1,371 @@
-+#include <linux/module.h>
-+#include <linux/errno.h>
-+#include <linux/signal.h>
-+#include <linux/sched.h>
-+#include <linux/timer.h>
-+#include <linux/interrupt.h>
-+#include <linux/tty.h>
-+#include <linux/tty_flip.h>
-+#include <linux/serial.h>
-+#include <linux/major.h>
-+#include <linux/string.h>
-+#include <linux/fcntl.h>
-+#include <linux/ptrace.h>
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/init.h>
-+#include <linux/delay.h>
-+#include <linux/miscdevice.h>
-+#include <asm/uaccess.h>
-+#include <asm/irq.h>
-+#include <linux/serial_reg.h>
-+#include <linux/uart_trace.h>
-+
-+static UartTrace *pUT = NULL;
-+
-+
-+
-+
-+
-+
-+
-+// convert ktime_t to microseconds
-+static unsigned long getMicroSeconds(ktime_t ktime_val)
-+{
-+    return((unsigned long)ktime_to_us(ktime_val));
-+}
-+
-+
-+static ktime_t getMicroTicks(void)
-+{
-+    return(ktime_get());
-+}
-+
-+static void getCompressedElapsed(unsigned short *pUtime)
-+{
-+	unsigned long now, jdiff, us, exp;
-+	ktime_t ktime_now,ktime_diff;
-+	
-+	ktime_now = getMicroTicks();
-+	ktime_diff = ktime_sub(ktime_now,pUT->microticks);
-+	pUT->microticks = ktime_now;
-+	
-+	now = jiffies;
-+	jdiff = now - pUT->jiffies;
-+	pUT->jiffies = now;
-+	
-+	exp = 0;
-+	if(jdiff >= HZ)							// 1+ seconds have passed by..
-+	{
-+		for(;jdiff > 4294UL; exp++)			// make sure nothing overflows
-+			jdiff = jdiff >> 1;
-+		us = (1000000UL * jdiff)/(unsigned long)HZ;
-+	}
-+	else
-+	{
-+		us = getMicroSeconds(ktime_diff);
-+	}
-+	
-+	for(;us > (1 << UTIME_MANTISSA_BITS); exp++)
-+		us = us >> 1;
-+	
-+	*pUtime = (exp << UTIME_MANTISSA_BITS) | us;
-+}
-+
-+static int putData(TraceFifo *pF, char *pData, int dlen)
-+{
-+	int blen, need;
-+	char *pBuf = pF->pBuf;
-+
-+	if(pF->end >= pF->start)
-+		blen = pF->end -pF->start;
-+	else
-+		blen = pF->len -pF->start +pF->end;
-+	
-+	need = blen + dlen - pF->len;		// needed room
-+//	if(need >= 0 && (pF->options & TRACE_OPTIONS_STOP))
-+//		return(-1);						// exit time
-+	
-+	while(need >= 0)					// if not enough room
-+	{
-+		int slen = ((int)pBuf[pF->start] & 0xff) +1; // get start entry length
-+		
-+		pF->start += slen;				// move start pointer
-+		if(pF->start >= pF->len)
-+			pF->start -= pF->len;
-+		need -= slen;
-+	}
-+	
-+	if(pF->len - pF->end <= dlen)		// end of buffer copy
-+	{
-+		int mlen = pF->len -pF->end;
-+		memcpy(&pBuf[pF->end], pData, mlen);
-+		pF->end = 0;					// new end pointer
-+		dlen -= mlen;					// move this much more
-+		pData += mlen;					// this pointer
-+	}
-+	
-+	if(dlen)
-+	{
-+		memcpy(&pBuf[pF->end], pData, dlen);
-+		pF->end += dlen;				// this won't wrap
-+	}
-+
-+	return(dlen);
-+}
-+
-+static int copy_to_user_FifoRead(TraceRead *pTR, TraceFifo *pF)
-+{
-+	int blen, clen, dlen, rmax;
-+	TraceRead tLocal;
-+	char *pSrc;
-+	char *pDst = (char *)pTR;
-+	char *pBuf = pF->pBuf;
-+	char *pEnd = &pBuf[pF->len];
-+	
-+	if(pF->end >= pF->start)
-+		blen = pF->end -pF->start;
-+	else
-+		blen = pF->len -pF->start +pF->end;
-+	
-+	dlen = 0;
-+	
-+	if(blen)
-+	{
-+		// lets run through the records to see how many we can copy
-+		for(rmax = pUT->readLength, pSrc = &pBuf[pF->start]; blen; )
-+		{
-+			int elen = ((int)*pSrc & 0xff) +1;	// copy one entry at a time
-+			int rlen = rmax - dlen;				// remaining length to copy
-+			
-+			if(elen > rlen)						// too big for copy
-+				break;
-+			
-+			dlen += elen;
-+			blen -= elen;
-+			
-+			clen = pEnd - pSrc;					// can copy this much first
-+			if(clen <= elen)					// copy in two parts
-+			{
-+				elen -= clen;
-+				pSrc = pF->pBuf;
-+			}
-+			if(elen)
-+			{
-+				pSrc += elen;
-+			}
-+		}
-+	}
-+	
-+	tLocal.dataLen = dlen;
-+	tLocal.remLen = blen;
-+	if (copy_to_user(pDst, &tLocal, sizeof(TraceRead)))
-+	{
-+		return -EFAULT;
-+	}
-+	pDst += sizeof(TraceRead);
-+	
-+	if(dlen)
-+	{
-+		pSrc = &pBuf[pF->start];				// start copy from here
-+		clen = pF->len -pF->start;				// can copy this much first
-+		if(clen <= dlen)
-+		{
-+			dlen -= clen;
-+			if (copy_to_user(pDst, pSrc, clen))
-+            {
-+                return -EFAULT;
-+            }
-+			pDst += clen;
-+			pSrc = pF->pBuf;
-+			pF->start = 0;
-+		}
-+		if(dlen)
-+		{
-+			if (copy_to_user(pDst, pSrc, dlen))
-+            {
-+                return -EFAULT;
-+            }
-+			pF->start += dlen;
-+		}
-+	}
-+	return(0);	
-+}
-+
-+static unsigned long uartTraceStartJiffies;
-+
-+int uartTraceStart(int readLength)
-+{
-+	unsigned long flags;
-+	UartTrace *pAlloc;
-+	unsigned short utime;
-+	unsigned long now = jiffies;
-+	
-+	if(readLength == 0)
-+		return(0);
-+	if(!pUT)
-+    {
-+        pAlloc = (UartTrace *)kmalloc(sizeof(UartTrace), GFP_ATOMIC);
-+        if(pAlloc == NULL)
-+            return(-ENOMEM);
-+        memset(pAlloc, 0, sizeof(UartTrace));
-+        pAlloc->fifo.pBuf = pAlloc->data;
-+        pAlloc->fifo.len = UART_TRACE_LENGTH;
-+		uartTraceStartJiffies = 0;
-+    }
-+    else
-+    {
-+        pAlloc = pUT;
-+    }
-+	
-+	// Fix small problem when starting multiple port traces at once...
-+	if(now < uartTraceStartJiffies || now > (uartTraceStartJiffies + HZ))
-+    pAlloc->fifo.start = pAlloc->fifo.end = 0;
-+
-+	pAlloc->readLength = readLength;
-+	uartTraceStartJiffies = now;
-+	
-+	local_irq_save(flags);
-+	pUT = pAlloc;
-+    getCompressedElapsed(&utime);
-+	local_irq_restore(flags);
-+	
-+	return(0);
-+}
-+EXPORT_SYMBOL(uartTraceStart);
-+
-+int uartTraceRead(TraceRead *pTR)
-+{
-+	unsigned long flags;
-+	
-+	if(pUT == NULL)
-+		return(-EACCES);
-+	
-+	local_irq_save(flags);
-+	copy_to_user_FifoRead(pTR, &pUT->fifo);
-+	local_irq_restore(flags);
-+	
-+	return(0);
-+}
-+EXPORT_SYMBOL(uartTraceRead);
-+
-+static int uartTraceAddHelper(int port, int type, int len, const char *pData)
-+{
-+	int elen;
-+	unsigned long flags;
-+	TraceEntry entry;
-+	
-+	if(len > MAX_TRACE_DATA || pUT == NULL)
-+	{
-+	    printk_deferred("(%s,%s,%d): len (%d) exceeds the maximum allowed (%d)...ignoring\n",__FILE__,__FUNCTION__,__LINE__,len, MAX_TRACE_DATA);
-+		return(-1);
-+	}
-+	elen = sizeof(TraceEntry) - MAX_TRACE_DATA + len;
-+	entry.len = (unsigned char)(elen -1);
-+	entry.type = (unsigned char)type;
-+	entry.port = (unsigned char)port;
-+	memcpy(entry.data, pData, len);
-+	
-+	local_irq_save(flags);
-+	getCompressedElapsed(&entry.utime);
-+	putData(&pUT->fifo, (char *)&entry, elen);
-+	local_irq_restore(flags);
-+	
-+	return(elen);
-+}
-+
-+/*
-+ * returns: total # of bytes used in the trace buffer (including the TraceEntry header (5 bytes).
-+ */
-+int uartTraceAdd(int port, int type, int len, const unsigned char *pData)
-+{
-+    int ret_len=0;
-+    int len_to_process=0;
-+    int index_to_process=0;
-+    int status;
-+
-+    while(len)
-+    {
-+        if (len > MAX_TRACE_DATA)
-+        {
-+            len_to_process=MAX_TRACE_DATA;
-+        }
-+        else
-+        {
-+            len_to_process=len;
-+        }
-+        status=uartTraceAddHelper(port,type,len_to_process,&pData[index_to_process]);
-+        if (status < 0)
-+        {
-+            ret_len=status;
-+            break;
-+        }
-+        len-=len_to_process;
-+        index_to_process+=len_to_process;
-+        ret_len+=status;
-+    }
-+    return(ret_len);
-+}
-+EXPORT_SYMBOL(uartTraceAdd);
-+
-+int uartTraceAddSignals(int port, int *pSignals, int MCR, int MSR)
-+{
-+	int signals, retc;
-+	
-+	retc=0;
-+	signals =  ((MCR & UART_MCR_RTS) ? TIOCM_RTS : 0)
-+		| ((MCR & UART_MCR_DTR) ? TIOCM_DTR : 0)
-+		| ((MCR & UART_MCR_OUT1) ? TIOCM_OUT1 : 0)
-+		| ((MCR & UART_MCR_OUT2) ? TIOCM_OUT2 : 0)
-+		| ((MSR  & UART_MSR_DCD) ? TIOCM_CAR : 0)
-+		| ((MSR  & UART_MSR_RI) ? TIOCM_RNG : 0)
-+		| ((MSR  & UART_MSR_DSR) ? TIOCM_DSR : 0)
-+		| ((MSR  & UART_MSR_CTS) ? TIOCM_CTS : 0);
-+		
-+	if(*pSignals != signals)
-+	{
-+		retc = uartTraceAdd(port, TRACE_SIGNALS, sizeof(signals), (char *)&signals);
-+		*pSignals = signals;
-+	}
-+	return(retc);
-+}
-+EXPORT_SYMBOL(uartTraceAddSignals);
-+
-+int uartTraceAddSignalsTIOCM(int port, int *pSignals, int MCR, int MSR)
-+{
-+    int signals, retc;
-+
-+    retc=0;
-+    signals = (MCR & (TIOCM_RTS | TIOCM_DTR | TIOCM_OUT1 | TIOCM_OUT2)) |
-+              (MSR & (TIOCM_CAR | TIOCM_RNG | TIOCM_DSR | TIOCM_CTS));
-+
-+    if(*pSignals != signals)
-+    {
-+        retc = uartTraceAdd(port, TRACE_SIGNALS, sizeof(signals), (char *)&signals);
-+        *pSignals = signals;
-+    }
-+    return(retc);
-+}
-+EXPORT_SYMBOL(uartTraceAddSignalsTIOCM);
-+
-+
-+int uartTraceAddSpecial(int port, short sp)
-+{
-+	return(uartTraceAdd(port, TRACE_SPECIAL, sizeof(sp), (char *)&sp));
-+}
-+EXPORT_SYMBOL(uartTraceAddSpecial);
-+
-+int uartTraceAddIoctl(int port, int ioctl)
-+{
-+    if(ioctl == TRACEREAD)  // don't fill up the trace with myself please
-+    {
-+        return(0);
-+    }
-+    else
-+    {
-+	return(uartTraceAdd(port, TRACE_IOCTL, sizeof(ioctl), (char *)&ioctl));
-+    }
-+}
-+EXPORT_SYMBOL(uartTraceAddIoctl);
-+
-+
---- /dev/null	2025-06-13 16:46:25.248000000 -0400
-+++ linux-6.6.92changed/include/uapi/linux/uart_trace.h	2025-06-24 11:00:53.383761592 -0400
-@@ -0,0 +1,90 @@
-+#ifndef _UAPI_LINUX_UART_TRACE_H
-+#define _UAPI_LINUX_UART_TRACE_H
-+
-+#define MAX_TRACE_DATA 251
-+#define UTIME_MANTISSA_BITS 10
-+typedef struct
-+{
-+	unsigned char len;		/* 1->255 bytes follow */
-+	unsigned char type;
-+    unsigned short utime;
-+	unsigned char port;
-+	char data[MAX_TRACE_DATA];
-+} TraceEntry;
-+
-+typedef struct
-+{
-+    unsigned long mask;
-+    int maxTraceLength;
-+    int port;           // 0 based port index of iolan
-+} TraceControl;
-+
-+typedef struct
-+{
-+	int 	dataLen;						/* transferred length */
-+	int		remLen;							/* amount left to transfer */
-+} TraceRead;
-+
-+
-+enum
-+{
-+	TRACE_HEADER,
-+	TRACE_IN,
-+	TRACE_OUT,
-+	TRACE_SIGNALS,
-+	TRACE_SPECIAL,
-+	TRACE_IOCTL
-+};
-+
-+#define TRACE_BITS_IN (1 << TRACE_IN)
-+#define TRACE_BITS_OUT (1 << TRACE_OUT)
-+#define TRACE_BITS_SIGNALS (1 << TRACE_SIGNALS)
-+#define TRACE_BITS_SPECIAL (1 << TRACE_SPECIAL)
-+#define TRACE_BITS_IOCTL (1 << TRACE_IOCTL)
-+
-+enum
-+{
-+	UTR_MASK = 0xff00,
-+	UTR_PARITY = 0x100,
-+	UTR_FRAME = 0x200,
-+	UTR_OVERRUN = 0x300,
-+	UTR_TTY_OVERRUN = 0x400,
-+	UTR_RX_BREAK = 0x500,
-+	UTR_TX_BREAK = 0x600
-+};
-+
-+typedef struct
-+{
-+	char *pBuf;							/* pointer to FIFO buffer */
-+	int	len;							/* length of buffer */
-+	int	start;							/* oldest index */
-+	int	end;							/* next index */
-+	int	options;						/* trace options */
-+	
-+} TraceFifo;
-+
-+#define UART_TRACE_LENGTH 32768
-+typedef struct
-+{
-+	TraceFifo fifo;
-+	char	data[UART_TRACE_LENGTH];
-+	
-+	unsigned long jiffies;
-+	ktime_t microticks;
-+	
-+	int readLength;
-+	
-+} UartTrace;
-+
-+
-+
-+
-+int uartTraceStart(int readLength);
-+int uartTraceRead(TraceRead *pTR);
-+int uartTraceAdd(int port, int type, int len, const unsigned char *pData);
-+int uartTraceAddSignals(int port, int *pSignals, int MCR, int MSR);         // MCR and MSR use the UART_MCR_xxxx and UART_MSR_xxxx uart register #defines
-+int uartTraceAddSignalsTIOCM(int port, int *pSignals, int MCR, int MSR);    // MCR and MSR use the ioctl TIOCM_xxx #defines
-+int uartTraceAddSpecial(int port, short sp);
-+int uartTraceAddIoctl(int port, int ioctl);
-+
-+#endif	/* __UART_TRACE__ */
+diff -ur linux-6.6.69ori/drivers/tty/serial/8250/8250_core.c linux-6.6.69/drivers/tty/serial/8250/8250_core.c
+--- linux-6.6.69ori/drivers/tty/serial/8250/8250_core.c	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/drivers/tty/serial/8250/8250_core.c	2025-02-19 14:02:44.478376823 -0500
+@@ -35,6 +35,9 @@
+ #include <linux/string_helpers.h>
+ #include <linux/uaccess.h>
+ #include <linux/io.h>
++// Perle start for trueport
++#include <linux/version.h>
++// Perle end for trueport
+ #ifdef CONFIG_SPARC
+ #include <linux/sunserialcore.h>
+ #endif
+@@ -287,7 +290,12 @@
+ 	}
  
---- linux-6.6.92/drivers/tty/serial/Makefile	2025-06-24 18:19:42.662441464 -0400
-+++ linux-6.6.92changed/drivers/tty/serial/Makefile	2025-06-24 18:19:59.530571076 -0400
-@@ -95,3 +95,7 @@
- obj-$(CONFIG_SERIAL_KGDB_NMI) += kgdb_nmi.o
- obj-$(CONFIG_KGDB_SERIAL_CONSOLE) += kgdboc.o
- obj-$(CONFIG_SERIAL_NUVOTON_MA35D1) += ma35d1_serial.o
+ 	if (!(iir & UART_IIR_NO_INT))
+-		serial8250_tx_chars(up);
++    // Perle start for trueport
++    {
++        perle_serial8250_tx_chars(up);
++    }
++		// serial8250_tx_chars(up);
++// Perle end for trueport
+ 
+ 	if (up->port.irq)
+ 		serial_out(up, UART_IER, ier);
+@@ -559,7 +567,9 @@
+ 		port->membase  = old_serial_port[i].iomem_base;
+ 		port->iotype   = old_serial_port[i].io_type;
+ 		port->regshift = old_serial_port[i].iomem_reg_shift;
+-
++// Perle start for trueport
++serial8250_set_defaults(up);	/* PERLE */
++// Perle end for trueport
+ 		port->irqflags |= irqflag;
+ 		if (serial8250_isa_config != NULL)
+ 			serial8250_isa_config(i, &up->port, &up->capabilities);
+@@ -1066,6 +1076,14 @@
+ 		uart->rs485_stop_tx	= up->rs485_stop_tx;
+ 		uart->lsr_save_mask	= up->lsr_save_mask;
+ 		uart->dma		= up->dma;
++// Perle start for trueport
++		uart->uart_port_index	= up->uart_port_index;
++		uart->set_media_type	= up->set_media_type;
++		uart->mcr_mask			= up->mcr_mask;
++		uart->port.get_mstatus	= up->port.get_mstatus;
++		uart->port.set_termios	= up->port.set_termios;		// duplicate below
++		uart->port.set_mctrl	= up->port.set_mctrl;		// duplicate below
++// Perle end for trueport
+ 
+ 		/* Take tx_loadsz from fifosize if it wasn't set separately */
+ 		if (uart->port.fifosize && !uart->tx_loadsz)
+@@ -1129,6 +1147,50 @@
+ 			uart->dl_read = up->dl_read;
+ 		if (up->dl_write)
+ 			uart->dl_write = up->dl_write;
++// Perle start for trueport
++        {
++            uart->char_buf_ptr = &uart->char_buf[0];
++            uart->flag_buf_ptr = &uart->flag_buf[0];
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
++            init_timer(&uart->forward_idle_timer);
++            uart->forward_idle_timer.function = serial8250_forward_idle_timer;
++            uart->forward_idle_timer.data = (unsigned long)uart;
 +
-+# Perle start
-+obj-y +=  uart_trace.o
-+# Perle end
-
++            init_timer(&uart->forward_force_timer);
++            uart->forward_force_timer.function = serial8250_forward_force_timer;
++            uart->forward_force_timer.data = (unsigned long)uart;
++
++            init_timer(&uart->forward_send_timer);
++            uart->forward_send_timer.function = serial8250_forward_send_timer;
++            uart->forward_send_timer.data = (unsigned long)uart;
++
++            init_timer(&uart->sigscan_delay_timer);
++            uart->sigscan_delay_timer.function = serial8250_sigscan_delay_timer;
++            uart->sigscan_delay_timer.data = (unsigned long)uart;
++
++            init_timer(&uart->rs232_rts_toggle_timer);
++            uart->rs232_rts_toggle_timer.function = serial8250_rs232_rts_toggle_timer;
++            uart->rs232_rts_toggle_timer.data = (unsigned long)uart;
++
++            init_timer(&uart->rs232_rts_toggle_initial_timer);
++            uart->rs232_rts_toggle_initial_timer.function = serial8250_rs232_rts_toggle_initial_timer;
++            uart->rs232_rts_toggle_initial_timer.data = (unsigned long)uart;
++			
++            init_timer(&uart->signal_timer);
++            uart->signal_timer.function = serial8250_signal_timer;
++            uart->signal_timer.data = (unsigned long)uart;
++	
++#else
++            timer_setup(&uart->forward_idle_timer            , serial8250_forward_idle_timer            , 0);
++            timer_setup(&uart->forward_force_timer           , serial8250_forward_force_timer           , 0);
++            timer_setup(&uart->forward_send_timer            , serial8250_forward_send_timer            , 0);
++            timer_setup(&uart->sigscan_delay_timer           , serial8250_sigscan_delay_timer           , 0);
++            timer_setup(&uart->rs232_rts_toggle_timer        , serial8250_rs232_rts_toggle_timer        , 0);
++            timer_setup(&uart->rs232_rts_toggle_initial_timer, serial8250_rs232_rts_toggle_initial_timer, 0);
++            timer_setup(&uart->signal_timer                  , serial8250_signal_timer                  , 0);
++#endif
++        }
++// Perle end for trueport
+ 
+ 		if (uart->port.type != PORT_8250_CIR) {
+ 			if (serial8250_isa_config != NULL)
+--- linux-6.6.106/drivers/tty/serial/8250/8250.h	2025-09-11 11:20:28.000000000 -0400
++++ linux-6.6.106changed/drivers/tty/serial/8250/8250.h	2025-10-06 11:17:53.828945299 -0400
+@@ -19,7 +19,10 @@
+ 	int (*rx_dma)(struct uart_8250_port *p);
+ 	void (*prepare_tx_dma)(struct uart_8250_port *p);
+ 	void (*prepare_rx_dma)(struct uart_8250_port *p);
+-
++// Perle start for trueport
++	unsigned int (*handle_rx_dma)(struct uart_8250_port *p, u8 iir,
++				      unsigned char status);
++// Perle end for trueport
+ 	/* Filter function */
+ 	dma_filter_fn		fn;
+ 	/* Parameter to the filter function */
+@@ -269,6 +272,13 @@
+ 	return tiocm;
+ }
+ 
++// Perle start for trueport
++// void perle_serial8250_do_set_mctrl(struct uart_port *port, unsigned int mctrl);
++
++void perle_serial8250_break_ctl(struct uart_port *port, int break_state);
++void serial_out_mcr(struct uart_8250_port *up, int value);
++// Perle end for trueport
++
+ static inline void serial8250_out_MCR(struct uart_8250_port *up, int value)
+ {
+ 	serial_out(up, UART_MCR, value);
+@@ -277,6 +287,7 @@
+ 		mctrl_gpio_set(up->gpios, serial8250_MCR_to_TIOCM(value));
+ }
+ 
++
+ static inline int serial8250_in_MCR(struct uart_8250_port *up)
+ {
+ 	int mctrl;
+@@ -422,3 +433,4 @@
+ {
+ 	return port->minor - 64;
+ }
++
 --- /dev/null	2025-10-06 10:58:53.468000000 -0400
 +++ linux-6.6.106changed/drivers/tty/serial/8250/8250_perleomap.c	2025-10-06 11:12:30.827629186 -0400
 @@ -0,0 +1,4627 @@
@@ -7006,3 +5496,1494 @@ diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uap
 +MODULE_AUTHOR("Perle");
 +MODULE_LICENSE("GPL");
 +MODULE_DESCRIPTION("Modularized 8250 OMAP UART driver");
+--- linux-6.6.106/drivers/tty/serial/8250/8250_port.c	2025-09-11 11:20:28.000000000 -0400
++++ linux-6.6.106changed/drivers/tty/serial/8250/8250_port.c	2025-10-06 11:16:16.101768213 -0400
+@@ -51,6 +51,8 @@
+ #define DEBUG_AUTOCONF(fmt...)	do { } while (0)
+ #endif
+ 
++int set_modem_info(struct uart_8250_port *up, unsigned int cmd, unsigned int arg);
++
+ /*
+  * Here we define the default xmit fifo size used for each type of UART.
+  */
+@@ -1909,6 +1911,7 @@
+ 	unsigned long flags;
+ 	u16 status;
+ 
++    // printk("(%s,%d)\n",__FUNCTION__,__LINE__);
+ 	if (iir & UART_IIR_NO_INT)
+ 		return 0;
+ 
+@@ -2039,11 +2042,14 @@
+ 	struct uart_8250_port *up = up_to_u8250p(port);
+ 	unsigned char mcr;
+ 
+-	mcr = serial8250_TIOCM_to_MCR(mctrl);
++	//mcr = serial8250_TIOCM_to_MCR(mctrl);
+ 
+-	mcr |= up->mcr;
++	//mcr |= up->mcr;
++	
++
++	//serial8250_out_MCR(up, mcr);
++	set_modem_info(up,TIOCMSET,mctrl);
+ 
+-	serial8250_out_MCR(up, mcr);
+ }
+ EXPORT_SYMBOL_GPL(serial8250_do_set_mctrl);
+ 
+@@ -3264,7 +3270,7 @@
+ 	.unthrottle	= serial8250_unthrottle,
+ 	.stop_rx	= serial8250_stop_rx,
+ 	.enable_ms	= serial8250_enable_ms,
+-	.break_ctl	= serial8250_break_ctl,
++	.break_ctl	= perle_serial8250_break_ctl,
+ 	.startup	= serial8250_startup,
+ 	.shutdown	= serial8250_shutdown,
+ 	.flush_buffer	= serial8250_flush_buffer,
+@@ -3280,6 +3286,10 @@
+ 	.poll_get_char = serial8250_get_poll_char,
+ 	.poll_put_char = serial8250_put_poll_char,
+ #endif
++//perle
++    .ioctl = serial8250_ioctl,
++    .get_rs232_rts_toggle=serial8250_get_rs232_rts_toggle,
++    .uart_trace_add_ioctl=serial8250_uart_trace_add_ioctl,
+ };
+ 
+ void serial8250_init_port(struct uart_8250_port *up) 
+diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Kconfig linux-6.6.69/drivers/tty/serial/8250/Kconfig
+--- linux-6.6.69ori/drivers/tty/serial/8250/Kconfig	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/drivers/tty/serial/8250/Kconfig	2025-02-19 14:02:44.481376757 -0500
+@@ -466,6 +466,14 @@
+ 	  not booting kernel because the serial console remains silent in case
+ 	  they forgot to update the command line.
+ 
++config SERIAL_8250_PERLE_OMAP
++    tristate "Custom Perle 8250 omap serial port modularized support"
++    depends on SERIAL_8250
++    default y
++    help
++      This option replace 8250_omap serial driver.
++
++
+ config SERIAL_8250_LPC18XX
+ 	tristate "NXP LPC18xx/43xx serial port support"
+ 	depends on SERIAL_8250 && OF && (ARCH_LPC18XX || COMPILE_TEST)
+diff -ur linux-6.6.69ori/drivers/tty/serial/8250/Makefile linux-6.6.69/drivers/tty/serial/8250/Makefile
+--- linux-6.6.69ori/drivers/tty/serial/8250/Makefile	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/drivers/tty/serial/8250/Makefile	2025-02-19 14:02:44.482376734 -0500
+@@ -35,6 +35,7 @@
+ obj-$(CONFIG_SERIAL_8250_EM)		+= 8250_em.o
+ obj-$(CONFIG_SERIAL_8250_IOC3)		+= 8250_ioc3.o
+ obj-$(CONFIG_SERIAL_8250_OMAP)		+= 8250_omap.o
++obj-$(CONFIG_SERIAL_8250_PERLE_OMAP) += 8250_perleomap.o
+ obj-$(CONFIG_SERIAL_8250_RT288X)	+= 8250_rt288x.o
+ obj-$(CONFIG_SERIAL_8250_LPC18XX)	+= 8250_lpc18xx.o
+ obj-$(CONFIG_SERIAL_8250_MT6577)	+= 8250_mtk.o
+--- linux-6.6.92/drivers/tty/serial/Makefile	2025-06-24 18:19:42.662441464 -0400
++++ linux-6.6.92changed/drivers/tty/serial/Makefile	2025-06-24 18:19:59.530571076 -0400
+@@ -95,3 +95,7 @@
+ obj-$(CONFIG_SERIAL_KGDB_NMI) += kgdb_nmi.o
+ obj-$(CONFIG_KGDB_SERIAL_CONSOLE) += kgdboc.o
+ obj-$(CONFIG_SERIAL_NUVOTON_MA35D1) += ma35d1_serial.o
++
++# Perle start
++obj-y +=  uart_trace.o
++# Perle end
+--- linux-6.6.100/drivers/tty/serial/serial_core.c	2025-07-24 02:53:22.000000000 -0400
++++ linux-6.6.100changed/drivers/tty/serial/serial_core.c	2025-08-12 14:53:09.498708303 -0400
+@@ -33,7 +33,7 @@
+ #include <linux/uaccess.h>
+ 
+ #include "serial_base.h"
+-
++#include <linux/serial_8250.h>
+ /*
+  * This is used to lock changes in serial line configuration.
+  */
+@@ -656,7 +656,17 @@
+ 	unsigned int ret;
+ 
+ 	port = uart_port_lock(state, flags);
+-	ret = uart_circ_chars_pending(&state->xmit);
++// Perle start for trueport
++	if (state->uart_port->drain_flag)
++	{
++	    ret=0;
++	}
++	else
++	{
++		ret = uart_circ_chars_pending(&state->xmit);
++	}
++	// ret = uart_circ_chars_pending(&state->xmit);
++// Perle end for trueport
+ 	uart_port_unlock(port, flags);
+ 	return ret;
+ }
+@@ -1014,7 +1024,10 @@
+ 	port->closing_wait    = closing_wait;
+ 	if (new_info->xmit_fifo_size)
+ 		uport->fifosize = new_info->xmit_fifo_size;
+-
++    // // Perle start for trueport
++	// port->low_latency = (uport->flags & UPF_LOW_LATENCY) ? 1 : 0;
++	// port->perle_iolan = (uport->flags & UPF_PERLE_IOLAN) ? 1 : 0;
++    // // Perle end for trueport
+  check_and_exit:
+ 	retval = 0;
+ 	if (uport->type == PORT_UNKNOWN)
+@@ -1491,6 +1504,8 @@
+ 	int ret;
+ 	unsigned long flags;
+ 
++	////printk_deferred("%s()@%d: \n",__FUNCTION__,__LINE__);
++
+ 	if (!(port->rs485_supported.flags & SER_RS485_ENABLED))
+ 		return -ENOTTY;
+ 
+@@ -1500,9 +1515,13 @@
+ 	ret = uart_check_rs485_flags(port, &rs485);
+ 	if (ret)
+ 		return ret;
+-	uart_sanitize_serial_rs485(port, &rs485);
+-	uart_set_rs485_termination(port, &rs485);
+-	uart_set_rs485_rx_during_tx(port, &rs485);
++	if (rs485.flags & SER_RS485_ENABLED)
++	{	
++		////printk_deferred("%s()@%d: value \n",__FUNCTION__,__LINE__);
++		uart_sanitize_serial_rs485(port, &rs485);
++		uart_set_rs485_termination(port, &rs485);
++		uart_set_rs485_rx_during_tx(port, &rs485);
++	}
+ 
+ 	spin_lock_irqsave(&port->lock, flags);
+ 	ret = port->rs485_config(port, &tty->termios, &rs485);
+@@ -1512,6 +1531,12 @@
+ 		/* Reset RTS and other mctrl lines when disabling RS485 */
+ 		if (!(rs485.flags & SER_RS485_ENABLED))
+ 			port->ops->set_mctrl(port, port->mctrl);
++
++		if ((rs485.flags & SER_RS422_ENABLED))
++		{
++			////printk_deferred("%s()@%d: 422:Force RTS \n",__FUNCTION__,__LINE__);
++			port->ops->set_mctrl(port, UART_MCR_RTS);
++		}	
+ 	}
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ 	if (ret) {
+@@ -1593,7 +1618,16 @@
+ 	void __user *uarg = (void __user *)arg;
+ 	int ret = -ENOIOCTLCMD;
+ 
+-
++// perle start
++    {
++        struct uart_port *uport = uart_port_check(state);
++
++        if (!!uport && uport->ops->uart_trace_add_ioctl)
++        {
++            uport->ops->uart_trace_add_ioctl(uport, cmd);
++        }
++    }
++//perle end
+ 	/*
+ 	 * These ioctls don't rely on the hardware to be present.
+ 	 */
+@@ -1830,6 +1864,13 @@
+ 		uart_port_deref(port);
+ 		return;
+ 	}
++// Perle start for trueport
++    if(port->drain_flag)
++    {
++		uart_port_deref(port);
++        return;
++    }
++// Perle end for trueport
+ 
+ 	/*
+ 	 * Set the check interval to be 1/5 of the estimated time to
+@@ -2014,7 +2055,10 @@
+ 	uport = uart_port_check(state);
+ 	if (!uport || uport->flags & UPF_DEAD)
+ 		return -ENXIO;
+-
++    // // Perle start for trueport
++	// port->low_latency = (uport->flags & UPF_LOW_LATENCY) ? 1 : 0;
++	// port->perle_iolan = (uport->flags & UPF_PERLE_IOLAN) ? 1 : 0;
++    // // Perle end for trueport
+ 	/*
+ 	 * Start up the serial port.
+ 	 */
+@@ -3137,6 +3181,9 @@
+ 	.attrs = tty_dev_attrs,
+ };
+ 
++// Perle start for trueport
++int setProcSigScan(int dsline, int state);
++// Perle end for trueport
+ /**
+  * serial_core_add_one_port - attach a driver-defined port structure
+  * @drv: pointer to the uart low level driver structure for this port
+@@ -3184,6 +3231,13 @@
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
++// Perle start for trueport
++	/*
++	 * save the major # for the device
++	 * we need it for sigscan
++	 */
++	uport->major = drv->major;
++// Perle end for trueport
+ 
+ 	/*
+ 	 * If this port is in use as a console then the spinlock is already
+@@ -3226,6 +3280,9 @@
+ 		dev_err(uport->dev, "Cannot register tty device on line %d\n",
+ 		       uport->line);
+ 	}
++// Perle start for trueport
++setProcSigScan(uport->line, 0);
++// Perle end for trueport
+ 
+  out:
+ 	mutex_unlock(&port->mutex);
+--- linux-6.6.93/drivers/tty/serial/serial_mctrl_gpio.c	2025-06-04 08:42:26.000000000 -0400
++++ linux-6.6.93changed/drivers/tty/serial/serial_mctrl_gpio.c	2025-07-15 17:37:11.489204608 -0400
+@@ -13,9 +13,18 @@
+ #include <linux/serial_core.h>
+ #include <linux/module.h>
+ #include <linux/property.h>
++#include <linux/serial_8250.h>
+ 
+ #include "serial_mctrl_gpio.h"
++#include "linux/uart_trace.h"
+ 
++// events for fsmSigScan
++#define FSMSS_EXIT 0
++#define FSMSS_TIMEOUT 1
++#define FSMSS_SCAN 2
++#define FSMSS_TIOCM 3
++int fsmSigScan(struct uart_8250_port *up, int event, int data, int caller);
++unsigned short MSR2TIOCM(unsigned char msr);
+ struct mctrl_gpios {
+ 	struct uart_port *port;
+ 	struct gpio_desc *gpio[UART_GPIO_MAX];
+@@ -96,6 +105,8 @@
+  */
+ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+ {
++	struct uart_port *port = gpios->port;
++    struct uart_8250_port *up = up_to_u8250p(port);
+ 	enum mctrl_gpio_idx i;
+ 
+ 	if (gpios == NULL)
+@@ -109,7 +120,8 @@
+ 				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
+ 		}
+ 	}
+-
++	////printk_deferred("(%s,%d) mctrl = %x\n",__FUNCTION__,__LINE__,*mctrl);
++	up->mctrl_prev = *mctrl;
+ 	return *mctrl;
+ }
+ EXPORT_SYMBOL_GPL(mctrl_gpio_get);
+@@ -173,40 +185,77 @@
+ }
+ EXPORT_SYMBOL_GPL(mctrl_gpio_init_noauto);
+ 
++static int send_signal_DEBUG(int pid, int sig, int priv, const char *func, int line)
++{
++	////printk_deferred("send_signal(%d,%d,%d) caller: %s()@%d\n", pid, sig, priv, func, line);
++    return(kill_pid(find_vpid(pid), sig, priv));
++}
++#define send_signal(pid, sig, priv) send_signal_DEBUG(pid, sig, priv, __FUNCTION__, __LINE__)
++
++
+ #define MCTRL_ANY_DELTA (TIOCM_RI | TIOCM_DSR | TIOCM_CD | TIOCM_CTS)
+ static irqreturn_t mctrl_gpio_irq_handle(int irq, void *context)
+ {
+ 	struct mctrl_gpios *gpios = context;
+ 	struct uart_port *port = gpios->port;
++    struct uart_8250_port *up = up_to_u8250p(port);
+ 	u32 mctrl = gpios->mctrl_prev;
+ 	u32 mctrl_diff;
+ 	unsigned long flags;
+ 
+ 	mctrl_gpio_get(gpios, &mctrl);
+-
++    ////printk_deferred("(%s,%d) mctrl  %x \n",__FUNCTION__,__LINE__, mctrl);
++    ////printk_deferred("(%s,%d) mctrl ^ gpios->mctrl_prev %x \n",__FUNCTION__,__LINE__, mctrl ^ gpios->mctrl_prev);
++    //printk("(%s,%d) irq %d\n",__FUNCTION__,__LINE__, irq);
+ 	spin_lock_irqsave(&port->lock, flags);
+ 
+ 	mctrl_diff = mctrl ^ gpios->mctrl_prev;
+ 	gpios->mctrl_prev = mctrl;
++	up->mctrl_prev = mctrl;
+ 
+-	if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
+-		if ((mctrl_diff & mctrl) & TIOCM_RI)
+-			port->icount.rng++;
++	// if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
+ 
+-		if ((mctrl_diff & mctrl) & TIOCM_DSR)
+-			port->icount.dsr++;
++	// 	if ((mctrl_diff & mctrl) & TIOCM_RI)
++	// 		port->icount.rng++;
+ 
+-		if (mctrl_diff & TIOCM_CD)
+-			uart_handle_dcd_change(port, mctrl & TIOCM_CD);
++	// 	if ((mctrl_diff & mctrl) & TIOCM_DSR)
++	// 		port->icount.dsr++;
+ 
+-		if (mctrl_diff & TIOCM_CTS)
+-			uart_handle_cts_change(port, mctrl & TIOCM_CTS);
++	// 	if (mctrl_diff & TIOCM_CD)
++	// 		uart_handle_dcd_change(port, mctrl & TIOCM_CD);
+ 
+-		wake_up_interruptible(&port->state->port.delta_msr_wait);
+-	}
++	// 	if (mctrl_diff & TIOCM_CTS)
++	// 		uart_handle_cts_change(port, mctrl & TIOCM_CTS);
++
++	// 	wake_up_interruptible(&port->state->port.delta_msr_wait);
++	// }
+ 
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ 
++    if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL)
++    {
++        if ((up->rpt_mode == TRPT_ON) && (up->rpt_pid > 0))
++        {
++			send_signal(up->rpt_pid, SIGUSR1, 1);
++        }
++		fsmSigScan(up, FSMSS_TIOCM, mctrl,9);
++
++        if (mctrl & TIOCM_DSR)
++            up->last_msr_read |= UART_MSR_DSR;
++        else
++            up->last_msr_read &= ~UART_MSR_DSR;
++
++        if (mctrl & TIOCM_CAR)
++            up->last_msr_read |= UART_MSR_DCD;
++        else
++            up->last_msr_read &= ~UART_MSR_DCD;
++
++        if(up->traceMask & TRACE_BITS_SIGNALS)
++        {
++            uartTraceAddSignals(up->tracePortIndex, &up->traceSignals, up->last_mcr_written, up->last_msr_read);
++        }
++    }
++
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -229,7 +278,7 @@
+ 	gpios = mctrl_gpio_init_noauto(port->dev, idx);
+ 	if (IS_ERR(gpios))
+ 		return gpios;
+-
++    //printk("(%s,%d)\n",__FUNCTION__,__LINE__);
+ 	gpios->port = port;
+ 
+ 	for (i = 0; i < UART_GPIO_MAX; ++i) {
+@@ -239,6 +288,7 @@
+ 			continue;
+ 
+ 		ret = gpiod_to_irq(gpios->gpio[i]);
++    ////printk_deferred("(%s,%d)corresponding irq for %s (idx=%d, ret=%d)\n",__FUNCTION__,__LINE__,mctrl_gpios_desc[i].name, idx, ret);
+ 		if (ret < 0) {
+ 			dev_err(port->dev,
+ 				"failed to find corresponding irq for %s (idx=%d, err=%d)\n",
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/drivers/tty/serial/uart_trace.c	2025-06-24 10:56:41.307082613 -0400
+@@ -0,0 +1,371 @@
++#include <linux/module.h>
++#include <linux/errno.h>
++#include <linux/signal.h>
++#include <linux/sched.h>
++#include <linux/timer.h>
++#include <linux/interrupt.h>
++#include <linux/tty.h>
++#include <linux/tty_flip.h>
++#include <linux/serial.h>
++#include <linux/major.h>
++#include <linux/string.h>
++#include <linux/fcntl.h>
++#include <linux/ptrace.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
++#include <linux/init.h>
++#include <linux/delay.h>
++#include <linux/miscdevice.h>
++#include <asm/uaccess.h>
++#include <asm/irq.h>
++#include <linux/serial_reg.h>
++#include <linux/uart_trace.h>
++
++static UartTrace *pUT = NULL;
++
++
++
++
++
++
++
++// convert ktime_t to microseconds
++static unsigned long getMicroSeconds(ktime_t ktime_val)
++{
++    return((unsigned long)ktime_to_us(ktime_val));
++}
++
++
++static ktime_t getMicroTicks(void)
++{
++    return(ktime_get());
++}
++
++static void getCompressedElapsed(unsigned short *pUtime)
++{
++	unsigned long now, jdiff, us, exp;
++	ktime_t ktime_now,ktime_diff;
++	
++	ktime_now = getMicroTicks();
++	ktime_diff = ktime_sub(ktime_now,pUT->microticks);
++	pUT->microticks = ktime_now;
++	
++	now = jiffies;
++	jdiff = now - pUT->jiffies;
++	pUT->jiffies = now;
++	
++	exp = 0;
++	if(jdiff >= HZ)							// 1+ seconds have passed by..
++	{
++		for(;jdiff > 4294UL; exp++)			// make sure nothing overflows
++			jdiff = jdiff >> 1;
++		us = (1000000UL * jdiff)/(unsigned long)HZ;
++	}
++	else
++	{
++		us = getMicroSeconds(ktime_diff);
++	}
++	
++	for(;us > (1 << UTIME_MANTISSA_BITS); exp++)
++		us = us >> 1;
++	
++	*pUtime = (exp << UTIME_MANTISSA_BITS) | us;
++}
++
++static int putData(TraceFifo *pF, char *pData, int dlen)
++{
++	int blen, need;
++	char *pBuf = pF->pBuf;
++
++	if(pF->end >= pF->start)
++		blen = pF->end -pF->start;
++	else
++		blen = pF->len -pF->start +pF->end;
++	
++	need = blen + dlen - pF->len;		// needed room
++//	if(need >= 0 && (pF->options & TRACE_OPTIONS_STOP))
++//		return(-1);						// exit time
++	
++	while(need >= 0)					// if not enough room
++	{
++		int slen = ((int)pBuf[pF->start] & 0xff) +1; // get start entry length
++		
++		pF->start += slen;				// move start pointer
++		if(pF->start >= pF->len)
++			pF->start -= pF->len;
++		need -= slen;
++	}
++	
++	if(pF->len - pF->end <= dlen)		// end of buffer copy
++	{
++		int mlen = pF->len -pF->end;
++		memcpy(&pBuf[pF->end], pData, mlen);
++		pF->end = 0;					// new end pointer
++		dlen -= mlen;					// move this much more
++		pData += mlen;					// this pointer
++	}
++	
++	if(dlen)
++	{
++		memcpy(&pBuf[pF->end], pData, dlen);
++		pF->end += dlen;				// this won't wrap
++	}
++
++	return(dlen);
++}
++
++static int copy_to_user_FifoRead(TraceRead *pTR, TraceFifo *pF)
++{
++	int blen, clen, dlen, rmax;
++	TraceRead tLocal;
++	char *pSrc;
++	char *pDst = (char *)pTR;
++	char *pBuf = pF->pBuf;
++	char *pEnd = &pBuf[pF->len];
++	
++	if(pF->end >= pF->start)
++		blen = pF->end -pF->start;
++	else
++		blen = pF->len -pF->start +pF->end;
++	
++	dlen = 0;
++	
++	if(blen)
++	{
++		// lets run through the records to see how many we can copy
++		for(rmax = pUT->readLength, pSrc = &pBuf[pF->start]; blen; )
++		{
++			int elen = ((int)*pSrc & 0xff) +1;	// copy one entry at a time
++			int rlen = rmax - dlen;				// remaining length to copy
++			
++			if(elen > rlen)						// too big for copy
++				break;
++			
++			dlen += elen;
++			blen -= elen;
++			
++			clen = pEnd - pSrc;					// can copy this much first
++			if(clen <= elen)					// copy in two parts
++			{
++				elen -= clen;
++				pSrc = pF->pBuf;
++			}
++			if(elen)
++			{
++				pSrc += elen;
++			}
++		}
++	}
++	
++	tLocal.dataLen = dlen;
++	tLocal.remLen = blen;
++	if (copy_to_user(pDst, &tLocal, sizeof(TraceRead)))
++	{
++		return -EFAULT;
++	}
++	pDst += sizeof(TraceRead);
++	
++	if(dlen)
++	{
++		pSrc = &pBuf[pF->start];				// start copy from here
++		clen = pF->len -pF->start;				// can copy this much first
++		if(clen <= dlen)
++		{
++			dlen -= clen;
++			if (copy_to_user(pDst, pSrc, clen))
++            {
++                return -EFAULT;
++            }
++			pDst += clen;
++			pSrc = pF->pBuf;
++			pF->start = 0;
++		}
++		if(dlen)
++		{
++			if (copy_to_user(pDst, pSrc, dlen))
++            {
++                return -EFAULT;
++            }
++			pF->start += dlen;
++		}
++	}
++	return(0);	
++}
++
++static unsigned long uartTraceStartJiffies;
++
++int uartTraceStart(int readLength)
++{
++	unsigned long flags;
++	UartTrace *pAlloc;
++	unsigned short utime;
++	unsigned long now = jiffies;
++	
++	if(readLength == 0)
++		return(0);
++	if(!pUT)
++    {
++        pAlloc = (UartTrace *)kmalloc(sizeof(UartTrace), GFP_ATOMIC);
++        if(pAlloc == NULL)
++            return(-ENOMEM);
++        memset(pAlloc, 0, sizeof(UartTrace));
++        pAlloc->fifo.pBuf = pAlloc->data;
++        pAlloc->fifo.len = UART_TRACE_LENGTH;
++		uartTraceStartJiffies = 0;
++    }
++    else
++    {
++        pAlloc = pUT;
++    }
++	
++	// Fix small problem when starting multiple port traces at once...
++	if(now < uartTraceStartJiffies || now > (uartTraceStartJiffies + HZ))
++    pAlloc->fifo.start = pAlloc->fifo.end = 0;
++
++	pAlloc->readLength = readLength;
++	uartTraceStartJiffies = now;
++	
++	local_irq_save(flags);
++	pUT = pAlloc;
++    getCompressedElapsed(&utime);
++	local_irq_restore(flags);
++	
++	return(0);
++}
++EXPORT_SYMBOL(uartTraceStart);
++
++int uartTraceRead(TraceRead *pTR)
++{
++	unsigned long flags;
++	
++	if(pUT == NULL)
++		return(-EACCES);
++	
++	local_irq_save(flags);
++	copy_to_user_FifoRead(pTR, &pUT->fifo);
++	local_irq_restore(flags);
++	
++	return(0);
++}
++EXPORT_SYMBOL(uartTraceRead);
++
++static int uartTraceAddHelper(int port, int type, int len, const char *pData)
++{
++	int elen;
++	unsigned long flags;
++	TraceEntry entry;
++	
++	if(len > MAX_TRACE_DATA || pUT == NULL)
++	{
++	    printk_deferred("(%s,%s,%d): len (%d) exceeds the maximum allowed (%d)...ignoring\n",__FILE__,__FUNCTION__,__LINE__,len, MAX_TRACE_DATA);
++		return(-1);
++	}
++	elen = sizeof(TraceEntry) - MAX_TRACE_DATA + len;
++	entry.len = (unsigned char)(elen -1);
++	entry.type = (unsigned char)type;
++	entry.port = (unsigned char)port;
++	memcpy(entry.data, pData, len);
++	
++	local_irq_save(flags);
++	getCompressedElapsed(&entry.utime);
++	putData(&pUT->fifo, (char *)&entry, elen);
++	local_irq_restore(flags);
++	
++	return(elen);
++}
++
++/*
++ * returns: total # of bytes used in the trace buffer (including the TraceEntry header (5 bytes).
++ */
++int uartTraceAdd(int port, int type, int len, const unsigned char *pData)
++{
++    int ret_len=0;
++    int len_to_process=0;
++    int index_to_process=0;
++    int status;
++
++    while(len)
++    {
++        if (len > MAX_TRACE_DATA)
++        {
++            len_to_process=MAX_TRACE_DATA;
++        }
++        else
++        {
++            len_to_process=len;
++        }
++        status=uartTraceAddHelper(port,type,len_to_process,&pData[index_to_process]);
++        if (status < 0)
++        {
++            ret_len=status;
++            break;
++        }
++        len-=len_to_process;
++        index_to_process+=len_to_process;
++        ret_len+=status;
++    }
++    return(ret_len);
++}
++EXPORT_SYMBOL(uartTraceAdd);
++
++int uartTraceAddSignals(int port, int *pSignals, int MCR, int MSR)
++{
++	int signals, retc;
++	
++	retc=0;
++	signals =  ((MCR & UART_MCR_RTS) ? TIOCM_RTS : 0)
++		| ((MCR & UART_MCR_DTR) ? TIOCM_DTR : 0)
++		| ((MCR & UART_MCR_OUT1) ? TIOCM_OUT1 : 0)
++		| ((MCR & UART_MCR_OUT2) ? TIOCM_OUT2 : 0)
++		| ((MSR  & UART_MSR_DCD) ? TIOCM_CAR : 0)
++		| ((MSR  & UART_MSR_RI) ? TIOCM_RNG : 0)
++		| ((MSR  & UART_MSR_DSR) ? TIOCM_DSR : 0)
++		| ((MSR  & UART_MSR_CTS) ? TIOCM_CTS : 0);
++		
++	if(*pSignals != signals)
++	{
++		retc = uartTraceAdd(port, TRACE_SIGNALS, sizeof(signals), (char *)&signals);
++		*pSignals = signals;
++	}
++	return(retc);
++}
++EXPORT_SYMBOL(uartTraceAddSignals);
++
++int uartTraceAddSignalsTIOCM(int port, int *pSignals, int MCR, int MSR)
++{
++    int signals, retc;
++
++    retc=0;
++    signals = (MCR & (TIOCM_RTS | TIOCM_DTR | TIOCM_OUT1 | TIOCM_OUT2)) |
++              (MSR & (TIOCM_CAR | TIOCM_RNG | TIOCM_DSR | TIOCM_CTS));
++
++    if(*pSignals != signals)
++    {
++        retc = uartTraceAdd(port, TRACE_SIGNALS, sizeof(signals), (char *)&signals);
++        *pSignals = signals;
++    }
++    return(retc);
++}
++EXPORT_SYMBOL(uartTraceAddSignalsTIOCM);
++
++
++int uartTraceAddSpecial(int port, short sp)
++{
++	return(uartTraceAdd(port, TRACE_SPECIAL, sizeof(sp), (char *)&sp));
++}
++EXPORT_SYMBOL(uartTraceAddSpecial);
++
++int uartTraceAddIoctl(int port, int ioctl)
++{
++    if(ioctl == TRACEREAD)  // don't fill up the trace with myself please
++    {
++        return(0);
++    }
++    else
++    {
++	return(uartTraceAdd(port, TRACE_IOCTL, sizeof(ioctl), (char *)&ioctl));
++    }
++}
++EXPORT_SYMBOL(uartTraceAddIoctl);
++
++
+diff -ur linux-6.6.69ori/drivers/tty/tty_port.c linux-6.6.69/drivers/tty/tty_port.c
+--- linux-6.6.69ori/drivers/tty/tty_port.c	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/drivers/tty/tty_port.c	2025-02-19 14:02:44.483376713 -0500
+@@ -521,12 +521,20 @@
+ 	}
+ 	if (filp == NULL || (filp->f_flags & O_NONBLOCK)) {
+ 		/* Indicate we are open */
+-		if (C_BAUD(tty))
+-			tty_port_raise_dtr_rts(port);
++// Perle start for trueport
++		if(!port->perle_iolan)
++		{
++// Perle end for trueport
++            if (C_BAUD(tty))
++            {
++             //   tty_port_raise_dtr_rts(port);
++            }
++// Perle start for trueport
++        }
++//Perle end for trueport
+ 		tty_port_set_active(port, true);
+ 		return 0;
+ 	}
+-
+ 	if (C_CLOCAL(tty))
+ 		do_clocal = 1;
+--- /dev/null	2025-01-15 10:22:07.042000000 -0500
++++ linux-6.6.69/include/linux/perle_serial.h	2025-01-15 14:20:16.206917130 -0500
+@@ -0,0 +1,31 @@
++#ifndef _LINUX_PERLE_SERIAL_H
++#define _LINUX_PERLE_SERIAL_H
++
++#if !defined(TRUE)
++#define TRUE    1
++#endif
++#if !defined(FALSE)
++#define FALSE   0
++#endif
++
++// forwarding options
++#define PERLE_SERIAL_FORWARD_ON_CHAR                    (DS_FORWARD_ON_CHAR1|DS_FORWARD_ON_CHAR2)
++#define PERLE_SERIAL_FORWARD_ON_FRAME                   (DS_FORWARD_START_CHAR1|DS_FORWARD_START_CHAR2|DS_FORWARD_END_CHAR1|DS_FORWARD_END_CHAR2)
++
++#define PERLE_SERIAL_FORWARD_STATE_START_1OF1           0
++#define PERLE_SERIAL_FORWARD_STATE_START_1OF2           1
++#define PERLE_SERIAL_FORWARD_STATE_START_2OF2           2
++#define PERLE_SERIAL_FORWARD_STATE_END_1OF1             3
++#define PERLE_SERIAL_FORWARD_STATE_END_1OF2             4
++#define PERLE_SERIAL_FORWARD_STATE_END_2OF2             5
++#define PERLE_SERIAL_FORWARD_STATE_WAITING_1OF1         6
++#define PERLE_SERIAL_FORWARD_STATE_WAITING_1OF2         7
++#define PERLE_SERIAL_FORWARD_STATE_WAITING_2OF2         8
++
++#define PERLE_SERIAL_DS_FLIPBUF_SIZE                    1024
++#define PERLE_SERIAL_FORWARD_SEND_TIMEOUT               (2 * HZ / 1000)
++
++//#define PERLE_SERIAL_DEBUG_RTSTOGGLE 1
++
++#endif  // _LINUX_PERLE_SERIAL_H
++
+--- linux-6.6.93/include/linux/serial_8250.h	2025-06-04 08:42:26.000000000 -0400
++++ linux-6.6.93changed/include/linux/serial_8250.h	2025-06-26 13:04:46.702850381 -0400
+@@ -11,7 +11,9 @@
+ #include <linux/serial_core.h>
+ #include <linux/serial_reg.h>
+ #include <linux/platform_device.h>
+-
++// Perle start for trueport
++#include <linux/perle_serial.h>
++// Perle end for trueport
+ struct uart_8250_port;
+ 
+ /*
+@@ -133,6 +135,10 @@
+ 	unsigned char		ier;
+ 	unsigned char		lcr;
+ 	unsigned char		mcr;
++// Perle start for trueport
++	unsigned char		mcr_mask;	/* mask of user bits */
++	unsigned char		mcr_force;	/* mask of forced bits */
++// Perle end for trueport
+ 	unsigned char		cur_iotype;	/* Running I/O type */
+ 	unsigned int		rpm_tx_active;
+ 	unsigned char		canary;		/* non-zero during system sleep
+@@ -161,6 +167,127 @@
+ 	void			(*dl_write)(struct uart_8250_port *up, u32 value);
+ 
+ 	struct uart_8250_em485 *em485;
++// Perle start for trueport
++	int uart_port_index;                                        // the index of port on the chips (master+slave)
++	int baud;
++	                                                            // on the iolan V, each serial port card has 2 exar chips in a master/slave configuration
++	                                                            // the master ports are 0-7 and the slave ports are 8-15
++#define SERIAL_8250_MEDIA_TYPE_TRISTATE	0
++#define SERIAL_8250_MEDIA_TYPE_232		1
++#define SERIAL_8250_MEDIA_TYPE_232_DCE	2
++#define SERIAL_8250_MEDIA_TYPE_422		3
++#define SERIAL_8250_MEDIA_TYPE_485_FULL	4
++#define SERIAL_8250_MEDIA_TYPE_485_HALF	5
++
++#define SERIAL_8250_MEDIA_TYPE_MASK		0xf
++
++#define SERIAL_8250_MEDIA_TERMINATION		0x10
++#define SERIAL_8250_MEDIA_FAST				0x20
++
++	void (*set_media_type)(struct uart_8250_port *,int);       // callback to 8250_pci.c to set the dce/dte mode on the uart port
++	unsigned int media_type;
++
++	unsigned int prescaler;     // 1 or 4
++	unsigned int mode8_16;      // 8=mode8x, 16=mode16x
++	
++	struct exar8250 *exar8250priv;	// back pointer
++	
++#if 0
++    /*
++     * GPIO signal support
++     */
++    int         DTR_gpio;
++    int         DTR_inverted;
++    int         DTR_present;
++    int         DTR_active;     // used to track the current state of the DTR signal/gpio
++                                // so we only write to the gpio if the state changes
++    int         DCD_gpio;
++    int         DCD_inverted;
++    int         DCD_present;
++    int         DSR_gpio;
++    int         DSR_inverted;
++    int         DSR_present;
++    int         RI_gpio;
++    int         RI_inverted;
++    int         RI_present;
++
++    u8          gpio_msr;       // emulate MSR (modem status register) for GPIOs
++                                // the delta and status bits for DCD, DSR and RI will be
++                                // updated
++#endif // if 0
++    // these are used for serialt (uart trace)
++    u8          last_mcr_written;
++    u8          last_msr_read;
++	u8			mcr_signal_flips;
++    // used for signal notification
++    unsigned short      rpt_mode;           // report mode   TRPT_(OFF,ON)
++    int                 rpt_pid;            // process ID
++    unsigned short      rpt_lsrmask;        // lsr mask      (TRPTSET >> 16)
++    unsigned short      rpt_user_sigmask;   // signals mask - linux API bits to look for (TRPTSET & 0xffff). TIOCM_DSR ...
++    unsigned short      rpt_sigmask;        // signals mask - uart bits to look for (TRPTSET & 0xffff). UART_MSR_DSR ...
++    unsigned short      rpt_LSR;            // lsr status    UART_LSR_(FE,OE,PE,BI)
++
++    // forwarding config
++    unsigned short      forwarding;        // options for packet forwarding
++    unsigned short        start_transmit_rule;
++    unsigned short        end_transmit_rule;
++    unsigned short      packet_size;       // maximum packet size
++    unsigned short      idle_time;         // idle time in msec
++    unsigned short      force_time;        // time to force transmit in msec
++    unsigned char       trigger_char1;     // transmit if char is encountered
++    unsigned char       trigger_char2;     // transmit if char is encountered
++    unsigned char       start_frame1;      // start of frame marker
++    unsigned char       start_frame2;      // start of frame marker
++    unsigned char       end_frame1;        // end of frame marker
++    unsigned char       end_frame2;        // end of frame marker
++    unsigned short      oneshot_config;    // oneshot forwarding config
++    unsigned char       direct_trigger;    // direct mode trigger character
++        // forwarding state info
++    unsigned short      oneshot_forwarding;// oneshot forwarding options that may be cleared
++    unsigned int        forward_state;     // state of forwarding
++    unsigned int           base_state;       // starting state
++    unsigned int           stored_char;      // was the char saved in the flip buf
++    unsigned char          saved_ch;         // save char for later
++    unsigned char          saved_st;         // save status for later
++    unsigned long          last_idle_time;         // last time idle timer was set in jiffies
++    // forwarding timers
++    struct timer_list       forward_idle_timer;     // forward on idle timer
++    struct timer_list       forward_force_timer;    // force forward timer
++    struct timer_list       forward_send_timer;     // send to tty process timer
++    struct timer_list       sigscan_delay_timer;    // signal scan delay timer
++
++    // forwarding flip buffer
++    char            *char_buf_ptr;
++    unsigned char   *flag_buf_ptr;
++    int             count;
++    char            *get_char_ptr;
++    unsigned char   *get_flag_ptr;
++    int             get_count;
++    int             buf_num;
++    unsigned char   char_buf[2*PERLE_SERIAL_DS_FLIPBUF_SIZE];
++    char            flag_buf[2*PERLE_SERIAL_DS_FLIPBUF_SIZE];
++
++    unsigned char   MCRmap;     // MCR value when mapping is used
++    unsigned char   out1;       // re-map for OUT1
++    unsigned char   out2;       // re-map for OUT2
++
++    int             traceMask;
++    int             traceSignals;
++    int             tracePortIndex; // 0 based port index of iolan
++    struct sigscan  sigScan;        // DSR/DCD signal scan
++
++    // rts toggle
++    struct timer_list rs232_rts_toggle_timer;
++    struct timer_list rs232_rts_toggle_initial_timer;
++    int rs232_rts_toggle_char_timeout;
++    int rs232_rts_toggle;
++    unsigned short rts_toggle_initial_delay;
++    unsigned short rts_toggle_final_delay;
++    struct timer_list signal_timer;
++    int signal_count;
++    unsigned int mctrl_prev;
++// Perle end for trueport
++
+ 	void			(*rs485_start_tx)(struct uart_8250_port *);
+ 	void			(*rs485_stop_tx)(struct uart_8250_port *);
+ 
+@@ -209,6 +336,24 @@
+ 
+ void serial8250_set_isa_configurator(void (*v)(int port, struct uart_port *up,
+ 					       u32 *capabilities));
++// Perle start for trueport
++int serial8250_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg);
++void perle_serial8250_tx_chars(struct uart_8250_port *up);
++// void serial8250_enable_ms(struct uart_port *port);
++int getProcSigScan(int dsline);
++int setProcSigScan(int dsline, int state);
++void forward_frame(struct uart_8250_port *up);
++int serial8250_get_rs232_rts_toggle(struct uart_port *port);
++int serial8250_uart_trace_add_ioctl(struct uart_port *port, int ioctl_cmd);
++
++void serial8250_forward_idle_timer(struct timer_list *t);
++void serial8250_forward_force_timer(struct timer_list *t);
++void serial8250_forward_send_timer(struct timer_list *t);
++void serial8250_sigscan_delay_timer(struct timer_list *t);
++void serial8250_rs232_rts_toggle_timer(struct timer_list *t);
++void serial8250_rs232_rts_toggle_initial_timer(struct timer_list *t);
++void serial8250_signal_timer(struct timer_list *t);
++// Perle end for trueport
+ 
+ #ifdef CONFIG_SERIAL_8250_RT288X
+ int rt288x_setup(struct uart_port *p);
+--- linux-6.6.92/include/linux/serial_core.h	2025-05-22 08:12:26.000000000 -0400
++++ linux-6.6.92changed/include/linux/serial_core.h	2025-06-25 13:17:29.215841277 -0400
+@@ -403,6 +403,11 @@
+ 	void		(*poll_put_char)(struct uart_port *, unsigned char);
+ 	int		(*poll_get_char)(struct uart_port *);
+ #endif
++// Perle start for trueport
++    int    (*get_rs485)(struct uart_port *,struct serial_rs485 *);
++    int    (*get_rs232_rts_toggle)(struct uart_port *);
++    int    (*uart_trace_add_ioctl)(struct uart_port *, int);
++// Perle end for trueport
+ };
+ 
+ #define NO_POLL_CHAR		0x00ff0000
+@@ -470,6 +475,12 @@
+ 	unsigned char		iotype;			/* io access style */
+ 	unsigned char		quirks;			/* internal quirks */
+ 
++// Perle start for trueport
++	unsigned int	(*get_mstatus)(struct uart_port *);
++//	void (*get_logical_dcd)(struct uart_port *port);
++//	void (*get_logical_dsr)(struct uart_port *port);
++//	void (*get_logical_ri)(struct uart_port *port);
++// Perle end for trueport
+ #define UPIO_UNKNOWN		((unsigned char)~0U)	/* UCHAR_MAX */
+ #define UPIO_PORT		(SERIAL_IO_PORT)	/* 8b I/O port access */
+ #define UPIO_HUB6		(SERIAL_IO_HUB6)	/* Hub6 ISA card */
+@@ -516,6 +527,7 @@
+ #define UPF_LOW_LATENCY		((__force upf_t) ASYNC_LOW_LATENCY    /* 13 */ )
+ #define UPF_BUGGY_UART		((__force upf_t) ASYNC_BUGGY_UART     /* 14 */ )
+ #define UPF_MAGIC_MULTIPLIER	((__force upf_t) ASYNC_MAGIC_MULTIPLIER /* 16 */ )
++#define UPF_PERLE_IOLAN		((__force upf_t) ASYNC_PERLE_IOLAN    /* 17  */ )
+ 
+ #define UPF_NO_THRE_TEST	((__force upf_t) BIT_ULL(19))
+ /* Port has hardware-assisted h/w flow control */
+@@ -587,6 +599,15 @@
+ 	struct gpio_desc	*rs485_rx_during_tx_gpio; /* Output GPIO that sets the state of RS485 RX during TX */
+ 	struct serial_iso7816   iso7816;
+ 	void			*private_data;		/* generic platform data pointer */
++// Perle start for trueport
++    char             drain_flag;
++    char        rs485_txing_no_echo;    // indicates when TXing for 485 hdx. this is used for echo suppression
++	unsigned char		card_id;		/* Perle card_id */
++	char		perle_unused;
++    // uart_xr17v358_t uart_xr17v358_regs;
++    unsigned int    major;      // save the major_id of the device. required for reporting sigscan info to userspace
++                                // since uart port numbering in the kernel does not correspond to the physical ports on the iolan
++// Perle end for trueport
+ };
+ 
+ /**
+@@ -997,7 +1018,8 @@
+ 
+ #define uart_circ_chars_free(circ)	\
+ 	(CIRC_SPACE((circ)->head, (circ)->tail, UART_XMIT_SIZE))
+-
++// Perle start for trueport
++	#if 0
+ static inline int uart_tx_stopped(struct uart_port *port)
+ {
+ 	struct tty_struct *tty = port->state->port.tty;
+@@ -1005,6 +1027,40 @@
+ 		return 1;
+ 	return 0;
+ }
++#else
++/*
++ * the code for this in kernel-3.14.0-rc2 was inline (drivers/tty/serial/serial_core.c)
++ * and was referenced as:
++ *
++ * if (!uart_circ_empty(&state->xmit) && state->xmit.buf &&
++ *          !tty->stopped && (!tty->hw_stopped || rts_toggle))
++ *          port->ops->start_tx(port);
++ *
++ * tty->stopped        tty->hw_stopped     rts_toggle (1=start)        start result        stop result
++ * 0                   0                   0                           1                   0
++ * 0                   0                   1                           1                   0
++ * 0                   1                   0                           0                   1
++ * 0                   1                   1                           1                   0
++ * 1                   0                   0                           0                   1
++ * 1                   0                   1                           0                   1
++ * 1                   1                   0                           0                   1
++ * 1                   1                   1                           0                   1
++ *
++ */
++static inline int uart_tx_stopped(struct uart_port *port)
++{
++    struct tty_struct *tty = port->state->port.tty;
++    int rts_toggle = 0;
++    if (port->ops->get_rs232_rts_toggle)
++    {
++        rts_toggle = port->ops->get_rs232_rts_toggle(port);
++    }
++    if ((tty && tty->flow.stopped) || (port->hw_stopped && (rts_toggle==0)))
++        return 1;
++    return 0;
++}
++#endif
++// Perle end for trueport
+ 
+ static inline bool uart_cts_enabled(struct uart_port *uport)
+ {
+diff -ur linux-6.6.69ori/include/linux/tty_port.h linux-6.6.69/include/linux/tty_port.h
+--- linux-6.6.69ori/include/linux/tty_port.h	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/include/linux/tty_port.h	2025-02-19 14:02:44.486376646 -0500
+@@ -111,7 +111,11 @@
+ 	wait_queue_head_t	delta_msr_wait;
+ 	unsigned long		flags;
+ 	unsigned long		iflags;
+-	unsigned char		console:1;
++	unsigned char		console:1,
++// Perle start for trueport
++	low_latency:1,	/* optional: tune for latency */
++	perle_iolan:1;	/* option set from UPF_PERLE_IOLAN */
++// Perle end for trueport
+ 	struct mutex		mutex;
+ 	struct mutex		buf_mutex;
+ 	unsigned char		*xmit_buf;
+--- linux-6.6.93/include/uapi/asm-generic/ioctls.h	2025-06-04 08:42:26.000000000 -0400
++++ linux-6.6.93changed/include/uapi/asm-generic/ioctls.h	2025-07-10 10:56:24.090547611 -0400
+@@ -117,5 +117,94 @@
+ #define TIOCPKT_IOCTL		64
+ 
+ #define TIOCSER_TEMT	0x01	/* Transmitter physically empty */
++// Perle start for trueport
+ 
++#define TRPTSET		_IOW('t', 130, int)
++#define TRPTGET		_IOR('t', 131, struct ttyrpt)
++#define TRPTGETRST	_IOR('t', 132, struct ttyrpt)
++#define TRPTSETPID	_IOW('t', 133, int)
++#define TIOCSERDS	_IOW('t', 134, int)
++#define TIOCFWDDS	_IOW('t', 135, struct fwdpkt)
++#define TIOCMAPDTR	_IOW('t', 136, int)
++#define TIOCMAPRTS	_IOW('t', 137, int)
++#define TRACECONTROL _IOW('t', 138, int)
++#define TRACEREAD    _IOR('t', 139, int)
++#define TIOCOSARMDS	_IOW('t', 140, int)
++#define TRESETCOUNT	_IOW('t', 141, int)
++#define TSIGSCAN	_IOW('t', 142, struct sigscan)
++#define TIOCCICOUNT _IOW('t', 143, int)             /* clear port stats like rx, tx counts */
++#define TRTSCONTROL	_IOW('t', 144, struct rts_control)
++#define TIOCSLEEP	_IOW('t', 145, int)
++
++// bit defs for arg to TIOCCICOUNT ioctl 
++#define TIOCCICOUNT_CTS         0x0001
++#define TIOCCICOUNT_DSR         0x0002
++#define TIOCCICOUNT_RNG         0x0004
++#define TIOCCICOUNT_DCD         0x0008
++#define TIOCCICOUNT_TX          0x0010
++#define TIOCCICOUNT_RX          0x0020
++#define TIOCCICOUNT_FRAME       0x0040
++#define TIOCCICOUNT_PARITY      0x0080
++#define TIOCCICOUNT_OVERRUN     0x0100
++#define TIOCCICOUNT_BRK         0x0200
++#define TIOCCICOUNT_BUFOVERRUN  0x0400
++#define TIOCCICOUNT_ALL         0xffff
++
++/*
++ * These are the definitions for the Line Status Register
++ */
++#define TIOCSER_TEMPT           0x40  /* Transmitter empty */
++#define TIOCSER_THRE            0x20  /* Transmit-hold-register empty */
++#define TIOCSER_BI              0x10  /* Break interrupt indicator */
++#define TIOCSER_FE              0x08  /* Frame error indicator */
++#define TIOCSER_PE              0x04  /* Parity error indicator */
++#define TIOCSER_OE              0x02  /* Overrun error indicator */
++#define TIOCSER_DR              0x01  /* Receiver data ready */
++
++/* modem lines */
++#define TIOCM_LE	0x001
++#define TIOCM_DTR	0x002
++#define TIOCM_RTS	0x004
++#define TIOCM_ST	0x008
++#define TIOCM_SR	0x010
++#define TIOCM_CTS	0x020
++#define TIOCM_CAR	0x040
++#define TIOCM_RNG	0x080
++#define TIOCM_DSR	0x100
++#define TIOCM_CD	TIOCM_CAR
++#define TIOCM_RI	TIOCM_RNG
++#define TIOCM_OUT1	0x2000
++#define TIOCM_OUT2	0x4000
++#define TIOCM_LOOP	0x8000
++
++/* c_lflag bits */
++#if 0 //Defined in termbits.h
++#define ISIG	0000001
++#define ICANON	0000002
++#define XCASE	0000004
++#define ECHO	0000010
++#define ECHOE	0000020
++#define ECHOK	0000040
++#define ECHONL	0000100
++#define NOFLSH	0000200
++#define TOSTOP	0000400
++#define ECHOCTL	0001000
++#define ECHOPRT	0002000
++#define ECHOKE	0004000
++#define FLUSHO	0010000
++#define PENDIN	0040000
++#define IEXTEN	0100000
++#define EXTPROC	0200000
++#endif
++#define NO_XLATE 01000000
++
++#define FANOUT_IOC_MAGIC        'k'
++#define FANOUT_IOCT_FLUSH       _IO(FANOUT_IOC_MAGIC, 0x80)
++#define FANOUT_IOCT_READMARK    _IO(FANOUT_IOC_MAGIC, 0x81)
++
++/* the following bits represent the requested report mode */
++/* this is the data that follows a TRPTSET ioclt */
++#define TRPT_OFF	0x0000			// report mode off
++#define TRPT_ON		0x0001			// report mode on
++// Perle end for trueport
+ #endif /* __ASM_GENERIC_IOCTLS_H */
+diff -ur linux-6.6.69ori/include/uapi/asm-generic/termbits.h linux-6.6.69/include/uapi/asm-generic/termbits.h
+--- linux-6.6.69ori/include/uapi/asm-generic/termbits.h	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/include/uapi/asm-generic/termbits.h	2025-02-19 14:02:44.489376580 -0500
+@@ -146,4 +146,107 @@
+ #define	TCSADRAIN	1
+ #define	TCSAFLUSH	2
+ 
++// Perle start for trueport
++#define CBAUDEX2 0020000
++#define B1843200 0020001
++#define B3686400 0020002
++#define B28800   0020003
++// Perle-end
++
++// Perle-start
++#define PSPACE  00100000
++#define CTSFLOW 00200000
++#define RTSFLOW 00400000
++#define PARMARK	01000000
++#define CSTOP15 02000000
++// Perle-end
++// PERLE specific - start
++/* the following bits represent the requested report mode */
++/* this is the data that follows a TRPTSET ioclt */
++#define TRPT_SPCD	0x80000000			// SPCD task (lsrmask)
++#define TRPT_PRIVATE 	0xf0000000			// reserved (lsrmask)
++
++struct ttyrpt
++{
++	unsigned short lsrmask;		// lsr mask      (TRPTSET >> 16)
++	unsigned short sigmask;		// signals mask	 (TRPTSET & 0xffff)
++
++	unsigned short signals;		// signal levels TIOCM_(DTR,RTS,CTS,DSR,RI,CD)
++	unsigned short lsr;		// lsr status    TIOCSER_(FE,OE,PE,BI)
++};
++
++/* the following bits represent the requested report mode */
++/* this is the data that follows a TRPTSET ioclt */
++#define TRPT_OFF	0x0000			// report mode off
++#define TRPT_ON		0x0001			// report mode on
++
++#define DS_RS232_FD                 0x0001
++#define DS_RS422_FD                 0x0002
++#define DS_RS485_FD                 0x0004
++#define DS_RS485_HD                 0x0008
++#define DS_LINE_TERM                0x0010
++#define DS_DRIVERCTL_AUTO           0x0020
++#define DS_ECHO_SUPRESSION          0x0040
++#define DS_SINGLE_CHAR_INTERRUPT    0x0080
++#define DS_SLEW_RATE_LIMIT          0x0100
++#define DS_SIGNALCTL_MANUAL         0x0200
++#define DS_SIGNALCTL_INACTIVE       0x0400
++#define DS_FIFO_DIRECT              0x0800
++#define DS_IGNORE_LINE_ERRORS       0x1000
++
++
++struct fwdpkt
++{
++        unsigned short		forwarding;        // options for packet forwarding
++        unsigned short        start_transmit_rule;
++        unsigned short        end_transmit_rule;
++        unsigned short		packet_size;       // maximum packet size
++        unsigned short		idle_time;         // idle time in msec
++        unsigned short		force_time;        // time to force transmit in msec
++        unsigned char		trigger_char1;     // transmit if char is encountered
++        unsigned char		trigger_char2;     // transmit if char is encountered
++        unsigned char		start_frame1;      // start of frame marker
++        unsigned char		start_frame2;      // start of frame marker
++        unsigned char		end_frame1;        // end of frame marker
++        unsigned char		end_frame2;        // end of frame marker
++		unsigned short		oneshot_config;	   // oneshot forwarding config
++		unsigned char		direct_trigger;    // one-time filter for direct service types
++};
++
++// forwarding field
++#define DS_FORWARD_ON_COUNT        		0x0001
++#define DS_FORWARD_ON_IDLE         		0x0002
++#define DS_FORWARD_ON_TIME         		0x0004
++#define DS_FORWARD_ON_CHAR1        		0x0010
++#define DS_FORWARD_ON_CHAR2        		0x0020
++#define DS_FORWARD_START_CHAR1     		0x0100
++#define DS_FORWARD_START_CHAR2     		0x0200
++#define DS_FORWARD_END_CHAR1   			0x1000
++#define DS_FORWARD_END_CHAR2   			0x2000
++
++#define DS_ONESHOT_ON_DIRECT_TRIGGER	0x0001
++
++// transmit rules
++#define DS_FORWARD_TRANS_STRIP     0
++#define DS_FORWARD_TRANS_TRIG      1
++#define DS_FORWARD_TRANS_TRIG_1    2
++#define DS_FORWARD_TRANS_TRIG_2    3
++
++#define DS_FORWARD_PACKET_SIZE_MAX 1024
++
++struct sigscan {
++	int		pid;					// pid of caller to signal
++	unsigned short sigmask;		// handshake signals to scan
++	unsigned short sigdrop;		// handshake signals to drop
++	unsigned short msec;			// milliseconds to delay
++	unsigned short line;			// line (port) number
++};
++
++#define RTS_TOGGLE_ON	0x0001
++struct rts_control {
++    unsigned short flags;
++    unsigned short initial_delay;
++    unsigned short final_delay;
++};
++// Perle end for trueport
+ #endif /* __ASM_GENERIC_TERMBITS_H */
+diff -ur linux-6.6.69ori/include/uapi/linux/serial.h linux-6.6.69/include/uapi/linux/serial.h
+--- linux-6.6.69ori/include/uapi/linux/serial.h	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/include/uapi/linux/serial.h	2025-02-19 14:02:44.491376536 -0500
+@@ -149,6 +149,33 @@
+ #define SER_RS485_ADDR_RECV		(1 << 7)
+ #define SER_RS485_ADDR_DEST		(1 << 8)
+ 
++// Perle start for trueport
++#define SER_RS485_USE_GPIO              (1 << 5)
++#define SER_RS485_HDX               (1 << 16)       // 0x00010000, half duplex if enabled
++#define SER_RS485_ECHO_SUPPRESSION  (1 << 17)       // 0x00020000, echo suppression for half duplex only
++#define SER_RS4XX_LINE_TERMINATION  (1 << 18)       // 0x00040000, line termination
++#define SER_RS485_DRIVERCTL_AUTO    (1 << 19)       // 0x00080000, driver controls RTS (TX envelope for 485 hdx and fdx only. for 422 RTS is always active)
++#define SER_RS422_ENABLED           (1 << 20)       // 0x00100000, 422 enabled
++#define SER_RS4XX_INVERT_RTS        (1 << 21)       // 0x00200000, invert RTS when accessing the MCR because the transceiver uses an inverted RTS signal to control the TX
++                                                    //           normally MCR[RTS]=1, causes 0V from the UART and results in RTS high
++                                                    //                    MCR[RTS]=0, causes 3.3V from the UART and results in RTS low
++                                                    //           with RS4XX
++                                                    //                    MCR[RTS]=1, causes 0V from the UART and results in RTS low (TX off)
++                                                    //                    MCR[RTS]=0, causes 3.3V from the UART and results in RTS high (TX on)
++#define SER_RSXXX_IGNORE_LINE_ERRORS    (1 << 22)   // 0x00400000, ignore line errors (parity and framing)
++#define SER_RSXXX_SINGLE_CHAR_INTERRUPT (1 << 23)   // 0x00800000, single char interrupt
++#define SER_RSXXX_SIGNALCTL_MANUAL      (1 << 24)   // 0x01000000, manual signal control
++#define SER_RSXXX_SIGNALCTL_INACTIVE    (1 << 25)   // 0x02000000, DTR and RTS inactive
++#define SER_RSXXX_FIFO_DIRECT           (1 << 26)   // 0x04000000, fifo direct mode
++#define SER_RS232_ENABLED               (1 << 27)   // 0x08000000, 232 enabled
++
++#define SER_RSXXX_DTE_DCE_MODE_MASK     (3 << 28)
++#define SER_RSXXX_DTE_DCE_MODE_DISABLED (0 << 28)
++#define SER_RSXXX_DTE_DCE_MODE_DTE      (1 << 28)
++#define SER_RSXXX_DTE_DCE_MODE_DCE      (2 << 28)			
++
++#define SER_RS232_DCE				    (1 << 28)	// 0x10000000, choose DCE (needs SER_RS232_ENABLED also)
++// Perle end for trueport
+ 	__u32	delay_rts_before_send;
+ 	__u32	delay_rts_after_send;
+diff -ur linux-6.6.69ori/include/uapi/linux/tty_flags.h linux-6.6.69/include/uapi/linux/tty_flags.h
+--- linux-6.6.69ori/include/uapi/linux/tty_flags.h	2025-01-02 04:32:11.000000000 -0500
++++ linux-6.6.69/include/uapi/linux/tty_flags.h	2025-02-19 14:02:44.491376536 -0500
+@@ -32,6 +32,8 @@
+ #define ASYNCB_AUTOPROBE	15 /* [x] Port was autoprobed by PCI/PNP code */
+ #define ASYNCB_MAGIC_MULTIPLIER	16 /* Use special CLK or divisor */
+ #define ASYNCB_LAST_USER	16
++#define ASYNCB_PERLE_IOLAN	17	/* this is a Perle iolan port and needs special treatment */
++
+ 
+ /*
+  * Internal flags used only by kernel (read-only)
+@@ -71,6 +73,9 @@
+ #define ASYNC_BUGGY_UART	(1U << ASYNCB_BUGGY_UART)
+ #define ASYNC_AUTOPROBE		(1U << ASYNCB_AUTOPROBE)
+ #define ASYNC_MAGIC_MULTIPLIER	(1U << ASYNCB_MAGIC_MULTIPLIER)
++// Perle start for trueport
++#define ASYNC_PERLE_IOLAN	(1U << ASYNCB_PERLE_IOLAN)
++// Perle end for trueport
+ 
+ #define ASYNC_FLAGS		((1U << (ASYNCB_LAST_USER + 1)) - 1)
+ #define ASYNC_DEPRECATED	(ASYNC_SPLIT_TERMIOS | ASYNC_SESSION_LOCKOUT | \
+--- /dev/null	2025-06-13 16:46:25.248000000 -0400
++++ linux-6.6.92changed/include/uapi/linux/uart_trace.h	2025-06-24 11:00:53.383761592 -0400
+@@ -0,0 +1,90 @@
++#ifndef _UAPI_LINUX_UART_TRACE_H
++#define _UAPI_LINUX_UART_TRACE_H
++
++#define MAX_TRACE_DATA 251
++#define UTIME_MANTISSA_BITS 10
++typedef struct
++{
++	unsigned char len;		/* 1->255 bytes follow */
++	unsigned char type;
++    unsigned short utime;
++	unsigned char port;
++	char data[MAX_TRACE_DATA];
++} TraceEntry;
++
++typedef struct
++{
++    unsigned long mask;
++    int maxTraceLength;
++    int port;           // 0 based port index of iolan
++} TraceControl;
++
++typedef struct
++{
++	int 	dataLen;						/* transferred length */
++	int		remLen;							/* amount left to transfer */
++} TraceRead;
++
++
++enum
++{
++	TRACE_HEADER,
++	TRACE_IN,
++	TRACE_OUT,
++	TRACE_SIGNALS,
++	TRACE_SPECIAL,
++	TRACE_IOCTL
++};
++
++#define TRACE_BITS_IN (1 << TRACE_IN)
++#define TRACE_BITS_OUT (1 << TRACE_OUT)
++#define TRACE_BITS_SIGNALS (1 << TRACE_SIGNALS)
++#define TRACE_BITS_SPECIAL (1 << TRACE_SPECIAL)
++#define TRACE_BITS_IOCTL (1 << TRACE_IOCTL)
++
++enum
++{
++	UTR_MASK = 0xff00,
++	UTR_PARITY = 0x100,
++	UTR_FRAME = 0x200,
++	UTR_OVERRUN = 0x300,
++	UTR_TTY_OVERRUN = 0x400,
++	UTR_RX_BREAK = 0x500,
++	UTR_TX_BREAK = 0x600
++};
++
++typedef struct
++{
++	char *pBuf;							/* pointer to FIFO buffer */
++	int	len;							/* length of buffer */
++	int	start;							/* oldest index */
++	int	end;							/* next index */
++	int	options;						/* trace options */
++	
++} TraceFifo;
++
++#define UART_TRACE_LENGTH 32768
++typedef struct
++{
++	TraceFifo fifo;
++	char	data[UART_TRACE_LENGTH];
++	
++	unsigned long jiffies;
++	ktime_t microticks;
++	
++	int readLength;
++	
++} UartTrace;
++
++
++
++
++int uartTraceStart(int readLength);
++int uartTraceRead(TraceRead *pTR);
++int uartTraceAdd(int port, int type, int len, const unsigned char *pData);
++int uartTraceAddSignals(int port, int *pSignals, int MCR, int MSR);         // MCR and MSR use the UART_MCR_xxxx and UART_MSR_xxxx uart register #defines
++int uartTraceAddSignalsTIOCM(int port, int *pSignals, int MCR, int MSR);    // MCR and MSR use the ioctl TIOCM_xxx #defines
++int uartTraceAddSpecial(int port, short sp);
++int uartTraceAddIoctl(int port, int ioctl);
++
++#endif	/* __UART_TRACE__ */
+ 
