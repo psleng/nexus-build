@@ -63,7 +63,5 @@ docker run --rm $DFLAGS \
   -e PATH=/opt/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin$EXTRA_PATH \
   -h vyos-build \
   -v $(pwd):/vyos -v /dev:/dev -v /etc/fstab:/etc/fstab \
-  -v $SSH_AUTH_SOCK:$SSH_AUTH_SOCK \
-  -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK \
   $GITMNT $SSHMNT $EXTRA_ARGS -w /vyos \
   vyos/vyos-build:$TAG "$@"
