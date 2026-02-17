@@ -102,15 +102,13 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
 
-    cd vyos-build/scripts
-# Get the latest all the time
-if [ -d "$IOL_REPO_NAME" ]; then
-    rm -rf "$IOL_REPO_NAME"
-fi
-    git clone -b main --single-branch "$IOL_REPO_URL"
-    cd $TSK
+    if [ ! -d "vyos-build/scripts/$IOL_REPO_NAME" ]; then
+        git clone -b main --single-branch "$IOL_REPO_URL" vyos-build/scripts/$IOL_REPO_NAME
+    fi
+
+    cd vyos-build/scripts/$IOL_REPO_NAME
     ./all-build.py
-    cd ../../..
+    cd -
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
