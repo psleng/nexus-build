@@ -93,6 +93,27 @@ else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
 fi
 
+############## package-build-iolan
+# This will populate ./vyos-build/scripts/iolan_apps/
+IOL_REPO_NAME="iolan_apps"
+IOL_REPO_URL="git@github.com:Perle-Systems-Limited/iolan_apps.git"
+TSK=iolan_apps
+BLT=.filesystem.$TSK.built
+if [ ! -f "$BLT" ]; then
+    echo "=== I: $0: package-build.py $TSK BEGIN"
+
+    if [ ! -d "vyos-build/scripts/$IOL_REPO_NAME" ]; then
+        git clone -b main --single-branch "$IOL_REPO_URL" vyos-build/scripts/$IOL_REPO_NAME
+    fi
+
+    cd vyos-build/scripts/$IOL_REPO_NAME
+    ./all-build.py
+    cd -
+    touch "$BLT" # build success
+else
+    echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
+fi
+
 ############## package-symlink-debs
 # This will populate ./vyos-build/packages/ with .deb files
 TSK=package-symlink-debs
