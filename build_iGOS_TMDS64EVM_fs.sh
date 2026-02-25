@@ -148,6 +148,9 @@ if [ ! -f "$BLT" ]; then
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
+        */salt-api_*.deb|*/salt-syndic_*.deb|*/salt-dbg_*.deb|*/salt-master_*.deb|*/salt-cloud_*.deb|*/salt-ssh_*.deb)  # Unwanted salt components
+            continue
+            ;;
         esac
 
         test -f "$a" || continue
