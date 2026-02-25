@@ -166,8 +166,8 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
-    if [ "$BUILDTARG" != "ti-evm" ]; then
-        echo "=== I: $0: SKIP $TSK (target $BUILDTARG != ti-evm)"
+    if [ "$BUILDTARG" = "x86_64" ]; then
+        echo "=== I: $0: SKIP $TSK (target $BUILDTARG = x86_64)"
     else
         # this section needs some rework to clean up how this ti firmware is pulled.
         sudo rm -rf debian-repos
@@ -184,6 +184,8 @@ if [ ! -f "$BLT" ]; then
         sudo DEB_SUITE=$DEB_SUITE ./run.sh ti-linux-firmware
         cd ${ROOTDIR}
         if [ "$BUILDTYPE" = "bookworm-am64xx-evm" ]; then
+            ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
+        elif [ "$BUILDTYPE" = "bookworm-am64xx-iolan" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
         elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*j7200*.deb $ROOTDIR/vyos-build/packages/
@@ -236,9 +238,9 @@ cd $ROOTDIR
 # This will populate ./build/fs/
 TSK=ti-evm-fs-build
 BLT=.filesystem.$TSK.built
-if [ "$BUILDTARG" != "ti-evm" ]; then
+if [ "$BUILDTARG" = "x86_64" ]; then
     # Not TI.
-    echo "=== I: $0: Skipping $TSK because $BUILDTARG != ti-evm"
+    echo "=== I: $0: Skipping $TSK because $BUILDTARG = x86_64"
     touch $BLT
 fi
 
