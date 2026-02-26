@@ -1,0 +1,5 @@
+[[packages]]
+name = "flask-react-web"
+commit_id = "main"
+scm_url = "git@github.com:Perle-Systems-Limited/flask-react-dev.git"
+build_cmd = "cd builds; make; cp -L *.deb ../.."

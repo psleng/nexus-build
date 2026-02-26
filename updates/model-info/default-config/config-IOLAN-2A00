@@ -3,6 +3,23 @@ interfaces {
     }
 }
 service {
+    https {
+        api {
+            graphql {
+                authentication {
+                    type key
+                }
+            }
+            keys {
+                id myid {
+                    key mykey
+                }
+            }
+            rest {
+            }
+        }
+        port 443
+    }
     ntp {
         allow-client {
             address "127.0.0.0/8"
