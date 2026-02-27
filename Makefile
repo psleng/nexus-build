@@ -19,6 +19,7 @@ KERNEL_TARG   = .kernel.built
 UBOOT_TARG    = .uboot.built
 FS_TARG       = .filesystem.built
 IMAGE_TARG    = .image.built
+ISO_TARG      = .iso.built
 
 DATECODE = $(shell date +%Y%m%d%H%M%S00)
 
@@ -45,7 +46,7 @@ help:
 	@echo
 	@echo 'make sdcard         # flash sdcard with the built image'
 	@echo 'make sdcard-squashfs# flash sdcard with squash image in ./iso-images<buildtype/stage-iso'
-	@echo 'make live-iso       # create iso in ./iso-images/<buildtype>'
+#	@echo 'make live-iso       # create iso in ./iso-images/<buildtype>'
 	@echo 'make dfuimg         # create DFU images to \"dfu-images\" folder'
 	@echo
 	@if [ -s "$(DEFS)" ]; then \
@@ -108,7 +109,7 @@ endif
 
 .PHONY: help all sdcard sdcard-squashfs live-iso status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless
 
-all: $(DEFS) $(IMAGE_TARG)
+all: $(DEFS) $(ISO_TARG)
 
 # Run a docker session.
 define DOCKRUN
@@ -153,15 +154,51 @@ else
 # This invalid directory sometimes appears breaking git ops on build
 	@if [ -d ~root/.gitconfig ]; then sudo rm -rf ~root/.gitconfig; fi
 	@$(call DOCKRUN,image,./buildiGOSti.sh $(BUILDTYPE))
-	@ls -l images/$(BUILDTYPE)/tisdk*.squashfs
-	@echo '### Making uSDcard image COMPLETED'
-	@echo '### Type "bin/buildlog" to check for errors'
-	@echo '### Type "make sdcard" to write bootloader and flat rootfs to an uSD card'
-	@echo '### Type "make sdcard-squashfs" to write bootloader and squashed rootfs to an uSD card'
-	@echo '### Type "make live-iso" to create a live iso under /iso_images'
 	@touch $@
 endif
 
+# Create a iso image
+$(ISO_TARG): $(IMAGE_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+	@echo "### The final .iso image should be here:"
+	@ISO=vyos-build/build/live-image-$(ARCH).hybrid.iso; if [ -f $$ISO ]; then ls -l `realpath $$ISO`; else echo "Error: $$ISO not found!"; fi
+	@touch $@
+else
+	@echo '### Making ISO image'
+	@$(call DOCKRUN,iso,./buildiGOS_iso.sh $(BUILDTYPE))
+	@command -v xorriso >/dev/null 2>&1 || { \
+		echo "Error: xorriso is not installed."; \
+		echo "Please install it by running: sudo apt install xorriso"; \
+		exit 1; \
+	}
+	# create an iso with the igos updates using the same iso attributes
+	sudo xorriso -as mkisofs -R -r -J -joliet-long -l -cache-inodes -iso-level 3 -A "iGOS" \
+  -p "live-build ${DATECODE}; https://salsa.debian.org/live-team/live-build" \
+  -publisher "psleng@perle.com" -V "iGOS" --modification-date="${DATECODE}" \
+  -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -isohybrid-apm-hfsplus \
+  -o iso-images/$(BUILDTYPE)/"igos-live-${DATECODE}-arm64.iso" iso-images/$(BUILDTYPE)/stage_iso
+
+	@ls -l images/$(BUILDTYPE)/tisdk*.squashfs
+	@echo '### '
+	@echo '### Making uSDcard image COMPLETED'
+	@echo '### Type "bin/buildlog" to check for errors'
+	@echo '### '
+	@echo '################################################################################# '
+	@echo '### Type "make sdcard" to write bootloader and flat rootfs to an uSD card'
+	@echo '### Type "make sdcard-squashfs" to write bootloader + squashed rootfs to uSD card'
+#	@echo '### Type "make live-iso" to create a live iso under /iso_images'
+	@echo '################################################################################# '
+	@echo '#### '
+	@echo '######################################################## '
+	@echo '### List of ISO images in iso-images/$(BUILDTYPE)'
+	@echo '######################################################## '
+	@ls -l iso-images/$(BUILDTYPE)/*.iso
+	@echo '### '
+	@echo '### Making ISO image COMPLETED'
+	@echo '### '
+	@touch $@
+endif
 # Write bootloader and flat rootfs to a uSDcard.
 sdcard: $(IMAGE_TARG)
 ifeq ($(BUILDTARG),x86_64)
@@ -230,7 +267,7 @@ spotless: clean containerclean
 
 # Clean everything.
 clean: mostlyclean
-	sudo rm -rf images dfu-images
+	sudo rm -rf images dfu-images iso-images
 
 # Clean build artifacts only (but not built images).
 mostlyclean:
