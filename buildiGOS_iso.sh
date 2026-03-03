@@ -101,10 +101,12 @@ ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
 
     # cleanup the staging filesystem directory
     # sudo rm -rf $ISO_ROOTFS
+    if [[ ! -d "$ISOPATH_BUILD" ]]; then
+       sudo mkdir -p $ISOPATH_BUILD
+    fi
     sudo rm -rf $ISOPATH_BUILD/stage_iso
-    # sudo mkdir -p $ISOPATH_BUILD/stage_iso
     sudo mv $STAGE_ISO $ISOPATH_BUILD/stage_iso
-    # sudo rm -rf $STAGE_ISO
+    sudo rm -rf $STAGE_ISO
 
     # housekeeping - remove vyos-build/build/vyos*.iso
     sudo rm -f vyos-build/build/vyos*.iso
