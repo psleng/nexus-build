@@ -223,4 +223,8 @@ sudo unsquashfs -f -d $DFU_IMG_FOLDER/tmp/ $ROOTFS_IMG_FILE
 sudo umount $DFU_IMG_FOLDER/tmp
 rm -rf $DFU_IMG_FOLDER/tmp 
 
+echo "Creating split rootfs images... (512M)"
+mkdir $DFU_IMG_FOLDER/sptimg
+split -b 512M $DFU_IMG_FOLDER/am64x-rootfs.ext4 $DFU_IMG_FOLDER/sptimg/am64x-rootfs.
+
 echo "DFU images are created at $DFU_IMG_FOLDER"

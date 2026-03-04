@@ -85,6 +85,93 @@ you must then exit to do the remaining steps.
 	sudo ./ti-bdebstrap/create-sdcardiGOS.sh bookworm-am64xx-evm
 ```
 
+---
+## How to Generate Flashing Images (make dfuimg)
+
+Before using JTAG, TFTP, or DFU flashing methods, you must generate the necessary binary images.
+
+1) **Build the Image**: Compile your project to generate the base binaries.
+2) **Generate Flashing Files**: Run the following command:
+
+```Bash
+make dfuimg
+```
+
+This command performs the following:
+
+- Creates a `dfu-images/` folder containing the bootloaders, U-Boot images and rootfs.ext4.
+
+- Creates a `dfu-images/sptimg/` subfolder.
+
+- Automatically splits the large RootFS file into 512MB chunks (e.g., `am64x-rootfs.aa`, `am64x-rootfs.ab`, etc.) for use in the TFTP update procedure.
+
+## How to Flash eMMC via JTAG (XDS110)
+
+This procedure allows for initial flashing or recovery of the eMMC using a JTAG connection.
+
+1) Requirements
+
+- **XDS110 Debug Probe** connected to the target JTAG port.
+- **[iolan-tool](https://github.com/Perle-Systems-Limited/iolan-tool)**: The primary automation script.
+- **Images**: Uses the U-boot images generated in the `dfu-images/` folder 
+
+2) Note on Source Code
+
+The `iolan-tool` contains **prebuilt binaries** for the initialization and flashing applications. You only need to clone/build the following repositories if you intend to modify the underlying JTAG logic:
+- [iolan-ccs_init](https://github.com/Perle-Systems-Limited/iolan-ccs_init): SoC/DDR initialization code.
+- [iolan-flasher](https://github.com/Perle-Systems-Limited/iolan-flasher): The CCS-based flashing application.
+
+3) Procedure
+
+- Ensure Code Composer Studio (CCS) and XDS110 drivers are installed.
+- Connect the XDS110 to the target.
+- Make sure the boot mode is configured to **DEV Boot mode**
+- Run the **iolan-tool** script (**[flash_emmc.js](https://github.com/Perle-Systems-Limited/iolan-tool/blob/master/flash_emmc.js)**). It will initialize the SoC using the prebuilt `iolan-ccs_init` and then stream the images from `dfu-images/` to the eMMC via `iolan-flasher`. Refer to iolan-tool's **[README.md](https://github.com/Perle-Systems-Limited/iolan-tool/blob/master/README.md)** for more details.
+
+---
+## How to Flash RootFS via TFTP (U-Boot)
+
+Once the bootloaders are flashed and you can reach the U-Boot prompt (`IOLAN-2A >`), use this method to flash the RootFS over the network.
+
+1) Network Configuration
+
+In the U-Boot console, set your network parameters:
+
+```Bash
+setenv ipaddr 192.168.1.10
+setenv serverip 192.168.1.100
+setenv gatewayip 192.168.1.1
+setenv netmask 255.255.255.0
+ping $serverip
+```
+
+2) Flashing Script (Copy & Paste)
+Copy the split files from `dfu-images/sptimg/` to your TFTP server root. Then, run these commands in U-Boot:
+
+```Bash
+# 1. Basic variables
+setenv loadaddr 0xC0000000
+setenv chunk_blocks 0x100000
+setenv start_block 0x22
+
+# 2. Helper macro
+setenv flash_chunk 'tftp ${loadaddr} ${fname}; mmc write ${loadaddr} ${next_block} ${chunk_blocks}; setexpr next_block ${next_block} + ${chunk_blocks}'
+
+# 3. Define sequences (Split to avoid buffer limits)
+setenv flash_seq_1 'setenv next_block ${start_block}; setenv fname am64x-rootfs.aa; run flash_chunk; setenv fname am64x-rootfs.ab; run flash_chunk; setenv fname am64x-rootfs.ac; run flash_chunk; setenv fname am64x-rootfs.ad; run flash_chunk'
+setenv flash_seq_2 'setenv fname am64x-rootfs.ae; run flash_chunk; setenv fname am64x-rootfs.af; run flash_chunk; setenv fname am64x-rootfs.ag; run flash_chunk; setenv fname am64x-rootfs.ah; run flash_chunk'
+
+# 4. Final trigger
+setenv flash_full 'gpt write mmc 0 ${partitions}; mmc dev 0; run flash_seq_1; run flash_seq_2; echo !!! ALL PARTS FLASHED SUCCESSFULLY !!!'
+```
+
+3) Execute Update
+
+```Bash
+run flash_full
+```
+
+---
 ## How to DFU (Device Firmware Update)
 
 ### Preparation: Build Images
