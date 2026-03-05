@@ -183,9 +183,8 @@ else
 	@echo '### Making ISO image'
 	@$(call DOCKRUN,iso,./buildiGOS_iso.sh $(BUILDTYPE))
 	@command -v xorriso >/dev/null 2>&1 || { \
-		echo "Error: xorriso is not installed."; \
-		echo "Please install it by running: sudo apt install xorriso"; \
-		exit 1; \
+		echo "Warning: xorriso is not installed....installing it now"; \
+		sudo apt-get install -y -qq xorriso; \
 	}
 	# create an iso with the igos updates using the same iso attributes
 	sudo xorriso -as mkisofs -R -r -J -joliet-long -l -cache-inodes -iso-level 3 -A "iGOS" \
@@ -242,9 +241,8 @@ ifeq ($(BUILDTARG),x86_64)
 else
 	@echo '### Making $@'
 	@command -v xorriso >/dev/null 2>&1 || { \
-		echo "Error: xorriso is not installed."; \
-		echo "Please install it by running: sudo apt install xorriso"; \
-		exit 1; \
+		echo "Warning: xorriso is not installed...installing now"; \
+		sudo apt-get install -y -qq xorriso; \
 	}
 	# create an iso with the igos updates using the same iso attributes
 	sudo xorriso -as mkisofs -R -r -J -joliet-long -l -cache-inodes -iso-level 3 -A "iGOS" \
