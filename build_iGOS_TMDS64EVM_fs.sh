@@ -67,7 +67,7 @@ TSK=package-build
 BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
-    ./package-build.py --dir $TSK --include \
+    ./package-build.py --dir $TSK --include salt vpp \
         ethtool telegraf owamp net-snmp frr frr_exporter isc-kea strongswan \
         openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
         podman ddclient dropbear hostap kea keepalived netfilter \
@@ -93,6 +93,27 @@ else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
 fi
 
+############## package-build-iolan
+# This will populate ./vyos-build/scripts/iolan_apps/
+IOL_REPO_NAME="iolan_apps"
+IOL_REPO_URL="git@github.com:Perle-Systems-Limited/iolan_apps.git"
+TSK=iolan_apps
+BLT=.filesystem.$TSK.built
+if [ ! -f "$BLT" ]; then
+    echo "=== I: $0: package-build.py $TSK BEGIN"
+
+    if [ ! -d "vyos-build/scripts/$IOL_REPO_NAME" ]; then
+        git clone -b main --single-branch "$IOL_REPO_URL" vyos-build/scripts/$IOL_REPO_NAME
+    fi
+
+    cd vyos-build/scripts/$IOL_REPO_NAME
+    ./all-build.py
+    cd -
+    touch "$BLT" # build success
+else
+    echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
+fi
+
 ############## package-symlink-debs
 # This will populate ./vyos-build/packages/ with .deb files
 TSK=package-symlink-debs
@@ -104,6 +125,8 @@ if [ ! -f "$BLT" ]; then
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")\
              $ROOTDIR/ti-bdebstrap/*.deb
     do
+        test -s "$a" || continue  # Skip zero length junk
+
         case "$a" in
         *libsnmp-dev_*64.deb)  # Needed for frr (despite -dev_ pattern)
             ;;
@@ -125,7 +148,7 @@ if [ ! -f "$BLT" ]; then
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
-        */libyang3*.deb|*/libyang-*_3*.deb)  # libyang3 Cannot be used since libyang2 will be installed
+        */salt-api_*.deb|*/salt-syndic_*.deb|*/salt-dbg_*.deb|*/salt-master_*.deb|*/salt-cloud_*.deb|*/salt-ssh_*.deb)  # Unwanted salt components
             continue
             ;;
         esac
@@ -146,8 +169,8 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
-    if [ "$BUILDTARG" != "ti-evm" ]; then
-        echo "=== I: $0: SKIP $TSK (target $BUILDTARG != ti-evm)"
+    if [ "$BUILDTARG" = "x86_64" ]; then
+        echo "=== I: $0: SKIP $TSK (target $BUILDTARG = x86_64)"
     else
         # this section needs some rework to clean up how this ti firmware is pulled.
         sudo rm -rf debian-repos
@@ -164,6 +187,8 @@ if [ ! -f "$BLT" ]; then
         sudo DEB_SUITE=$DEB_SUITE ./run.sh ti-linux-firmware
         cd ${ROOTDIR}
         if [ "$BUILDTYPE" = "bookworm-am64xx-evm" ]; then
+            ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
+        elif [ "$BUILDTYPE" = "bookworm-am64xx-iolan" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
         elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*j7200*.deb $ROOTDIR/vyos-build/packages/
@@ -216,9 +241,9 @@ cd $ROOTDIR
 # This will populate ./build/fs/
 TSK=ti-evm-fs-build
 BLT=.filesystem.$TSK.built
-if [ "$BUILDTARG" != "ti-evm" ]; then
+if [ "$BUILDTARG" = "x86_64" ]; then
     # Not TI.
-    echo "=== I: $0: Skipping $TSK because $BUILDTARG != ti-evm"
+    echo "=== I: $0: Skipping $TSK because $BUILDTARG = x86_64"
     touch $BLT
 fi
 
@@ -269,76 +294,6 @@ if [ ! -f "$BLT" ]; then
     sudo cp updates/perle-init.sh $FS/usr/bin
     sudo cp -rf updates/model-info $FS/usr/share/vyos/
     sudo cp -rf updates/product.env $FS/etc/
-
-    # !!!! end of core rootfs fixups - do not add further fixups after this point
-    # unless it is sdcard or mmc rootfs specific
-
-    # START - make a copy of the ISO for squashfs image type
-    STAGE_ISO=$ROOTDIR/build/stage_iso
-    ISOPATH_BUILD=$ROOTDIR/iso-images/$BUILDTYPE
-
-    # create directory for staging the squashfs version of the image
-    sudo rm -rf $STAGE_ISO
-    sudo mkdir -p $STAGE_ISO
-    sudo chmod u+w $STAGE_ISO
-
-    # copy entire ISO to staging area,  preserving all attrs, hidden, symlinks
-    # and remove original filesystem.squashfs in prep for updated one
-    sudo cp -a $ISO_DIR/. $STAGE_ISO/
-    sudo rm -f $STAGE_ISO/live/filesystem.squashfs
-
-    # copy all cumulative fixups in flat rootfs preserving all attrs, hidden, symlinks
-    # to the staging filesystem directory
-
-    # copy the dtbs from built location to /boot/dtb for uboot to access this is different
-    # than copying it WITHIN the /boot/dtb in the LINUX rootfs that install_image.py needs
-    # to copy to another image's /boot/dtb that uboot needs to access
-    sudo mkdir $STAGE_ISO/boot/dtb
-    sudo cp -R $FS/usr/lib/linux-image*/ti $STAGE_ISO/boot/dtb
-
-    SQUASHFILE=$STAGE_ISO/live/filesystem.squashfs
-    # now we need to squash everthing back to the /live/filesystem.squashfs and zap the rest of the rootfs
-    # except for what was in the original ISO
-    sudo mksquashfs $FS $SQUASHFILE -comp xz -b 262144 -always-use-fragments -noappend
-
-    # we need to replace the sha256 checksum, in the live/sha256sum.txt as the last thing, otherwise
-    # the "add system image <file.iso> will fail on checksum verificatiom
-    SHA256TXTFILE=$STAGE_ISO/sha256sum.txt
-    RELSQUASHFILE=./live/filesystem.squashfs
-
-    # make the sha256sum.txt writeable
-    sudo chmod u+w $SHA256TXTFILE
-
-    # Calculate new hash
-    NEWHASH=$(sha256sum "$SQUASHFILE" | awk '{print $1}')
-
-    # Update the entry inside sha256sum.txt
-    sudo sed -i "s|^[0-9a-f]\{64\}  $RELSQUASHFILE|$NEWHASH $RELSQUASHFILE|" "$SHA256TXTFILE"
-
-    # make the sha256sum.txt non-writeable
-    sudo chmod u-w $SHA256TXTFILE
-
-    # Extract the kernel version from the initrd.img-* file (assuming it follows the pattern)
-    KERNEL_VER=$(ls ${STAGE_ISO}/live/initrd.img-* | sed 's/.*initrd.img-\(.*\)/\1/' | head -n 1)
-
-    echo "Creating initrd.img-${KERNEL_VER} and vmlinuz-${KERNEL_VER} symlinks"
-
-    # Create the symlinks
-    sudo ln -sf initrd.img-${KERNEL_VER} ${STAGE_ISO}/live/initrd.img
-    sudo ln -sf vmlinuz-${KERNEL_VER} ${STAGE_ISO}/live/vmlinuz
-
-    # cleanup the staging filesystem directory
-    sudo rm -rf $ISOPATH_BUILD/stage_iso
-    sudo mkdir -p $ISOPATH_BUILD/stage_iso
-    sudo cp -a $STAGE_ISO/. $ISOPATH_BUILD/stage_iso/
-    sudo rm -rf $STAGE_ISO
-
-    # END - make a copy of the rootfs for non-sdcard image
-
-    # housekeeping - remove vyos-build/build/vyos*.iso
-    sudo rm -f vyos-build/build/vyos*.iso
-
-    # flat rootfs sdcard build continues below
 
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"
