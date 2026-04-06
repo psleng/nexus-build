@@ -62,10 +62,13 @@ fi
 echo
 echo "$H Possible failures in $FILES"
 
-# egrep for errors followed by removing known false positives
+# egrep for errors followed by removing known false positives.
+# The sed script is specifically for the for salt build
+# which has known harmless errors.
 cat $FILES 2> /dev/null | \
+    sed '/undefined reference to .timer_create./,/building .zmq.libzmq. extension/d' |
     egrep --color=always \
-        '(fatal:| error:|^\*\*\*|dpkg:.*error|no space left on device)' |
+        '(fatal:| error:|^\*\*\*|dpkg:.*error|no space left on device|Depends: [^ ]* but it is not)' |
     egrep -v '(Linking the executable xfrmi|libstrongswan-kernel-netlink.so is not portable|unable to read /etc/init.d/iperf3|/usr/sbin/grub-probe|bash-completion-test-subject.deb|NOTE: Filtering of link-warnings enabled)'
 echo $H
 
