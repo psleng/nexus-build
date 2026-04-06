@@ -1,1 +1,1 @@
-uenvcmd=load mmc 0:2 ${kernel_addr_r} /EFI/VyOS/grubaa64.efi; load mmc 0:3 ${fdt_addr_r} /boot/dtb/ti/k3-am642-evm.dtb; bootefi ${kernel_addr_r} ${fdt_addr_r}
+uenvcmd=load mmc 0:2 ${kernel_addr_r} /EFI/VyOS/grubaa64.efi; load mmc 0:3 ${fdt_addr_r} /boot/dtb/ti/k3-j7200-evm.dtb; bootefi ${kernel_addr_r} ${fdt_addr_r}
