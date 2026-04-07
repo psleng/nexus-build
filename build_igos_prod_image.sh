@@ -12,12 +12,20 @@ ISOPATH=$ROOTDIR/iso-images/$BUILDTYPE
 ISOPATH_STAGE=$ROOTDIR/iso-images/$BUILDTYPE/stage_iso
 IMAGEPATH=$ROOTDIR/images/$BUILDTYPE
 
+BOOT3OFFSET=0
+SPLOFFSET=0x800
+UBOOTOFFSET=0x1800
+BOOTIMGSIZE_MB=7
+
 if [[ "$BUILDTYPE" == "bookworm-am64xx-evm" ]]; then
     UENVFILE="$ROOTDIR/updates/uEnv/uEnv-am64x-evm.txt"
 elif [[ "$BUILDTYPE" == "bookworm-j7200-evm" ]]; then
     UENVFILE="$ROOTDIR/updates/uEnv/uEnv-j72x-evm.txt"
 else
     UENVFILE="$ROOTDIR/updates/uEnv/uEnv-iolan.txt"
+    SPLOFFSET=0x700
+    UBOOTOFFSET=0x1000
+    BOOTIMGSIZE_MB=4
 fi
 
 if [[ ! -d "$ISOPATH_STAGE" ]]; then
@@ -159,16 +167,16 @@ else
     echo "Unsquashing boot squash image $1 found in: $IMAGEPATH"
     sudo unsquashfs -f -d "$UBOOTWORK" "$1"
 
-    sudo dd if=/dev/zero of=$BOOTIMG bs=1M count=7    
+    sudo dd if=/dev/zero of=$BOOTIMG bs=1M count=$BOOTIMGSIZE_MB    
 
-    # tiboot3.bin @ 0x0
-    sudo dd if=$UBOOTWORK/tiboot3.bin of=$BOOTIMG bs=512 seek=0 conv=notrunc
+    # tiboot3.bin
+    sudo dd if=$UBOOTWORK/tiboot3.bin of=$BOOTIMG bs=512 seek=$BOOT3OFFSET conv=notrunc
 
-    # tispl.bin @ 0x800
-    sudo dd if=$UBOOTWORK/tispl.bin of=$BOOTIMG bs=512 seek=$((0x800)) conv=notrunc
+    # tispl.bin
+    sudo dd if=$UBOOTWORK/tispl.bin of=$BOOTIMG bs=512 seek=$(($SPLOFFSET)) conv=notrunc
 
-    # u-boot.img @ 0x1800
-    sudo dd if=$UBOOTWORK/u-boot.img of=$BOOTIMG bs=512 seek=$((0x1800)) conv=notrunc
+    # u-boot.img
+    sudo dd if=$UBOOTWORK/u-boot.img of=$BOOTIMG bs=512 seek=$(($UBOOTOFFSET)) conv=notrunc
 
     echo "==========================================================================="
     echo "Production boot image build complete: $BOOTIMG"
