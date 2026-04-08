@@ -53,6 +53,7 @@ help:
 	@echo 'make sdcard-squashfs# flash sdcard with squash image in ./iso-images<buildtype/stage-iso'
 #	@echo 'make live-iso       # create iso in ./iso-images/<buildtype>'
 	@echo 'make dfuimg         # create DFU images to \"dfu-images\" folder'
+	@echo 'make prod-image     # create 16G emmc and boot images in ./iso-images/<buildtype>'
 	@echo
 	@if [ -s "$(DEFS)" ]; then \
 	    echo "The current build settings ($(DEFS)) are:"; \
@@ -202,6 +203,7 @@ else
 	@echo '### Type "make sdcard" to write bootloader and flat rootfs to an uSD card'
 	@echo '### Type "make sdcard-squashfs" to write bootloader + squashed rootfs to uSD card'
 #	@echo '### Type "make live-iso" to create a live iso under /iso_images'
+	@echo '### Type "make prod-image" to create 16G emmc and boot images in /iso-images'
 	@echo '################################################################################# '
 	@echo '#### '
 	@echo '######################################################## '
@@ -261,6 +263,16 @@ ifeq ($(BUILDTARG),x86_64)
 else
 	@echo '### Making $@'
 	@./build-dfu-image.sh
+	@echo '### Making $@ COMPLETED'
+endif
+
+# Create emmc and boot production .img files.
+prod-image: $(IMAGE_TARG)
+ifeq ($(BUILDTARG),x86_64)
+	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
+else
+	@echo '### Making $@'
+	@./build_igos_prod_image.sh
 	@echo '### Making $@ COMPLETED'
 endif
 
