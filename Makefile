@@ -26,7 +26,7 @@ ISO_TARG      = .iso.built
 
 DATECODE := $(shell date +%Y%m%d%H%M%S00)
 
-.PHONY: help all test sdcard sdcard-squashfs live-iso dfuimg status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless
+.PHONY: help all test sdcard sdcard-squashfs live-iso dfuimg status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless prod-image
 
 help:
 	@echo First select a build type.  Valid types are:

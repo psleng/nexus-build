@@ -174,7 +174,18 @@ if [ ! -f "$BLT" ]; then
     else
         # this section needs some rework to clean up how this ti firmware is pulled.
         sudo rm -rf debian-repos
-        git clone -b psl-master $REPO_URL_TI_DEB
+
+        # TI repos are flaky, so retries are needed
+        for i in 1 2 3
+        do
+            git clone -b psl-master $REPO_URL_TI_DEB && { i=''; break; }
+            st=$?
+            sleeptime=$((i * 30))
+            echo "warning: Clone $REPO_URL_TI_DEB failed (status $st); sleeping $sleeptime and retrying"
+            sleep $sleeptime
+        done
+        test -z "$i" || { echo "fatal: Cannot clone $REPO_URL_TI_DEB, giving up"; exit 1; }
+
         cd debian-repos
 
         # Determine the Debian distro to use
