@@ -33,8 +33,8 @@ if [[ ! -d "$ISOPATH_STAGE" ]]; then
     exit 1
 fi
 
-IMG=$ROOTDIR/iso-images/$BUILDTYPE/igos-prod-${DATECODE}.img
-BOOTIMG=$ROOTDIR/iso-images/$BUILDTYPE/igos-boot-${DATECODE}.img
+IMG=$ROOTDIR/iso-images/$BUILDTYPE/igos-prod-firm-${BUILDTYPE}.img
+BOOTIMG=$ROOTDIR/iso-images/$BUILDTYPE/igos-prod-boot-${BUILDTYPE}.img
 SIZE=14G
 
 WORKDIR=$ISOPATH/prod-work
