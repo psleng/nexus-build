@@ -44,6 +44,7 @@ service {
             rest {
             }
         }
+        enable-http-redirect
         port 443
     }
     ntp {
