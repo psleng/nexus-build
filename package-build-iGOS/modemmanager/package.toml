@@ -1,0 +1,26 @@
+[[packages]]
+name = "modemmanager"
+
+apply_patches = false
+
+build_cmd = """
+wget http://ftp.de.debian.org/debian/pool/main/m/modemmanager/modemmanager_1.20.4-1.dsc
+wget http://ftp.de.debian.org/debian/pool/main/m/modemmanager/modemmanager_1.20.4.orig.tar.xz
+wget http://ftp.de.debian.org/debian/pool/main/m/modemmanager/modemmanager_1.20.4-1.debian.tar.xz
+
+# Unpack Debian source
+dpkg-source -x modemmanager_1.20.4-1.dsc
+
+# Copy all local patches
+cp patches/* modemmanager-1.20.4/debian/patches/
+
+# Register all patches in the series file
+for p in patches/*.patch; do
+    echo "$(basename "$p")" >> modemmanager-1.20.4/debian/patches/series
+done
+
+# Build from parent directory
+cd modemmanager-1.20.4/..
+dpkg-buildpackage -us -uc
+
+"""

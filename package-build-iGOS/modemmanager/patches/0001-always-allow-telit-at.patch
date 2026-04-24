@@ -1,0 +1,13 @@
+--- a/plugins/telit/mm-plugin-telit.c
++++ b/plugins/telit/mm-plugin-telit.c
+@@ -150,7 +150,12 @@ static gboolean
+ supports_at_commands (MMBaseModem *self)
+ {
+-    return mm_base_modem_is_debug (self);
++    /*
++     * Patch: Always allow AT commands for Telit modems.
++     * VyOS / embedded systems require AT passthrough for 5G features
++     * not implemented in ModemManager.
++     */
++    return TRUE;
+ }
