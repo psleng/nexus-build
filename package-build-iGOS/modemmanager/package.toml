@@ -11,12 +11,17 @@ wget http://ftp.de.debian.org/debian/pool/main/m/modemmanager/modemmanager_1.20.
 # Unpack Debian source
 dpkg-source -x modemmanager_1.20.4-1.dsc
 
-# Copy all local patches
-cp patches/* modemmanager-1.20.4/debian/patches/
-
-# Register all patches in the series file
+# Copy upstream (quilt) patches; debian/* patches are applied separately below.
 for p in patches/*.patch; do
-    echo "$(basename "$p")" >> modemmanager-1.20.4/debian/patches/series
+    name="$(basename "$p")"
+    # Any patch that touches files under debian/ is applied directly, not via quilt,
+    # because the 3.0 (quilt) source format expects quilt patches to modify upstream only.
+    if grep -qE '^\+\+\+ [ab]?/?debian/' "$p"; then
+        (cd modemmanager-1.20.4 && patch -p1 --no-backup-if-mismatch) < "$p"
+    else
+        cp "$p" modemmanager-1.20.4/debian/patches/
+        echo "$name" >> modemmanager-1.20.4/debian/patches/series
+    fi
 done
 
 # Build from parent directory
