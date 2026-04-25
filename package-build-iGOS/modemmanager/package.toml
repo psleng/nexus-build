@@ -1,31 +1,24 @@
 [[packages]]
 name = "modemmanager"
+commit_id = "debian/1.20.4-1"
+scm_url = "https://salsa.debian.org/DebianOnMobile-team/modemmanager.git"
 
 apply_patches = false
 
 build_cmd = '''
-wget http://ftp.de.debian.org/debian/pool/main/m/modemmanager/modemmanager_1.20.4-1.dsc
-wget http://ftp.de.debian.org/debian/pool/main/m/modemmanager/modemmanager_1.20.4.orig.tar.xz
-wget http://ftp.de.debian.org/debian/pool/main/m/modemmanager/modemmanager_1.20.4-1.debian.tar.xz
-
-# Unpack Debian source
-dpkg-source -x modemmanager_1.20.4-1.dsc
-
-# Copy upstream (quilt) patches; debian/* patches are applied separately below.
-for p in patches/*.patch; do
+# Apply local patches: those that modify files under debian/ are applied
+# directly (since the 3.0 (quilt) source format expects quilt patches to
+# touch upstream only); everything else is registered in the quilt series.
+for p in ../patches/*.patch; do
+    [ -e "$p" ] || continue
     name="$(basename "$p")"
-    # Any patch that touches files under debian/ is applied directly, not via quilt,
-    # because the 3.0 (quilt) source format expects quilt patches to modify upstream only.
     if grep -qE '^\+\+\+ [ab]?/?debian/' "$p"; then
-        (cd modemmanager-1.20.4 && patch -p1 --no-backup-if-mismatch) < "$p"
+        patch -p1 --no-backup-if-mismatch < "$p"
     else
-        cp "$p" modemmanager-1.20.4/debian/patches/
-        echo "$name" >> modemmanager-1.20.4/debian/patches/series
+        cp "$p" debian/patches/
+        echo "$name" >> debian/patches/series
     fi
 done
 
-# Build from parent directory
-cd modemmanager-1.20.4/..
-dpkg-buildpackage -us -uc
-
+dpkg-buildpackage -uc -us -tc -b
 '''
