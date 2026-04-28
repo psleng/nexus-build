@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# This is called by iGOS-daily-build as builduser
+#
+
+# set -x
+if [ "$LOGNAME" != "builduser" ]; then
+    echo "$0: This must be run by builduser who has access to" >&2
+    echo "$0: https://github.com/Perle-Systems-Limited" >&2
+    exit 1
+fi
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 builddir" >&2
+    exit 1
+fi
+
+cd "$1"
+if [ "`pwd`" = "$HOME" ]; then
+    echo "$0: Refusing to run in home directory; unsafe!" >&2
+    exit 2
+fi
+
+umask 002
+sudo rm -rf nexus-build
+git clone -q https://github.com/psleng/nexus-build
+cd nexus-build
+
+## TODO HACK BEGIN
+# echo "HACK stuffing in psl-progs and Makefile.hack to `pwd`"
+# cp -r $HOME/psl-progs package-build-iGOS
+# mv -f Makefile Makefile.dist
+# cp    $HOME/Makefile.hack Makefile
+# ls -l
+## TODO HACK END
+
+set -e
+
+echo "=== I: Starting daily iGOS build in `realpath .`..."
+make spotless
+date
+
+#TARGS='targ-ti-j7200 targ-ti-am64x targ-perle-iolan'
+# 20260420: do not bother with 7200 for now and build am64x last since
+#           it is still the most in use.
+TARGS='targ-perle-iolan targ-ti-am64x'
+for T in $TARGS
+do
+    echo "=== I: Starting $T iGOS build at $(date)..."
+    make mostlyclean
+    make $T
+    msg=''
+    make all || msg="status=$?"
+    echo "=== I: Finished $T iGOS build at $(date) $msg"
+    ls -l .*built
+    # Stash the .ERR files for this build
+    E=errorfiles/$T
+    rm -rf $E; mkdir -p $E; cp -pf *.ERR $E
+done
+
+echo '=== I: Daily iGOS build completed! Please check *.ERR files for errors.'
