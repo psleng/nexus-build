@@ -7,7 +7,7 @@
 # 00 22 * * * script -e -c /home/psleng/buildprogs/iGOS-daily-build all.out
 
 # set -x
-D=$(dirname $(realpath $0))
+D=$(dirname $(realpath -s $0))
 
 # Set up a nexus-build dir for builduser which must be a member of the 
 # same Unix group as psleng with directory write access
