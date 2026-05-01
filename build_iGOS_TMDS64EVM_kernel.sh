@@ -36,4 +36,4 @@ if [ ! -d "$REPO_NAME" ]; then
 fi
 
 # Make Kernel and associated packages
-./package-build.py --dir package-build --include linux-kernel
+#./package-build.py --dir package-build --include linux-kernel

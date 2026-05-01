@@ -65,6 +65,7 @@ export EMAIL="psleng@perle.com"
 # This will populate ./vyos-build/scripts/package-build/
 TSK=package-build
 BLT=.filesystem.$TSK.built
+touch "$BLT" # force bypass
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir $TSK --include salt vpp \
