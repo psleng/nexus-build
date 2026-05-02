@@ -1,21 +1,18 @@
-Description: Enable AT command passthrough via D-Bus without requiring --debug
- By default ModemManager only allows the org.freedesktop.ModemManager1.Modem
- Command() D-Bus method when the daemon is started in debug mode. VyOS ships
- ModemManager as a normal system daemon but still needs AT passthrough for
- carrier-specific 5G features not exposed through the standard interfaces.
- Enabling the meson at_command_via_dbus option compiles out the debug-only
- gate in src/mm-iface-modem.c so the Command() method is always available.
-Author: VyOS
+Description: Enable AT command passthrough via D-Bus.
+ By default ModemManager exposes org.freedesktop.ModemManager1.Modem.Command()
+ only when started with --debug.  Building with -Dat_command_via_dbus=true
+ removes that gate so the FSM can issue AT commands over the system bus in
+ production.
+Author: VyOS / iGOS WWAN team
+Last-Update: 2026-04-30
 Forwarded: not-needed
-Last-Update: 2026-04-24
 
 --- a/debian/rules
 +++ b/debian/rules
-@@ -21,6 +21,7 @@ override_dh_autoreconf:
-
+@@ -21,5 +21,6 @@
  override_dh_auto_configure:
  	dh_auto_configure -- $(configure_flags) \
+ 		-Ddbus_policy_dir=/usr/share/dbus-1/system.d \
 +		-Dat_command_via_dbus=true \
  		-Dpolkit=permissive \
- 		-Dsystemdsystemunitdir=/lib/systemd/system \
  		-Dvapi=true

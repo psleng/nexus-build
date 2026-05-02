@@ -1,6 +1,11 @@
 [[packages]]
 name = "modemmanager"
-commit_id = "debian/1.20.4-1"
+# 1.24.2-2 is the latest stable Debian-packaged release.  It adds
+# org.freedesktop.ModemManager1.Modem.CellInfo (introduced in 1.20, hardened
+# in 1.22) which lets the FSM read the *active* serving band/EARFCN over
+# D-Bus, removing the need to spawn qmicli for that information.  Build
+# dependencies are unchanged from 1.20.4-1.
+commit_id = "debian/1.24.2-2"
 scm_url = "https://salsa.debian.org/DebianOnMobile-team/modemmanager.git"
 
 apply_patches = false
