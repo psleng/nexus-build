@@ -64,7 +64,7 @@ help:
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 IGOS_PKGS='flask-react-web apnscripts psl-progs saml-sso vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
-           vyos-utils ipaddrcheck hvinfo libgpiod \
+           ipaddrcheck hvinfo libgpiod \
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
            ssh-tpm-agent tacacs live-boot tpm2-openssl'
 
