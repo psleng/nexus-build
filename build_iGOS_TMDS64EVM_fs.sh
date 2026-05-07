@@ -295,6 +295,9 @@ if [ ! -f "$BLT" ]; then
     sudo cp -rf updates/model-info $FS/usr/share/vyos/
     sudo cp -rf updates/product.env $FS/etc/
 
+    # add EFI (FAT) mount point /mnt/efi to /dev/mmcblk0p2 so system can access uEnv.txt and product.env
+    echo "/dev/mmcblk0p2  /mnt/efi  vfat  defaults,nofail  0  2" | sudo tee -a $FS/etc/fstab
+
     # Decompress the vmlinuz (symlink to the real thing) into Image
     gunzip < $FS/boot/vmlinuz | sudo sh -c "cat > $FS/boot/Image"
 
