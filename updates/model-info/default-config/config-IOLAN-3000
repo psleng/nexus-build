@@ -48,9 +48,6 @@ system {
         device ttyS0 {
             speed 115200
         }
-        device ttyS3 {
-            speed 115200
-        }
     }
     host-name Iolan-3
     login {

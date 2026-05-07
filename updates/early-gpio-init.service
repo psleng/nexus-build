@@ -1,0 +1,12 @@
+[Unit]
+Description=Early Boot GPIO Initializer
+DefaultDependencies=no
+Before=sysinit.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/perle_gpioctl.py apply-defaults all
+Restart=no
+
+[Install]
+WantedBy=sysinit.target
