@@ -46,7 +46,9 @@ else
     while true; do
         read -p "$DFU_IMG_FOLDER is exist. Do you want to overwrite it? (y/n) " yn
         case $yn in
-            [Yy]* ) echo "Overwriting..."; break;;
+            [Yy]* ) echo "Deleting files in $DFU_IMG_FOLDER...";
+                    sudo rm -rf $DFU_IMG_FOLDER/*;
+                    break;;
             [Nn]* ) echo "Exiting..."; exit 1;;
             * ) echo "Invalid input. Please answer 'y' or 'n'.";;
         esac
@@ -220,6 +222,7 @@ mkfs.ext4 -F $DFU_IMG_FOLDER/am64x-rootfs.ext4
 mkdir $DFU_IMG_FOLDER/tmp
 sudo mount -t ext4 $DFU_IMG_FOLDER/am64x-rootfs.ext4 $DFU_IMG_FOLDER/tmp
 sudo unsquashfs -f -d $DFU_IMG_FOLDER/tmp/ $ROOTFS_IMG_FILE
+
 sudo umount $DFU_IMG_FOLDER/tmp
 rm -rf $DFU_IMG_FOLDER/tmp 
 
