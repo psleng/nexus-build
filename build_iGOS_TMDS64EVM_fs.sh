@@ -235,7 +235,12 @@ if [ ! -f "$BLT" ]; then
     if [ "$BUILDTARG" = "x86_64" ]; then
         BUILDFLAVOUR=generic
     else
-        BUILDFLAVOUR=${ARCH}fs
+        case "$BUILDTYPE" in
+            bookworm-am64xx-iolan) BUILDFLAVOUR=igos-am64x-all ;;
+            bookworm-am64xx-evm)   BUILDFLAVOUR=igos-am64x-evm ;;
+            bookworm-j7200-evm)    BUILDFLAVOUR=igos-j7200-evm ;;
+            *) echo "=== E: unknown BUILDTYPE: $BUILDTYPE" >&2; exit 1 ;;
+        esac
     fi
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
     export VYOS1X_REPO_BRANCH=psl-master
