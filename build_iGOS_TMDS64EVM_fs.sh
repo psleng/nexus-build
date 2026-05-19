@@ -242,8 +242,8 @@ if [ ! -f "$BLT" ]; then
             *) echo "=== E: unknown BUILDTYPE: $BUILDTYPE" >&2; exit 1 ;;
         esac
     fi
-    export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
-    export VYOS1X_REPO_BRANCH=psl-master
+    export VYOS1X_REPO_URL=${VYOS1X_REPO_URL:-https://github.com/psleng/vyos-1x}
+    export VYOS1X_REPO_BRANCH=${VYOS1X_REPO_BRANCH:-vyos-1x-jf}
     sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
         ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
     cd -
