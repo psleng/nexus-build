@@ -70,6 +70,18 @@ GPIO_PINS: Dict[str, Dict[str, object]] = {
     "UARTC5_SLR":        {"bank": 1, "line": 30, "dir": "out", "active_low": "no", "bias": "pull-up", "value": 1},
     "UARTC5_SHUT_N":     {"bank": 1, "line": 9, "dir": "out", "active_low": "yes", "bias": "pull-down", "value": 1},
     "SEP_7": {"separator": True},
+
+    # ---------------- STATUS LEDs ----------------
+    "SYS_RED":           {"bank": 0, "line": 62, "dir": "out", "active_low": "no", "bias": "pull-up", "value": 0},
+    "SYS_GREEN":         {"bank": 0, "line": 57, "dir": "out", "active_low": "no", "bias": "pull-down", "value": 1},
+    "SYS_BLUE":          {"bank": 0, "line": 46, "dir": "out", "active_low": "no", "bias": "pull-down", "value": 0},
+    "LTE_RED":           {"bank": 0, "line": 63, "dir": "out", "active_low": "no", "bias": "pull-up", "value": 0},
+    "LTE_GREEN":         {"bank": 0, "line": 61, "dir": "out", "active_low": "no", "bias": "pull-down", "value": 1},
+    "LTE_BLUE":          {"bank": 0, "line": 48, "dir": "out", "active_low": "no", "bias": "pull-down", "value": 0},
+    "WIFI_RED":          {"bank": 0, "line": 64, "dir": "out", "active_low": "no", "bias": "pull-up", "value": 0},
+    "WIFI_GREEN":        {"bank": 0, "line": 58, "dir": "out", "active_low": "no", "bias": "pull-down", "value": 1},
+    "WIFI_BLUE":         {"bank": 0, "line": 47, "dir": "out", "active_low": "no", "bias": "pull-down", "value": 0},
+    "SEP_8": {"separator": True},
 }
 
 _RESOLVED_BANKS = {}
