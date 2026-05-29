@@ -314,8 +314,8 @@ if [ ! -f "$BLT" ]; then
 
     if [ "$BUILDTYPE" = "bookworm-am64xx-iolan" ]; then
         # Copy for early-gpio-init service
-        sudo cp updates/perle_gpio_map.py $FS/usr/local/bin
-        sudo cp updates/perle_gpioctl.py $FS/usr/local/bin
+#        sudo cp updates/perle_gpio_map.py $FS/usr/local/bin
+#        sudo cp updates/perle_gpioctl.py $FS/usr/local/bin
 #        sudo cp updates/early-gpio-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/early-gpio-init.service $FS/etc/systemd/system/sysinit.target.wants/early-gpio-init.service
 
