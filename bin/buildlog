@@ -68,7 +68,7 @@ echo "$H Possible failures in $FILES"
 cat $FILES 2> /dev/null | \
     sed '/undefined reference to .timer_create./,/building .zmq.libzmq. extension/d' |
     egrep --color=always \
-        '(fatal:| error:|^\*\*\*|dpkg:.*error|no space left on device|Depends: [^ ]* but it is not|E: An unexpected failure occurred)' |
+        '(fatal:| error:|^\*\*\*|dpkg:.*error|no space left on device|Depends: [^ ]* but it is not|E: An unexpected failure occurredi|hunks FAILED -- saving)' |
     egrep -v '(Linking the executable xfrmi|libstrongswan-kernel-netlink.so is not portable|unable to read /etc/init.d/iperf3|/usr/sbin/grub-probe|bash-completion-test-subject.deb|NOTE: Filtering of link-warnings enabled)'
 echo $H
 
