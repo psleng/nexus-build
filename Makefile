@@ -44,16 +44,18 @@ help:
 	@echo
 	@echo 'There are various clean targets.  From most to least destructive:'
 	@echo
-	@echo 'make spotless       # like "make clean containerclean"'
-	@echo 'make clean          # like "make mostlyclean" but also images/'
-	@echo 'make mostlyclean    # clean build artifacts'
-	@echo 'make containerclean # remove build container image.'
+	@echo 'make spotless        # like "make clean containerclean"'
+	@echo 'make clean           # like "make mostlyclean" but also images/'
+	@echo 'make mostlyclean     # clean build artifacts'
+	@echo 'make containerclean  # remove build container image.'
 	@echo
-	@echo 'make sdcard         # flash sdcard with the built image'
-	@echo 'make sdcard-squashfs# flash sdcard with squash image in ./iso-images<buildtype/stage-iso'
-#	@echo 'make live-iso       # create iso in ./iso-images/<buildtype>'
-	@echo 'make dfuimg         # create DFU images to \"dfu-images\" folder'
-	@echo 'make prod-image     # create 16G emmc and boot images in ./iso-images/<buildtype>'
+	@echo 'After "make all", the following will create a bootable image:'
+	@echo
+	@echo 'make sdcard          # flash sdcard with the built image'
+	@echo 'make sdcard-squashfs # flash sdcard with squash image in ./iso-images/<buildtype>/stage-iso'
+#	@echo 'make live-iso        # create iso in ./iso-images/<buildtype>'
+	@echo 'make dfuimg          # create DFU images to "dfu-images" folder'
+	@echo 'make prod-image      # create 16G emmc and boot images in ./iso-images/<buildtype>'
 	@echo
 	@if [ -s "$(DEFS)" ]; then \
 	    echo "The current build settings ($(DEFS)) are:"; \
