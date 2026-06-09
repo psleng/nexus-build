@@ -11,7 +11,7 @@ for d in $LIB_ORDER; do
     if [ -d "$d" ] && [ -f "$d/debian/control" ]; then
         (
             cd "$d"
-            sudo mk-build-deps --install --tool "apt-get --yes --allow-unauthenticated --no-install-recommends"
+            sudo mk-build-deps --install --tool "apt-get --yes --no-install-recommends"
             dpkg-buildpackage -uc -us -tc -b
             python3 ../update_local_repo.py ..
         )
@@ -27,7 +27,7 @@ for d in */ ; do
     if [ -d "$d" ] && [ -f "$d/debian/control" ]; then
         (
             cd "$d"
-            sudo mk-build-deps --install --tool "apt-get --yes --allow-unauthenticated --no-install-recommends"
+            sudo mk-build-deps --install --tool "apt-get --yes --no-install-recommends"
             dpkg-buildpackage -uc -us -tc -b
         )
     fi
