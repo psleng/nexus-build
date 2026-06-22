@@ -20,6 +20,11 @@
 ARG ARCH=
 FROM ${ARCH}debian:bookworm-slim
 
+# Rewrite ALL Debian sources (list + sources files)
+RUN find /etc/apt -type f \( -name "*.list" -o -name "*.sources" \) \
+    -exec sed -i 's|http://deb.debian.org|https://deb.debian.org|g' {} +
+
+
 RUN grep "VERSION_ID" /etc/os-release || (echo 'VERSION_ID="12"' >> /etc/os-release)
 
 # It is also possible to emulate an arm system inside docker,
