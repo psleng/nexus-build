@@ -24,6 +24,7 @@ FROM ${ARCH}debian:bookworm-slim
 RUN find /etc/apt -type f \( -name "*.list" -o -name "*.sources" \) \
     -exec sed -i 's|http://deb.debian.org|https://deb.debian.org|g' {} +
 
+RUN echo "nameserver 1.1.1.1" > /etc/resolv.conf
 
 
 RUN grep "VERSION_ID" /etc/os-release || (echo 'VERSION_ID="12"' >> /etc/os-release)
