@@ -65,7 +65,7 @@ if [ "$BUILDTARG" != "x86_64" ]; then
     DARGS='--build-arg ARCH=arm64v8/ --platform linux/arm64'
 fi
 
-docker build -t $IMGNAME docker $DARGS --no-cache
+docker build --dns=1.1.1.1 --dns=8.8.8.8 -t $IMGNAME docker $DARGS --no-cache
 st=$?
 resetqemu
 exit $st
