@@ -1,0 +1,17 @@
+[[packages]]
+name = "OpenSC"
+commit_id = "debian/0.27.1-1^{}"
+scm_url = "https://salsa.debian.org/opensc-team/opensc.git"
+build_cmd = "echo 'usr/share/p11-kit/modules/opensc.module' >> debian/opensc-pkcs11.install && dpkg-buildpackage -uc -us -tc -b"
+
+[[packages]]
+name = "tpm2-pkcs11"
+commit_id = "debian/1.9.1-0.2"
+scm_url = "https://salsa.debian.org/debian/tpm2-pkcs11.git"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
+
+[[packages]]
+name = "libengine-pkcs11-openssl"
+commit_id = "debian/1.2.0-1"
+scm_url = "https://salsa.debian.org/debian/pkcs11-provider.git"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"

@@ -1,0 +1,5 @@
+[[packages]]
+name = "OpenSC"
+commit_id = "debian/0.27.1-1^{}"
+scm_url = "https://salsa.debian.org/opensc-team/opensc.git"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
