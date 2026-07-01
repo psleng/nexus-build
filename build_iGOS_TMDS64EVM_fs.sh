@@ -66,25 +66,25 @@ export EMAIL="psleng@perle.com"
 TSK=package-build
 BLT=.filesystem.$TSK.built
 
-#if [ ! -f "$BLT" ]; then
-#    echo "=== I: $0: package-build.py $TSK BEGIN"
-#    ./package-build.py --dir $TSK --include salt vpp \
-#        ethtool telegraf owamp net-snmp frr frr_exporter isc-kea strongswan \
-#        openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
-#        podman ddclient dropbear hostap kea keepalived netfilter \
-#        pmacct radvd isc-dhcp ndppd hsflowd pyhumps bash-completion \
-#        udp-broadcast-relay libhtp
-#    touch "$BLT" # build success
-#else
-#    echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
-#fi
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
-    ./package-build.py --dir $TSK --include libhtp
+    ./package-build.py --dir $TSK --include salt vpp \
+        ethtool telegraf owamp net-snmp frr frr_exporter isc-kea strongswan \
+        openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
+        podman ddclient dropbear hostap kea keepalived netfilter \
+        pmacct radvd isc-dhcp ndppd hsflowd pyhumps bash-completion \
+        udp-broadcast-relay libhtp
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
 fi
+#if [ ! -f "$BLT" ]; then
+#    echo "=== I: $0: package-build.py $TSK BEGIN"
+#    ./package-build.py --dir $TSK --include libhtp
+#    touch "$BLT" # build success
+#else
+#    echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
+#fi
 
 ############## package-build-iGOS
 # This will populate ./vyos-build/scripts/package-build-iGOS/
