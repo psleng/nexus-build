@@ -65,7 +65,6 @@ export EMAIL="psleng@perle.com"
 # This will populate ./vyos-build/scripts/package-build/
 TSK=package-build
 BLT=.filesystem.$TSK.built
-
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir $TSK --include salt vpp \
@@ -78,13 +77,7 @@ if [ ! -f "$BLT" ]; then
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
 fi
-#if [ ! -f "$BLT" ]; then
-#    echo "=== I: $0: package-build.py $TSK BEGIN"
-#    ./package-build.py --dir $TSK --include libhtp
-#    touch "$BLT" # build success
-#else
-#    echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
-#fi
+
 
 ############## package-build-iGOS
 # This will populate ./vyos-build/scripts/package-build-iGOS/
@@ -227,8 +220,8 @@ if [ ! -f "$BLT" ]; then
             *) echo "=== E: unknown BUILDTYPE: $BUILDTYPE" >&2; exit 1 ;;
         esac
     fi
-    export VYOS1X_REPO_URL=${VYOS1X_REPO_URL:-https://github.com/psleng/vyos-1x}
-    export VYOS1X_REPO_BRANCH=${VYOS1X_REPO_BRANCH:-vyos-1x-jf}
+    export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
+    export VYOS1X_REPO_BRANCH=psl-master
     sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
         ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
     cd -
