@@ -39,7 +39,7 @@ def findup(targ: str) -> (Path | None):
     return None
 
 
-def merge_from_upstream(dpkg: dict) -> (str | None):
+def merge_from_upstream(dpkg: dict, warnings: list[str]) -> (str | None):
     '''
     Do the merge from upstream work.
     '''
@@ -98,18 +98,29 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
             print(f' I: toml suggests {branch} as upstream branch')
         r = run(['git', 'branch', '--list', '--remotes'],
                 capture_output=True, check=True)
-        if f'upstream/{branch}' not in r.stdout.decode():
+        branches = set([x.split()[-1] for x in r.stdout.decode().split('\n')
+                        if x])
+        if f'upstream/{branch}' not in branches:
             # Use existing psleng branch if upstream has it
             print(f' I: Cannot find upstream/{branch}')
             r = run(['git', 'branch', '--show-current'],
                     capture_output=True, check=True)
             branch = r.stdout.decode().strip()
-            if branch == 'psl-master':
-                # Will not exist upstream.  Pick master or first upstream.
-                upstreams = os.listdir('.git/refs/remotes/upstream')
+            upstreams = [b for b in branches if b.startswith('upstream')]
+            if f'upstream/{branch}' not in upstreams:
+                # Try to find something reasonable upstream
                 print(f' I: available upstream branches: {upstreams}')
                 if 'master' in upstreams:
                     branch = 'master'
+                elif 'upstream/rolling' in upstreams:
+                    # This means we have no sensible upstream to work with.
+                    # This happened after VyOS renamed the "current"
+                    # branch to "rolling" for some repos for VyOS 1.5.
+                    branch = 'rolling'
+                    print(' W: FALLING BACK TO ROLLING!')
+                    warnings.append(f'W: {name}: no good upstream found.\n'
+                                    f'   Used {branch} for now for testing.'
+                                    f'   Do NOT push this repo!')
                 else:
                     branch = upstreams[0]
             print(f' I: Using {branch} as the upstream')
@@ -117,15 +128,19 @@ def merge_from_upstream(dpkg: dict) -> (str | None):
         # Make the branch if not already in place
         if not Path(f'.git/refs/heads/{branch}').exists():
             print(f' I: No "{branch}" branch; making it')
-            r = run(['git', 'checkout', '-q',
-                     '--track', f'origin/{branch}'],
-                    capture_output=True)
-            dump('  N:', r)
-            if r.returncode:
-                branch = dpkg.get('upstream_branch', 'current')
-                print(f' I: Failed; falling back to {branch}')
+            obranch = f'origin/{branch}'
+            if obranch not in branches:
+                print(f' W: No "{obranch}, cannot make a local branch')
+                obranch = 'origin/origbranch'
+                print(f' W: Falling back to existing "{obranch}"')
             else:
-                origbranch = branch
+                r = run(['git', 'checkout', '-q',
+                        '--track', obranch],
+                        capture_output=True)
+                dump('  N:', r)
+                if r.returncode:
+                    branch = dpkg.get('upstream_branch', 'current')
+                    print(f' I: Failed; falling back to {branch}')
 
         if branch == 'psl-master':
             # No branch found
@@ -191,6 +206,7 @@ def do_merge() -> None:
 
     # Try to merge from upstream all the repos listed in the packages
     workdirs = []
+    warnings: list[str] = []
     for pkg in igos_pkgs:
         print(f'\nI: Processing {pkg}')
 
@@ -203,7 +219,7 @@ def do_merge() -> None:
         toml = tomli.load(open(pkgtoml, 'rb'))
         pkgs: dict = toml['packages']
         for dpkg in pkgs:
-            d = merge_from_upstream(dpkg)
+            d = merge_from_upstream(dpkg, warnings)
             if d:
                 workdirs.append(d)
 
@@ -226,11 +242,11 @@ def do_merge() -> None:
          'commit_id': 'current'},
         {'name': 'vyconf',
          'scm_url': 'git@github.com:psleng/vyconf',
-         'commit_id': 'master'}
+         'commit_id': 'current'}
     )
     for dpkg in extrapkgs:
         print(f'\nI: Processing {dpkg["name"]}')
-        d = merge_from_upstream(dpkg)
+        d = merge_from_upstream(dpkg, warnings)
         if d:
             workdirs.append(d)
 
@@ -291,6 +307,12 @@ def do_merge() -> None:
             for i in topush:
                 print(f'\t{os.path.basename(i)}', file=fp)
             print(textwrap.dedent(txt), file=fp)
+            if warnings:
+                print('\n** WARNING WARNING WARNING WARNING **', file=fp)
+                print('The following warnings occurred which means you MUST\n'
+                      'fix the underlying issues and try again:\n', file=fp)
+                for w in warnings:
+                    print(w, file=fp)
         # Echo that stdout
         with open(TODO) as fp:
             print(fp.read())
