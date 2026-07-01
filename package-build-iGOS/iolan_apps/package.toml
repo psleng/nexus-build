@@ -1,0 +1,35 @@
+[[packages]]
+name = "iolan_apps"
+scm_url = "git@github.com:Perle-Systems-Limited/iolan_apps.git"
+commit_id = "psl-master"
+build_cmd = """
+set -e
+
+LIB_ORDER="lib libjsonparse libsslperle libpamperle"
+
+for d in $LIB_ORDER; do
+    if [ -d "$d" ] && [ -f "$d/debian/control" ]; then
+        (
+            cd "$d"
+            sudo mk-build-deps --install --tool "apt-get --yes --no-install-recommends"
+            dpkg-buildpackage -uc -us -tc -b
+            python3 ../update_local_repo.py ..
+        )
+    fi
+done
+
+for d in */ ; do
+    d="${d%/}"
+
+    case "$d" in
+        lib*) continue ;;
+    esac
+    if [ -d "$d" ] && [ -f "$d/debian/control" ]; then
+        (
+            cd "$d"
+            sudo mk-build-deps --install --tool "apt-get --yes --no-install-recommends"
+            dpkg-buildpackage -uc -us -tc -b
+        )
+    fi
+done
+"""
