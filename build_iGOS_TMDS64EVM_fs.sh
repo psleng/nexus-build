@@ -37,6 +37,7 @@ fi
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
     git clone -b psl-master --single-branch "$REPO_URL"
+#    git clone -b vyos-build-jf --single-branch "$REPO_URL"
 fi
 
 # Copy package-build-iGOS/ to vyos-build/scripts/ now that it's there
@@ -287,8 +288,17 @@ if [ ! -f "$BLT" ]; then
     sudo cp updates/perle-init.service $FS/lib/systemd/system
     sudo ln -s /lib/systemd/system/perle-init.service $FS/etc/systemd/system/multi-user.target.wants/perle-init.service
     sudo cp updates/perle-init.sh $FS/usr/bin
-    sudo cp -rf updates/model-info $FS/usr/share/vyos/
-    sudo cp -rf updates/product.env $FS/etc/
+    # NOTE: model-info (default-config/cli-remove) is no longer installed here.
+    # Per-model definitions now live in vyos-build data/models/<platform>/<name>/
+    # and are resolved at boot by vyos.system.model (see vyos-1x
+    # src/init/vyos-router). The old placeholder configs were removed.
+    #
+    # NOTE: /etc/product.env is intentionally NOT shipped here anymore. Board
+    # identity comes from the EEPROM text blob that U-Boot injects onto the
+    # kernel cmdline (prod_id=/model=), with /mnt/efi/product.env as the runtime
+    # fallback. Copying a hardcoded updates/product.env stamped every image as a
+    # single SKU (IOLAN-2A01), so boards without an EEPROM (e.g. the EVM)
+    # misidentified. The build must not bake a fixed identity into the FS.
 
     if [ "$BUILDTYPE" = "bookworm-am64xx-iolan" ]; then
         # Copy for early-gpio-init service
