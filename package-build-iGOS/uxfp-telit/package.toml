@@ -1,0 +1,26 @@
+[[packages]]
+name = "uxfp-telit"
+commit_id = "main"
+scm_url = "git@github.com:Perle-Systems-Limited/uxfp-telit.git"
+
+# The actual autotools source + packaging is nested several levels below the
+# repo (clone) root:
+#     uxfp_1.14.5-0_source/uxfp-1.14.5-0/          <- source root
+#     uxfp_1.14.5-0_source/uxfp-1.14.5-0/deb/debian <- packaging
+# so we cd into the source root, then symlink deb/debian -> debian (where
+# dpkg-buildpackage looks), then build.  The resulting .deb lands one level up
+# in uxfp_1.14.5-0_source/.
+#
+# NOTE: build dependencies (libudev-dev, libusb-1.0-0-dev) are assumed to be
+# already present in the build container.  We deliberately do NOT run
+# mk-build-deps here: it installs packages into the shared container, which
+# would affect other users' builds.
+build_cmd = '''
+set -e
+
+cd uxfp_1.14.5-0_source/uxfp-1.14.5-0
+
+ln -sfn deb/debian debian
+
+dpkg-buildpackage -uc -us -tc -b
+'''
