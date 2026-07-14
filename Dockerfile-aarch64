@@ -274,7 +274,6 @@ RUN pip --no-cache --no-cache-dir install --break-system-packages \
       python3-protobuf \
       python3-tabulate \
       python3-zmq \
-      python3-vici \
       python3-fastapi \
       python3-pyudev \
       python3-systemd \
