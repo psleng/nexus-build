@@ -238,9 +238,9 @@ RUN apt-get update && apt-get install -y \
       build-essential
 RUN gem install --no-document fpm
 
-# Add vyos package repo
+# Add vyos package repo (repointed to Perle psleng.github.io; key is the Perle key)
 COPY vyos-dev.list /etc/apt/sources.list.d/vyos-dev.list
-COPY vyos-dev.key /usr/share/keyrings/vyos-dev-archive-keyring.asc
+COPY psleng.key /usr/share/keyrings/vyos-dev-archive-keyring.asc
 
 # Packages needed for vyos-1x
 RUN pip --no-cache --no-cache-dir install --break-system-packages \
@@ -281,6 +281,7 @@ RUN pip --no-cache --no-cache-dir install --break-system-packages \
       python3-pam \
       python3-dbus \
       python3-pyroute2 \
+      python3-vici \
       python3-voluptuous \
       pylint \
       quilt \
