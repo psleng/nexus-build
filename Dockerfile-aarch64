@@ -241,6 +241,9 @@ RUN gem install --no-document fpm
 # Add vyos package repo (repointed to Perle psleng.github.io; key is the Perle key)
 COPY vyos-dev.list /etc/apt/sources.list.d/vyos-dev.list
 COPY psleng.key /usr/share/keyrings/vyos-dev-archive-keyring.gpg
+# PSL: pin psleng below Debian so it only supplies packages Debian lacks (e.g. python3-vici)
+# and never shadows Debian base libs (e.g. libnftnl11) during build-dep installs.
+RUN printf 'Package: *\nPin: origin "psleng.github.io"\nPin-Priority: 100\n' > /etc/apt/preferences.d/psleng
 
 # Packages needed for vyos-1x
 RUN pip --no-cache --no-cache-dir install --break-system-packages \
