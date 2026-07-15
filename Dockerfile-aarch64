@@ -524,10 +524,13 @@ RUN apt-get update && apt-get install -y \
       asciidoc-base
 
 # Packages needed for iolan
+# libusb-1.0-0-dev is a build-dep of uxfp-telit (Telit modem firmware tool);
+# libudev-dev (its other build-dep) is already installed in the QAT section above.
 RUN apt-get update && apt-get install -y \
       libc6-dev \
       ppp-dev \
-      libnetfilter-queue-dev
+      libnetfilter-queue-dev \
+      libusb-1.0-0-dev
 
 # Allow password-less 'sudo' for all users in group 'sudo'
 RUN sed "s/^%sudo.*/%sudo\tALL=(ALL) NOPASSWD:ALL/g" -i /etc/sudoers && \
