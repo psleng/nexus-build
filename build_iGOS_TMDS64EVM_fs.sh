@@ -128,6 +128,8 @@ if [ ! -f "$BLT" ]; then
             ;;
         *libvppinfra-dev*)  # Needed for vpp and vyos-1x
             ;;
+        *libnftnl-dev*)  # Needed for keepalived in Docker build
+            ;;
         *vpp-dev_*64.deb)  # Needed for vpp and vyos-1x
             ;;
         *isc-kea-doc*)  # isc-kea insists on this
