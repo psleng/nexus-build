@@ -238,7 +238,6 @@ RUN apt-get update && apt-get install -y \
       build-essential
 RUN gem install --no-document fpm
 
-<<<<<<< HEAD
 # PSL: Perle package repo (psleng.github.io) — single source, added early so python3-vici
 # resolves during the vyos-1x package install below. No VyOS repo lists; everything is Perle.
 COPY psleng.key /etc/apt/keyrings/psleng.key
@@ -246,12 +245,6 @@ RUN echo "deb [signed-by=/etc/apt/keyrings/psleng.key] https://psleng.github.io 
 # PSL: pin psleng below Debian so it only supplies packages Debian lacks (e.g. python3-vici)
 # and never shadows Debian base libs (e.g. libnftnl11) during build-dep installs.
 RUN printf 'Package: *\nPin: origin "psleng.github.io"\nPin-Priority: 100\n' > /etc/apt/preferences.d/psleng
-=======
-# Add psleng package repo
-# PSL: Install apt pubkey and sources.list.d file for psleng.github.io
-RUN echo "deb [signed-by=/etc/apt/keyrings/psleng.key] https://psleng.github.io current main" >> /etc/apt/sources.list.d/psleng.list
-COPY psleng.key /etc/apt/keyrings/
->>>>>>> origin/psl-master
 
 # Packages needed for vyos-1x
 RUN pip --no-cache --no-cache-dir install --break-system-packages \
@@ -566,11 +559,8 @@ RUN printf "set mouse=\nset ttymouse=\n" > /etc/vim/vimrc.local
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
-<<<<<<< HEAD
 # PSL: psleng.github.io repo + key are configured earlier (before the first apt install); nothing to do here.
 
-=======
->>>>>>> origin/psl-master
 # PSL: Extend secure_path for sudo
 RUN sudo sed -i 's|Defaults\s\+secure_path=\"\(.*\)\"|Defaults secure_path=\"\1:/opt/go/bin\"|' /etc/sudoers
 
