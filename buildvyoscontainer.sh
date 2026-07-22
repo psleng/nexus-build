@@ -22,23 +22,6 @@ if [ ! -d vyos-build ]; then
 #    git clone -b vyos-build-jf --single-branch https://github.com/psleng/vyos-build
 fi
 
-if docker image inspect $IMGNAME > /dev/null 2>&1; then
-    # Docker image exists, but is it up to date?
-    P=$(basename $0)
-    if $ROOTDIR/bin/checkDockerImageUptodate.py $IMGNAME \
-            Dockerfile-$ARCH vyos-build/docker/entrypoint.sh
-    then
-        echo "$P: $IMGNAME exists and is up to date; skipping rebuild."
-        echo "$P: To force a rebuild type:"
-        echo "    docker image rm $IMGNAME"
-        exit 0
-    else
-        echo "$P: $IMGNAME exists but is obsolete; rebuilding."
-        docker image rm $IMGNAME
-        docker system prune -f
-    fi
-fi
-
 cd vyos-build
 
 DF=${ROOTDIR}/Dockerfile-$ARCH
@@ -66,7 +49,7 @@ if [ "$BUILDTARG" != "x86_64" ]; then
     DARGS='--build-arg ARCH=arm64v8/ --platform linux/arm64'
 fi
 
-docker build -t $IMGNAME docker $DARGS --no-cache
+docker build -t $IMGNAME docker $DARGS
 st=$?
 resetqemu
 exit $st
