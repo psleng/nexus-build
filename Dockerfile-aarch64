@@ -238,10 +238,13 @@ RUN apt-get update && apt-get install -y \
       build-essential
 RUN gem install --no-document fpm
 
-# Add psleng package repo
-# PSL: Install apt pubkey and sources.list.d file for psleng.github.io
-RUN echo "deb [signed-by=/etc/apt/keyrings/psleng.key] https://psleng.github.io current main" >> /etc/apt/sources.list.d/psleng.list
-COPY psleng.key /etc/apt/keyrings/
+# PSL: Perle package repo (psleng.github.io) — single source, added early so python3-vici
+# resolves during the vyos-1x package install below. No VyOS repo lists; everything is Perle.
+COPY psleng.key /etc/apt/keyrings/psleng.key
+RUN echo "deb [signed-by=/etc/apt/keyrings/psleng.key] https://psleng.github.io current main" > /etc/apt/sources.list.d/psleng.list
+# PSL: pin psleng below Debian so it only supplies packages Debian lacks (e.g. python3-vici)
+# and never shadows Debian base libs (e.g. libnftnl11) during build-dep installs.
+RUN printf 'Package: *\nPin: origin "psleng.github.io"\nPin-Priority: 100\n' > /etc/apt/preferences.d/psleng
 
 # Packages needed for vyos-1x
 RUN pip --no-cache --no-cache-dir install --break-system-packages \
@@ -275,7 +278,6 @@ RUN pip --no-cache --no-cache-dir install --break-system-packages \
       python3-protobuf \
       python3-tabulate \
       python3-zmq \
-      python3-vici \
       python3-fastapi \
       python3-pyudev \
       python3-systemd \
@@ -283,6 +285,7 @@ RUN pip --no-cache --no-cache-dir install --break-system-packages \
       python3-pam \
       python3-dbus \
       python3-pyroute2 \
+      python3-vici \
       python3-voluptuous \
       pylint \
       quilt \
@@ -521,10 +524,13 @@ RUN apt-get update && apt-get install -y \
       asciidoc-base
 
 # Packages needed for iolan
+# libusb-1.0-0-dev is a build-dep of uxfp-telit (Telit modem firmware tool);
+# libudev-dev (its other build-dep) is already installed in the QAT section above.
 RUN apt-get update && apt-get install -y \
       libc6-dev \
       ppp-dev \
-      libnetfilter-queue-dev
+      libnetfilter-queue-dev \
+      libusb-1.0-0-dev
 
 # Allow password-less 'sudo' for all users in group 'sudo'
 RUN sed "s/^%sudo.*/%sudo\tALL=(ALL) NOPASSWD:ALL/g" -i /etc/sudoers && \
@@ -552,6 +558,8 @@ RUN apt-get update
 RUN printf "set mouse=\nset ttymouse=\n" > /etc/vim/vimrc.local
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# PSL: psleng.github.io repo + key are configured earlier (before the first apt install); nothing to do here.
 
 # PSL: Extend secure_path for sudo
 RUN sudo sed -i 's|Defaults\s\+secure_path=\"\(.*\)\"|Defaults secure_path=\"\1:/opt/go/bin\"|' /etc/sudoers
