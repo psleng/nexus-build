@@ -65,7 +65,7 @@ ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
     # to copy to another image's /boot/dtb that uboot needs to access
     sudo rm -rf $STAGE_ISO/boot/dtb
     sudo mkdir -p $STAGE_ISO/boot/dtb
-    sudo cp -R $ROOTFS/usr/lib/linux-image*/ti $STAGE_ISO/boot/dtb
+    sudo cp -R $ROOTFS/usr/lib/linux-image*/* $STAGE_ISO/boot/dtb
 
     SQUASHFILE=$STAGE_ISO/live/filesystem.squashfs
     # now we need to squash everthing back to the /live/filesystem.squashfs and zap the rest of the rootfs

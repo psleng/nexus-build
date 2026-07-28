@@ -195,7 +195,7 @@ if [ ! -f "$BLT" ]; then
         cd ${ROOTDIR}
         if [ "$BUILDTYPE" = "bookworm-am64xx-evm" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
-        elif [ "$BUILDTYPE" = "bookworm-am64xx-iolan" ]; then
+        elif [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*64*.deb $ROOTDIR/vyos-build/packages/
         elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then
             ln -vrfs debian-repos/build/$DEB_SUITE/ti-linux-firmware/*j7200*.deb $ROOTDIR/vyos-build/packages/
@@ -231,7 +231,7 @@ if [ ! -f "$BLT" ]; then
         BUILDFLAVOUR=generic
     else
         case "$BUILDTYPE" in
-            bookworm-am64xx-iolan) BUILDFLAVOUR=igos-am64x-all ;;
+            bookworm-am64xx-igos)  BUILDFLAVOUR=igos-am64x-all ;;
             bookworm-am64xx-evm)   BUILDFLAVOUR=igos-am64x-evm ;;
             bookworm-j7200-evm)    BUILDFLAVOUR=igos-j7200-evm ;;
             *) echo "=== E: unknown BUILDTYPE: $BUILDTYPE" >&2; exit 1 ;;
@@ -288,7 +288,7 @@ if [ ! -f "$BLT" ]; then
 
     # -rm -rf $FS/boot/grub
     sudo mkdir $FS/boot/dtb
-    sudo cp -R $FS/usr/lib/linux-image*/ti $FS/boot/dtb
+    sudo cp -R $FS/usr/lib/linux-image*/* $FS/boot/dtb
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
     ## For debugging: stash the unsullied rootfs for later diffing via:
@@ -316,7 +316,7 @@ if [ ! -f "$BLT" ]; then
     # single SKU (IOLAN-2A01), so boards without an EEPROM (e.g. the EVM)
     # misidentified. The build must not bake a fixed identity into the FS.
 
-    if [ "$BUILDTYPE" = "bookworm-am64xx-iolan" ]; then
+    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
         # Copy for early-gpio-init service
 #        sudo cp updates/perle_gpio_map.py $FS/usr/local/bin
 #        sudo cp updates/perle_gpioctl.py $FS/usr/local/bin
