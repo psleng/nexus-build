@@ -22,7 +22,7 @@ if [[ "$BUILDTYPE" == "bookworm-am64xx-evm" ]]; then
 elif [[ "$BUILDTYPE" == "bookworm-j7200-evm" ]]; then
     UENVFILE="$ROOTDIR/updates/uEnv/uEnv-j72x-evm.txt"
 else
-    UENVFILE="$ROOTDIR/updates/uEnv/uEnv-iolan.txt"
+    UENVFILE="$ROOTDIR/updates/uEnv/uEnv-igos.txt"
     SPLOFFSET=0x700
     UBOOTOFFSET=0x1000
     BOOTIMGSIZE_MB=4
