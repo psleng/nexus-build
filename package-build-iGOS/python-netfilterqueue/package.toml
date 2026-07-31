@@ -1,0 +1,5 @@
+[[packages]]
+name = "python-netfilterqueue"
+commit_id = "debian/latest"
+scm_url = "https://salsa.debian.org/python-team/packages/python-netfilterqueue.git"
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
