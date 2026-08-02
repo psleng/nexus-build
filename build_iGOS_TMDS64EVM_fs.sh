@@ -40,21 +40,9 @@ if [ ! -d "$REPO_NAME" ]; then
     git clone -b vyos-build-jf --single-branch "$REPO_URL"
 fi
 
-# Copy package-build-iGOS/ to vyos-build/scripts/ now that it's there
-SRCDIR=package-build-iGOS
-DSTDIR=vyos-build/scripts/
-if [ ! -d $DSTDIR/$SRCDIR ]; then
-    echo "=== I: $0: Copying $ROOTDIR/$SRCDIR into $DSTDIR"
-    cp -rf $SRCDIR $DSTDIR
-    echo "These files were copied from $ROOTDIR/$SRCDIR" > $DSTDIR/$SRCDIR/README-PSL
-    # Borrow the vyos-build build.py if package-build-iGOS had none
-    BUILDPY=$DSTDIR/$SRCDIR/build.py
-    if [ ! -f $BUILDPY ]; then
-        echo "=== I: $0: Symlink VyOS build.py to $BUILDPY"
-        ln -rvfs $DSTDIR/package-build/build.py $BUILDPY
-    fi
-    unset BUILDPY
-fi
+# package-build-iGOS/ is now committed natively in vyos-build (scripts/package-build-iGOS/,
+# including its top-level build.py symlink), so it arrives with the clone above and no
+# longer needs to be copied in here.
 
 # Install build_flavor
 cp -f $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/
