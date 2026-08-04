@@ -66,7 +66,7 @@ help:
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 
 #IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit'
-IGOS_PKGS='python-netfilterqueue igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
+IGOS_PKGS='python3-netfilterqueue igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            ipaddrcheck hvinfo libgpiod modemmanager uxfp-telit\
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
