@@ -43,7 +43,7 @@ date
 #TARGS='targ-ti-j7200 targ-ti-am64x targ-perle-iolan'
 # 20260420: do not bother with 7200 for now and build am64x last since
 #           it is still the most in use.
-TARGS='targ-perle-iolan targ-ti-am64x'
+TARGS='targ-perle-igos targ-ti-am64x'
 for T in $TARGS
 do
     echo "=== I: Starting $T iGOS build at $(date)..."
