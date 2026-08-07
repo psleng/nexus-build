@@ -8,7 +8,8 @@ if [ ! -d $TI ]; then
     echo "I: Cloning $TI"
     # Get the latest.  The older x86/qemu code was mostly based on the tag
     # '10.00.07-release' (and 'psl-x86-qemu-20241202')
-    git clone https://github.com/psleng/$TI.git
+    #git clone https://github.com/psleng/$TI.git
+    git clone -b ti-bdebstrap-jf --single-branch https://github.com/psleng/$TI.git
     if [ $? != 0 ]; then
         echo "E: Cloning failed!"
         exit 1
