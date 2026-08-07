@@ -40,21 +40,9 @@ if [ ! -d "$REPO_NAME" ]; then
 #    git clone -b vyos-build-jf --single-branch "$REPO_URL"
 fi
 
-# Copy package-build-iGOS/ to vyos-build/scripts/ now that it's there
-SRCDIR=package-build-iGOS
-DSTDIR=vyos-build/scripts/
-if [ ! -d $DSTDIR/$SRCDIR ]; then
-    echo "=== I: $0: Copying $ROOTDIR/$SRCDIR into $DSTDIR"
-    cp -rf $SRCDIR $DSTDIR
-    echo "These files were copied from $ROOTDIR/$SRCDIR" > $DSTDIR/$SRCDIR/README-PSL
-    # Borrow the vyos-build build.py if package-build-iGOS had none
-    BUILDPY=$DSTDIR/$SRCDIR/build.py
-    if [ ! -f $BUILDPY ]; then
-        echo "=== I: $0: Symlink VyOS build.py to $BUILDPY"
-        ln -rvfs $DSTDIR/package-build/build.py $BUILDPY
-    fi
-    unset BUILDPY
-fi
+# package-build-iGOS/ is now committed natively in vyos-build (scripts/package-build-iGOS/,
+# including its top-level build.py symlink), so it arrives with the clone above and no
+# longer needs to be copied in here.
 
 # Install build_flavor
 cp -f $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/
@@ -287,8 +275,12 @@ if [ ! -f "$BLT" ]; then
     sudo unsquashfs -d $FS $ISO_DIR/live/filesystem.squashfs
 
     # -rm -rf $FS/boot/grub
-    sudo mkdir $FS/boot/dtb
-    sudo cp -R $FS/usr/lib/linux-image*/* $FS/boot/dtb
+    # DTBs: pull the CURATED set from the vyos-build ISO's own /boot/dtb (staged by
+    # the 26-igos-dtb.binary hook) instead of re-deriving the uncurated set from the
+    # kernel package (usr/lib/linux-image*). Keeps the flat fs byte-consistent with
+    # the ISO and lets vyos-build own dtb curation.
+    sudo mkdir -p $FS/boot/dtb
+    sudo cp -R $ISO_DIR/boot/dtb/. $FS/boot/dtb/
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
     ## For debugging: stash the unsullied rootfs for later diffing via:
