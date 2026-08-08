@@ -1,7 +1,0 @@
-[[packages]]
-name = "ssh-tpm-agent"
-commit_id = "psl-master"
-scm_url = "https://github.com/psleng/ssh-tpm-agent"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"
-scm_url_upstream = "https://github.com/Foxboron/ssh-tpm-agent"
-upstream_branch = "master"

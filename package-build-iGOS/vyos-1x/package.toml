@@ -1,5 +1,0 @@
-[[packages]]
-name = "vyos-1x"
-commit_id = "vyos-1x-jf"
-scm_url = "https://github.com/psleng/vyos-1x.git"
-build_cmd = "../brand.sh && dpkg-buildpackage -uc -us -tc -b"
