@@ -315,7 +315,7 @@ if [ ! -f "$BLT" ]; then
 #        sudo cp updates/early-gpio-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/early-gpio-init.service $FS/etc/systemd/system/sysinit.target.wants/early-gpio-init.service
 
-        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
+#        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
 #        sudo cp updates/rtc-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/rtc-init.service $FS/etc/systemd/system/sysinit.target.wants/rtc-init.service
     fi
