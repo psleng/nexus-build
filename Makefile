@@ -157,7 +157,9 @@ else
 endif
 
 # Build the root filesystem
+# Due to backport requirement, openssh runs in separate docker instance to avoid package issues like removing kpartx
 $(FS_TARG): $(UBOOT_TARG)
+	@$(call DOCKRUN,openssh,./build_iGOS_openssh_fs.sh)
 	@$(call DOCKRUN,filesystem,./build_iGOS_TMDS64EVM_fs.sh)
 
 # Create a uSDcard image
