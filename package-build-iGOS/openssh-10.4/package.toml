@@ -1,0 +1,33 @@
+[[packages]]
+name = "libwtmpdb-dev"
+commit_id = "80cb8550461fa568f55f6810d57b85b93137e198"
+scm_url = "https://salsa.debian.org/debian/wtmpdb.git"
+pre_build_hook = "sudo apt-get install -y -t bookworm-backports debputy dh-package-notes"
+build_cmd = "meson setup build; meson compile -C build; dpkg-buildpackage -uc -us -tc -b"
+
+[[packages]]
+name = "openssh"
+commit_id = "c15ceafbfa7c8da5413a20d8961cc3c87504008d"
+scm_url = "https://salsa.debian.org/ssh-team/openssh.git"
+pre_build_hook = """
+    sudo apt-get -y -t bookworm-backports install debhelper
+    sudo apt-get install -y ../libwtmpdb0_*.deb ../libwtmpdb-dev_*.deb
+"""
+build_cmd = "dpkg-buildpackage -uc -us -tc -b"
+
+# must build /libwtmpdb-dev and install 2 of the .debs as part of fulfilling a prerequisite
+# this is accomplished in the above pre_build_hook, rather than dependencies, since it is only available on trixie and newer and not through apt
+[dependencies]
+packages = [
+    "libssl-dev",
+    "dh-exec",
+    "dh-runit",
+    "docbook-xsl-ns",
+    "systemd-dev",
+    "runit-helper",
+    "libaudit-dev",
+    "libedit-dev",
+    "libfido2-dev",
+    "libgtk-3-dev",
+    "libwrap0-dev",
+]
