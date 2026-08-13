@@ -308,17 +308,17 @@ if [ ! -f "$BLT" ]; then
     # single SKU (IOLAN-2A01), so boards without an EEPROM (e.g. the EVM)
     # misidentified. The build must not bake a fixed identity into the FS.
 
-    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
+#    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
         # Copy for early-gpio-init service
 #        sudo cp updates/perle_gpio_map.py $FS/usr/local/bin
 #        sudo cp updates/perle_gpioctl.py $FS/usr/local/bin
 #        sudo cp updates/early-gpio-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/early-gpio-init.service $FS/etc/systemd/system/sysinit.target.wants/early-gpio-init.service
 
-        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
+#        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
 #        sudo cp updates/rtc-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/rtc-init.service $FS/etc/systemd/system/sysinit.target.wants/rtc-init.service
-    fi
+#    fi
 
     # add EFI (FAT) mount point /mnt/efi to /dev/mmcblk0p2 so system can access uEnv.txt and product.env
     echo "/dev/mmcblk0p2  /mnt/efi  vfat  defaults,nofail  0  2" | sudo tee -a $FS/etc/fstab

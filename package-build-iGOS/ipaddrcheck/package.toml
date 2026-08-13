@@ -1,6 +1,0 @@
-[[packages]]
-name = "ipaddrcheck"
-commit_id = "psl-master"
-scm_url = "https://github.com/psleng/ipaddrcheck"
-build_cmd = "autoreconf -i; ./configure; dpkg-buildpackage -uc -us -tc -b"
-

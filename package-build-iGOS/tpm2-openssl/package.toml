@@ -1,5 +1,0 @@
-[[packages]]
-name = "tpm2-openssl"
-commit_id = "debian/1.3.0-1"
-scm_url = "https://salsa.debian.org/debian/tpm2-openssl.git"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"
