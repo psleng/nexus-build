@@ -1,9 +1,0 @@
-[[packages]]
-name = "libnss-mapuser"
-commit_id = "psl-master"
-scm_url = "https://github.com/psleng/libnss-mapuser"
-
-[dependencies]
-packages = [
-    "libaudit-dev"
-]

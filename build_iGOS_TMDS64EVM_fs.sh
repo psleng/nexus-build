@@ -40,21 +40,9 @@ if [ ! -d "$REPO_NAME" ]; then
 #    git clone -b vyos-build-jf --single-branch "$REPO_URL"
 fi
 
-# Copy package-build-iGOS/ to vyos-build/scripts/ now that it's there
-SRCDIR=package-build-iGOS
-DSTDIR=vyos-build/scripts/
-if [ ! -d $DSTDIR/$SRCDIR ]; then
-    echo "=== I: $0: Copying $ROOTDIR/$SRCDIR into $DSTDIR"
-    cp -rf $SRCDIR $DSTDIR
-    echo "These files were copied from $ROOTDIR/$SRCDIR" > $DSTDIR/$SRCDIR/README-PSL
-    # Borrow the vyos-build build.py if package-build-iGOS had none
-    BUILDPY=$DSTDIR/$SRCDIR/build.py
-    if [ ! -f $BUILDPY ]; then
-        echo "=== I: $0: Symlink VyOS build.py to $BUILDPY"
-        ln -rvfs $DSTDIR/package-build/build.py $BUILDPY
-    fi
-    unset BUILDPY
-fi
+# package-build-iGOS/ is now committed natively in vyos-build (scripts/package-build-iGOS/,
+# including its top-level build.py symlink), so it arrives with the clone above and no
+# longer needs to be copied in here.
 
 # Install build_flavor
 cp -f $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/
@@ -287,8 +275,12 @@ if [ ! -f "$BLT" ]; then
     sudo unsquashfs -d $FS $ISO_DIR/live/filesystem.squashfs
 
     # -rm -rf $FS/boot/grub
-    sudo mkdir $FS/boot/dtb
-    sudo cp -R $FS/usr/lib/linux-image*/* $FS/boot/dtb
+    # DTBs: pull the CURATED set from the vyos-build ISO's own /boot/dtb (staged by
+    # the 26-igos-dtb.binary hook) instead of re-deriving the uncurated set from the
+    # kernel package (usr/lib/linux-image*). Keeps the flat fs byte-consistent with
+    # the ISO and lets vyos-build own dtb curation.
+    sudo mkdir -p $FS/boot/dtb
+    sudo cp -R $ISO_DIR/boot/dtb/. $FS/boot/dtb/
 
     echo "=== I: $0: $TSK: Almost done; performing fs fixups"
     ## For debugging: stash the unsullied rootfs for later diffing via:
@@ -316,17 +308,17 @@ if [ ! -f "$BLT" ]; then
     # single SKU (IOLAN-2A01), so boards without an EEPROM (e.g. the EVM)
     # misidentified. The build must not bake a fixed identity into the FS.
 
-    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
+#    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
         # Copy for early-gpio-init service
 #        sudo cp updates/perle_gpio_map.py $FS/usr/local/bin
 #        sudo cp updates/perle_gpioctl.py $FS/usr/local/bin
 #        sudo cp updates/early-gpio-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/early-gpio-init.service $FS/etc/systemd/system/sysinit.target.wants/early-gpio-init.service
 
-        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
+#        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
 #        sudo cp updates/rtc-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/rtc-init.service $FS/etc/systemd/system/sysinit.target.wants/rtc-init.service
-    fi
+#    fi
 
     # add EFI (FAT) mount point /mnt/efi to /dev/mmcblk0p2 so system can access uEnv.txt and product.env
     echo "/dev/mmcblk0p2  /mnt/efi  vfat  defaults,nofail  0  2" | sudo tee -a $FS/etc/fstab

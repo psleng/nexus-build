@@ -1,6 +1,0 @@
-[[packages]]
-name = "initramfs-tools"
-commit_id = "psl-master"
-scm_url = "https://github.com/psleng/initramfs-tools"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"
-upstream_branch = "lithium"
