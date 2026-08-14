@@ -33,7 +33,7 @@ fi
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
 #    git clone -b vyos-build-jf --single-branch "$REPO_URL"
-    git clone -b vyos-build --single-branch "$REPO_URL"
+    git clone -b cf-cloud --single-branch "$REPO_URL"
 fi
 
 # Make Kernel and associated packages
