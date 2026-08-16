@@ -19,4 +19,5 @@ fi
 # Set up links to TI files and do some modifications
 $TI/PSL-mklinks $(pwd) || { exit $?; }
 
-exec sudo $TI/buildiGOSti2.sh "$@"
+#exec sudo $TI/buildiGOSti2.sh "$@"
+exec sudo KEEP_BSP_SOURCES=1 $TI/buildiGOSti2.sh "$@"
