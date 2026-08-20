@@ -524,7 +524,7 @@ RUN apt-get update && apt-get install -y \
       asciidoc-base
 
 # Packages needed for iolan
-# libusb-1.0-0-dev is a build-dep of uxfp-telit (Telit modem firmware tool);
+# libusb-1.0-0-dev is a build-dep of uxfp-telit and tfl-telit (Telit modem firmware tools);
 # libudev-dev (its other build-dep) is already installed in the QAT section above.
 RUN apt-get update && apt-get install -y \
       libc6-dev \
