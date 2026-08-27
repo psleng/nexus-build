@@ -12,6 +12,10 @@ ISOPATH=$ROOTDIR/iso-images/$BUILDTYPE
 ISOPATH_STAGE=$ROOTDIR/iso-images/$BUILDTYPE/stage_iso
 IMAGEPATH=$ROOTDIR/images/$BUILDTYPE
 
+# The nexus stage_iso re-squash is retired; the source image now comes straight
+# from the authoritative vyos-build ISO, loop-mounted at $ISO_MNT below.
+LIVE_IMAGE_ISO=$ROOTDIR/vyos-build/build/live-image-$ARCH.hybrid.iso
+
 BOOT3OFFSET=0
 SPLOFFSET=0x800
 UBOOTOFFSET=0x1800
@@ -28,8 +32,8 @@ else
     BOOTIMGSIZE_MB=4
 fi
 
-if [[ ! -d "$ISOPATH_STAGE" ]]; then
-    echo "Error: missing iso staging directory: $ISOPATH_STAGE"
+if [[ ! -e "$LIVE_IMAGE_ISO" ]]; then
+    echo "Error: missing vyos-build ISO: $LIVE_IMAGE_ISO"
     exit 1
 fi
 
@@ -40,6 +44,7 @@ SIZE=14G
 WORKDIR=$ISOPATH/prod-work
 ROOTFS=$WORKDIR/rootfs
 UBOOTWORK=$WORKDIR/boot
+ISO_MNT=$WORKDIR/iso
 MOUNT=$ROOTFS/mnt
 MOUNT_P2=$ROOTFS/mnt/p3/boot/efi
 MOUNT_P3=$ROOTFS/mnt/p3
@@ -49,6 +54,8 @@ cleanup() {
     echo "Cleaning up..."
 
     sudo umount -lf "$ROOTFS/mnt/iso" 2>/dev/null || true
+    sudo umount -lf "$ISO_MNT" 2>/dev/null || true
+    sudo losetup -d "$ISO_LOOP" 2>/dev/null || true
     sudo umount -lf "$ROOTFS/dev" 2>/dev/null || true
     sudo umount -lf "$ROOTFS/proc" 2>/dev/null || true
     sudo umount -lf "$ROOTFS/sys" 2>/dev/null || true
@@ -132,7 +139,13 @@ if [[ ! -d "$ROOTFS" ]]; then
     sudo rm -rf $ROOTFS
 fi
 
-sudo unsquashfs -f -d "$ROOTFS" "$ISOPATH_STAGE/live/filesystem.squashfs"
+# Loop-mount the vyos-build ISO and source the squashfs + ISO tree from it
+# (replaces the retired stage_iso).
+sudo mkdir -p "$ISO_MNT"
+ISO_LOOP=$(sudo losetup --show -f "$LIVE_IMAGE_ISO")
+sudo mount -o ro "$ISO_LOOP" "$ISO_MNT"
+
+sudo unsquashfs -f -d "$ROOTFS" "$ISO_MNT/live/filesystem.squashfs"
 
 echo "Preparing to chroot..."
 
@@ -142,7 +155,7 @@ sudo mount --bind /sys "$ROOTFS/sys"
 sudo mount --bind /run "$ROOTFS/run"
 
 sudo mkdir -p "$ROOTFS/mnt/iso"
-sudo mount --bind "$ISOPATH_STAGE" "$ROOTFS/mnt/iso"
+sudo mount --bind "$ISO_MNT" "$ROOTFS/mnt/iso"
 
 echo "Running prod_image.py with GRUB target: $LOOP"
 # sudo chroot "$ROOTFS" ls -l "$LOOP"
