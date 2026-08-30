@@ -225,10 +225,31 @@ if [ ! -f "$BLT" ]; then
             *) echo "=== E: unknown BUILDTYPE: $BUILDTYPE" >&2; exit 1 ;;
         esac
     fi
+
+    # Secure-boot signing: for dm-verity (secure) flavors, hand the engineering
+    # GPG signing key to build-vyos-image so it detached-signs the FINAL kernel +
+    # initrd (binary-stage hook 29-igos-sign-boot.binary). The key lives in
+    # ~/nexus-build/keys/ for now; at release, replace it with a symlink to the
+    # production key. If the key is absent the build still proceeds, leaving the
+    # kernel/initrd UNSIGNED (the hook self-gates and warns) -- matching the
+    # "secure = dm-verity AND signatures; non-secure = neither" model.
+    SB_SIGNING_KEY="$ROOTDIR/keys/igos-secure-boot-signing.asc"
+    SIGN_ARGS=""
+    case "$BUILDFLAVOUR" in
+        igos-am64x-*)
+            if [ -f "$SB_SIGNING_KEY" ]; then
+                echo "=== I: $0: secure-boot signing key found -- signing kernel + initrd"
+                SIGN_ARGS="--gpg-signing-key $SB_SIGNING_KEY"
+            else
+                echo "=== W: $0: $BUILDFLAVOUR is a secure (dm-verity) flavor but no signing key at $SB_SIGNING_KEY -- kernel/initrd will be UNSIGNED"
+            fi
+            ;;
+    esac
+
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
     export VYOS1X_REPO_BRANCH=psl-master
     sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
-        ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
+        ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com" $SIGN_ARGS
     cd -
     touch "$BLT" # build success
 else
