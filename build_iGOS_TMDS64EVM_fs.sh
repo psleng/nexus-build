@@ -226,25 +226,22 @@ if [ ! -f "$BLT" ]; then
         esac
     fi
 
-    # Secure-boot signing: for dm-verity (secure) flavors, hand the engineering
-    # GPG signing key to build-vyos-image so it detached-signs the FINAL kernel +
-    # initrd (binary-stage hook 29-igos-sign-boot.binary). The key lives in
+    # Secure-boot signing is INDEPENDENT of dm-verity: if the engineering GPG
+    # signing key is present, hand it to build-vyos-image so it detached-signs
+    # the FINAL kernel + initrd (binary-stage hook 29-igos-sign-boot.binary),
+    # for ANY flavor regardless of its dm_verity setting. The key lives in
     # ~/nexus-build/keys/ for now; at release, replace it with a symlink to the
     # production key. If the key is absent the build still proceeds, leaving the
-    # kernel/initrd UNSIGNED (the hook self-gates and warns) -- matching the
-    # "secure = dm-verity AND signatures; non-secure = neither" model.
+    # kernel/initrd UNSIGNED (the hook self-gates). dm-verity itself is driven
+    # separately by the flavor file (dm_verity).
     SB_SIGNING_KEY="$ROOTDIR/keys/igos-secure-boot-signing.asc"
     SIGN_ARGS=""
-    case "$BUILDFLAVOUR" in
-        igos-am64x-*)
-            if [ -f "$SB_SIGNING_KEY" ]; then
-                echo "=== I: $0: secure-boot signing key found -- signing kernel + initrd"
-                SIGN_ARGS="--gpg-signing-key $SB_SIGNING_KEY"
-            else
-                echo "=== W: $0: $BUILDFLAVOUR is a secure (dm-verity) flavor but no signing key at $SB_SIGNING_KEY -- kernel/initrd will be UNSIGNED"
-            fi
-            ;;
-    esac
+    if [ -f "$SB_SIGNING_KEY" ]; then
+        echo "=== I: $0: secure-boot signing key found -- signing kernel + initrd"
+        SIGN_ARGS="--gpg-signing-key $SB_SIGNING_KEY"
+    else
+        echo "=== I: $0: no secure-boot signing key at $SB_SIGNING_KEY -- kernel/initrd will be UNSIGNED"
+    fi
 
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
     export VYOS1X_REPO_BRANCH=psl-master
