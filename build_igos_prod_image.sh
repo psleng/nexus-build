@@ -134,6 +134,12 @@ fi
 
 sudo unsquashfs -f -d "$ROOTFS" "$ISOPATH_STAGE/live/filesystem.squashfs"
 
+echo "Copying grub gpg keys temporarily to root filesystem for grub-install..."
+sudo cp -a $ROOTDIR/gpgkeys $ROOTFS/
+
+echo "Copying grub arm64-efi modules temporarily to root filesystem for grub-install..."
+sudo cp -a $ISOPATH_STAGE/boot/grub/arm64-efi $ROOTFS/
+sudo ls -l $ROOTFS/arm64-efi 
 echo "Preparing to chroot..."
 
 sudo mount --bind /dev "$ROOTFS/dev"
@@ -147,6 +153,17 @@ sudo mount --bind "$ISOPATH_STAGE" "$ROOTFS/mnt/iso"
 echo "Running prod_image.py with GRUB target: $LOOP"
 # sudo chroot "$ROOTFS" ls -l "$LOOP"
 sudo chroot "$ROOTFS" python3 /usr/lib/python3/dist-packages/vyos/system/prod_image.py --grub-target "$LOOP"
+
+# run GPG commands and signature kernel, initrd and dtb files
+export GPG_USER_ID="perle@perle.com"
+export PASSPHRASE_FILE="$ROOTDIR/gpgkeys/perle-passphrase.txt"
+
+sudo gpg --import $ROOTDIR/gpgkeys/perle.pubkey.bin
+sudo gpg --batch --yes --pinentry-mode loopback --passphrase-file $PASSPHRASE_FILE --import "$ROOTDIR/gpgkeys/perle.privatekey.bin"
+sudo gpg --batch --verbose --detach-sign --pinentry-mode loopback --passphrase-file $PASSPHRASE_FILE -u $GPG_USER_ID $MOUNT_P2/EFI/VyOS/grubaa64.efi
+sudo gpg --batch --verbose --detach-sign --pinentry-mode loopback --passphrase-file $PASSPHRASE_FILE -u $GPG_USER_ID $MOUNT_P3/boot/grub/grubenv
+sudo ls -l $MOUNT_P2/EFI/VyOS/grubaa64.*
+sudo ls -l $MOUNT_P3/boot/grub/grubenv*
 
 echo "==========================================================================="
 echo "Production firmware image build complete: $IMG"
