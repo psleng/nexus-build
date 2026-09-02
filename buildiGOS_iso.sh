@@ -80,14 +80,14 @@ ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
     KERNEL_VER=$(ls ${STAGE_ISO}/live/initrd.img-* | sed 's/.*initrd.img-\(.*\)/\1/' | head -n 1)
 
     # Decompress the vmlinuz into vmlinux
-    gunzip < ${STAGE_ISO}/live/vmlinuz-${KERNEL_VER} | sudo sh -c "cat > ${STAGE_ISO}/live/vmlinux-${KERNEL_VER}"
+    # gunzip < ${STAGE_ISO}/live/vmlinuz-${KERNEL_VER} | sudo sh -c "cat > ${STAGE_ISO}/live/vmlinux-${KERNEL_VER}"
 
     echo "Creating initrd.img-${KERNEL_VER}, vmlinuz-${KERNEL_VER}  and vmlinux-${KERNEL_VER} symlinks"
 
     # Create the symlinks
     sudo ln -sf initrd.img-${KERNEL_VER} ${STAGE_ISO}/live/initrd.img
     sudo ln -sf vmlinuz-${KERNEL_VER} ${STAGE_ISO}/live/vmlinuz
-    sudo ln -sf vmlinux-${KERNEL_VER} ${STAGE_ISO}/live/vmlinux
+    # sudo ln -sf vmlinux-${KERNEL_VER} ${STAGE_ISO}/live/vmlinux
 
     cd $STAGE_ISO/live
     # Loop through all initrd and vmlinuz in current directory
@@ -101,11 +101,12 @@ ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
                  --passphrase-file $PASSPHRASE_FILE -u $GPG_USER_ID $file
         sudo cp vmlinuz-*-vyos.sig vmlinuz.sig
     done
-    for file in vmlinux-*-vyos; do
-        sudo gpg --batch --verbose --detach-sign --pinentry-mode loopback \
-                 --passphrase-file $PASSPHRASE_FILE -u $GPG_USER_ID $file
-        sudo cp vmlinux-*-vyos.sig vmlinux.sig
-    done
+
+    # for file in vmlinux-*-vyos; do
+    #     sudo gpg --batch --verbose --detach-sign --pinentry-mode loopback \
+    #              --passphrase-file $PASSPHRASE_FILE -u $GPG_USER_ID $file
+    #     sudo cp vmlinux-*-vyos.sig vmlinux.sig
+    # done
 
     # Loop through all grub *.mod files n  directory
     cd $STAGE_ISO/boot/grub/arm64-efi/
