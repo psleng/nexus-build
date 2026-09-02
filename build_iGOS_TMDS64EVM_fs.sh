@@ -105,9 +105,16 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
+    # Canonical TI package source location is ~/ti-bdebstrap.
+    # Fall back to local ./ti-bdebstrap for backward compatibility.
+    TI_DEB_DIR="$HOME/ti-bdebstrap"
+    if [ ! -d "$TI_DEB_DIR" ]; then
+        TI_DEB_DIR="$ROOTDIR/ti-bdebstrap"
+    fi
+
     # Symlink everything to the vyos-build/packages directory
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")\
-             $ROOTDIR/ti-bdebstrap/*.deb
+             $TI_DEB_DIR/*.deb
     do
         test -s "$a" || continue  # Skip zero length junk
 

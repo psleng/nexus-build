@@ -108,6 +108,7 @@ targ-x86:
 
 # Base repository to use for all container build recipes.
 REPO := https://github.com/psleng
+TI_HOME := $(HOME)/ti-bdebstrap
 
 ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 # Different image tag for docker vyos/vyos-build image
@@ -215,7 +216,7 @@ ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
 else
 	@echo '### Making $@'
-	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE)
+	sudo $(TI_HOME)/create-sdcardiGOS.sh $(BUILDTYPE)
 	@echo '### Making $@ COMPLETED'
 endif
 
@@ -225,7 +226,7 @@ ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
 else
 	@echo '### Making $@'
-	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE) squashfs
+	sudo $(TI_HOME)/create-sdcardiGOS.sh $(BUILDTYPE) squashfs
 	@echo '### Making $@ COMPLETED'
 endif
 
@@ -271,7 +272,7 @@ clean: mostlyclean
 # Clean build artifacts only (but not built images).
 mostlyclean:
 	rm -f *.ERR .*.built $(DEFS)
-	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml create-sdcardiGOS.sh
+	sudo rm -rf vyos-build build debian-repos drivers logs tools configs scripts builds.toml create-sdcardiGOS.sh
 
 # Clean the container image.  It rarely needs rebuilding.
 containerclean:
