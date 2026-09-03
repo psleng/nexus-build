@@ -105,11 +105,10 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
-    # Prefer workspace-local ti-bdebstrap (persistent in docker /vyos mount).
-    # Fall back to ~/ti-bdebstrap for compatibility with host-side workflows.
-    TI_DEB_DIR="$ROOTDIR/ti-bdebstrap"
-    if [ ! -d "$TI_DEB_DIR" ]; then
-        TI_DEB_DIR="$HOME/ti-bdebstrap"
+    # Prefer canonical ~/ti-bdebstrap output, fall back to workspace-local.
+    TI_DEB_DIR="$HOME/ti-bdebstrap"
+    if [ ! -d "$TI_DEB_DIR" ] && [ -d "$ROOTDIR/ti-bdebstrap" ]; then
+        TI_DEB_DIR="$ROOTDIR/ti-bdebstrap"
     fi
 
     # Symlink everything to the vyos-build/packages directory

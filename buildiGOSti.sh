@@ -11,8 +11,12 @@ if [ -d /vyos ] && [ -w /vyos ]; then
     ROOTDIR=/vyos
 fi
 
-# Keep TI repo/debs inside the workspace so outputs persist after container exit.
-TI_HOME="${ROOTDIR}/ti-bdebstrap"
+# Canonical TI location is ~/ti-bdebstrap.
+# Fallback to workspace-local copy for compatibility when needed.
+TI_HOME="$HOME/ti-bdebstrap"
+if [ ! -d "$TI_HOME" ] && [ -d "${ROOTDIR}/ti-bdebstrap" ]; then
+    TI_HOME="${ROOTDIR}/ti-bdebstrap"
+fi
 
 # Canonical location for TI build artifacts/repo is ~/ti-bdebstrap
 if [ ! -d "$TI_HOME" ]; then
@@ -41,4 +45,4 @@ fi
 "$TI_HOME"/PSL-mklinks $(pwd) || { exit $?; }
 
 #exec sudo "$TI_HOME"/buildiGOSti2.sh "$@"
-exec sudo KEEP_BSP_SOURCES=1 "$TI_HOME"/buildiGOSti2.sh "$@"
+exec sudo KEEP_BSP_SOURCES=1 NEXUS_ROOT="$ROOTDIR" TI_BDEBSTRAP_HOME="$TI_HOME" "$TI_HOME"/buildiGOSti2.sh "$@"
