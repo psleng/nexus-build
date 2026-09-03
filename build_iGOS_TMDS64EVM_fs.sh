@@ -105,15 +105,13 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
-    # Prefer canonical ~/ti-bdebstrap output, fall back to workspace-local.
-    TI_DEB_DIR="$HOME/ti-bdebstrap"
-    if [ ! -d "$TI_DEB_DIR" ] && [ -d "$ROOTDIR/ti-bdebstrap" ]; then
-        TI_DEB_DIR="$ROOTDIR/ti-bdebstrap"
-    fi
+    # Search both possible TI artifact locations. Workspace-local is preferred
+    # for persistence across docker invocations; home path is kept as fallback.
 
     # Symlink everything to the vyos-build/packages directory
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")\
-             $TI_DEB_DIR/*.deb
+             $ROOTDIR/ti-bdebstrap/*.deb \
+             $HOME/ti-bdebstrap/*.deb
     do
         test -s "$a" || continue  # Skip zero length junk
 

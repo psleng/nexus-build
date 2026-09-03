@@ -11,11 +11,26 @@ if [ -d /vyos ] && [ -w /vyos ]; then
     ROOTDIR=/vyos
 fi
 
-# Canonical TI location is ~/ti-bdebstrap.
-# Fallback to workspace-local copy for compatibility when needed.
-TI_HOME="$HOME/ti-bdebstrap"
-if [ ! -d "$TI_HOME" ] && [ -d "${ROOTDIR}/ti-bdebstrap" ]; then
-    TI_HOME="${ROOTDIR}/ti-bdebstrap"
+# Prefer workspace-local ti-bdebstrap because /vyos is the persistent mount
+# shared across docker invocations in this pipeline. Fall back to ~/ti-bdebstrap
+# for host-side workflows.
+TI_HOME="${ROOTDIR}/ti-bdebstrap"
+if [ ! -d "$TI_HOME" ] && [ -d "$HOME/ti-bdebstrap" ]; then
+    TI_HOME="$HOME/ti-bdebstrap"
+fi
+
+# If workspace-local ti-bdebstrap is a stale/external symlink, replace it so
+# artifacts are written into the persistent workspace path.
+if [ "$TI_HOME" = "${ROOTDIR}/ti-bdebstrap" ] && [ -L "$TI_HOME" ]; then
+    TI_LINK_TARGET=$(readlink -f "$TI_HOME" 2>/dev/null || true)
+    case "$TI_LINK_TARGET" in
+        ${ROOTDIR}/*)
+            ;;
+        *)
+            echo "I: Replacing external ti-bdebstrap symlink at $TI_HOME"
+            rm -f "$TI_HOME"
+            ;;
+    esac
 fi
 
 # Canonical location for TI build artifacts/repo is ~/ti-bdebstrap

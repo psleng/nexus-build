@@ -64,7 +64,7 @@ help:
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 
-IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit tfl-telit'
+IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tpm2-openssl'
 #IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            ipaddrcheck hvinfo libgpiod modemmanager uxfp-telit tfl-telit\
