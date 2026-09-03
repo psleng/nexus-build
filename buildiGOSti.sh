@@ -4,7 +4,15 @@
 #
 
 TI=ti-bdebstrap
-TI_HOME="${HOME}/ti-bdebstrap"
+# Resolve workspace root robustly for both host and container runs.
+# In docker builds, /vyos is the mounted workspace and is persistent.
+ROOTDIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+if [ -d /vyos ] && [ -w /vyos ]; then
+    ROOTDIR=/vyos
+fi
+
+# Keep TI repo/debs inside the workspace so outputs persist after container exit.
+TI_HOME="${ROOTDIR}/ti-bdebstrap"
 
 # Canonical location for TI build artifacts/repo is ~/ti-bdebstrap
 if [ ! -d "$TI_HOME" ]; then
@@ -25,8 +33,8 @@ if [ ! -e "$TI" ]; then
 fi
 
 # Ensure ti-bdebstrap uses the active build selection from this nexus-build tree.
-if [ -f .defs.mk ]; then
-    ln -sfn "$(pwd)/.defs.mk" "$TI_HOME/.defs.mk"
+if [ -f "$ROOTDIR/.defs.mk" ]; then
+    ln -sfn "$ROOTDIR/.defs.mk" "$TI_HOME/.defs.mk"
 fi
 
 # Set up links to TI files and do some modifications
