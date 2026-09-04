@@ -158,6 +158,7 @@ endif
 
 # Build the root filesystem
 $(FS_TARG): $(UBOOT_TARG)
+	@$(call DOCKRUN,openssh,./build_iGOS_openssh_fs.sh)
 	@$(call DOCKRUN,filesystem,./build_iGOS_TMDS64EVM_fs.sh)
 
 # Create a uSDcard image
