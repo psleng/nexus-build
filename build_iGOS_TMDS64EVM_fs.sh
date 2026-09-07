@@ -230,27 +230,44 @@ if [ ! -f "$BLT" ]; then
         esac
     fi
 
-    # Secure-boot signing is INDEPENDENT of dm-verity: if the engineering GPG
-    # signing key is present, hand it to build-vyos-image so it detached-signs
-    # the FINAL kernel + initrd (binary-stage hook 29-igos-sign-boot.binary),
-    # for ANY flavor regardless of its dm_verity setting. The key lives in
-    # ~/nexus-build/keys/ for now; at release, replace it with a symlink to the
-    # production key. If the key is absent the build still proceeds, leaving the
-    # kernel/initrd UNSIGNED (the hook self-gates). dm-verity itself is driven
-    # separately by the flavor file (dm_verity).
-    SB_SIGNING_KEY="$ROOTDIR/keys/igos-secure-boot-signing.asc"
+    # Secure-boot signing key material lives in a dedicated PRIVATE repo (Perle
+    # GPG keys), cloned FRESH on the build HOST and WIPED right after use (the
+    # private key + passphrase never linger on disk). build-vyos-image discovers
+    # the passphrase-protected private key + its passphrase there by glob
+    # (filenames containing 'privatekey' / 'passphrase') and stages them ONLY
+    # for flavors whose build-flavor TOML sets sign_boot = true -- so signing is
+    # driven by the flavor flag, not by this script. No fallback: a sign_boot
+    # flavor with missing/ambiguous key material FAILS the build (build-vyos-image
+    # errors) rather than shipping an unsigned image. Only igos flavors fetch the
+    # keys; generic/x86_64 builds do not need signing-repo access.
+    GPGKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/gpgkeys.git"
+    GPGKEYS_DIR="$ROOTDIR/gpgkeys"
     SIGN_ARGS=""
-    if [ -f "$SB_SIGNING_KEY" ]; then
-        echo "=== I: $0: secure-boot signing key found -- signing kernel + initrd"
-        SIGN_ARGS="--gpg-signing-key $SB_SIGNING_KEY"
-    else
-        echo "=== I: $0: no secure-boot signing key at $SB_SIGNING_KEY -- kernel/initrd will be UNSIGNED"
-    fi
+    case "$BUILDFLAVOUR" in
+        igos-*)
+            # Fetch the secret signing keys FRESH each build, and arm a
+            # fail-safe so the clone (private key + passphrase in the clear) is
+            # wiped even if the build below aborts (set -e). It is also wiped
+            # inline immediately after build-vyos-image consumes it (below).
+            trap 'rm -rf "$GPGKEYS_DIR"' EXIT
+            rm -rf "$GPGKEYS_DIR"
+            echo "=== I: $0: cloning secure-boot GPG keys from $GPGKEYS_REPO_URL"
+            git clone --depth=1 "$GPGKEYS_REPO_URL" "$GPGKEYS_DIR"
+            SIGN_ARGS="--gpg-signing-key-dir $GPGKEYS_DIR"
+            ;;
+        *)
+            echo "=== I: $0: $BUILDFLAVOUR is not a signing flavor -- skipping GPG key checkout"
+            ;;
+    esac
 
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
     export VYOS1X_REPO_BRANCH=psl-master
     sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
         ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com" $SIGN_ARGS
+    # Wipe the secret key clone immediately after the build consumed it
+    # (build-vyos-image already removed its own staged copy under build/signing).
+    rm -rf "$GPGKEYS_DIR"
+    trap - EXIT
     cd -
     touch "$BLT" # build success
 else
