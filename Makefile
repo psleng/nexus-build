@@ -26,7 +26,7 @@ ISO_TARG      = .iso.built
 
 DATECODE := $(shell date +%Y%m%d%H%M%S00)
 
-.PHONY: help all test sdcard sdcard-squashfs live-iso dfuimg status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless prod-image
+.PHONY: help all test sdcard sdcard-squashfs dfuimg status clean mostlyclean targ-ti-am64x targ-ti-j7200 targ-x86 containerclean spotless prod-image
 
 help:
 	@echo First select a build type.  Valid types are:
@@ -53,7 +53,6 @@ help:
 	@echo
 	@echo 'make sdcard          # flash sdcard with the built image'
 	@echo 'make sdcard-squashfs # flash sdcard with squash image in ./iso-images/<buildtype>/stage-iso'
-#	@echo 'make live-iso        # create iso in ./iso-images/<buildtype>'
 	@echo 'make dfuimg          # create DFU images to "dfu-images" folder'
 	@echo 'make prod-image      # create 16G emmc and boot images in ./iso-images/<buildtype>'
 	@echo
@@ -65,8 +64,8 @@ help:
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 
-# IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit tfl-telit'
-IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
+IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tpm2-openssl'
+#IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            ipaddrcheck hvinfo libgpiod modemmanager uxfp-telit tfl-telit\
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
@@ -109,6 +108,7 @@ targ-x86:
 
 # Base repository to use for all container build recipes.
 REPO := https://github.com/psleng
+TI_HOME := $(HOME)/ti-bdebstrap
 
 ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 # Different image tag for docker vyos/vyos-build image
@@ -187,17 +187,8 @@ ifeq ($(BUILDTARG),x86_64)
 	@touch $@
 else
 	@echo '### Making ISO image'
+	# nexus re-squash + xorriso retired: buildiGOS_iso.sh symlinks the vyos-build ISO
 	@$(call DOCKRUN,iso,./buildiGOS_iso.sh $(BUILDTYPE))
-	@command -v xorriso >/dev/null 2>&1 || { \
-		echo "Warning: xorriso is not installed....installing it now"; \
-		sudo apt-get install -y -qq xorriso; \
-	}
-	# create an iso with the igos updates using the same iso attributes
-	sudo xorriso -as mkisofs -R -r -J -joliet-long -l -cache-inodes -iso-level 3 -A "iGOS" \
-  -p "live-build ${DATECODE}; https://salsa.debian.org/live-team/live-build" \
-  -publisher "psleng@perle.com" -V "iGOS" --modification-date="${DATECODE}" \
-  -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -isohybrid-apm-hfsplus \
-  -o iso-images/$(BUILDTYPE)/"igos-live-${DATECODE}-arm64.iso" iso-images/$(BUILDTYPE)/stage_iso
 
 	@ls -l images/$(BUILDTYPE)/tisdk*.squashfs
 	@echo '### '
@@ -207,7 +198,6 @@ else
 	@echo '################################################################################# '
 	@echo '### Type "make sdcard" to write bootloader and flat rootfs to an uSD card'
 	@echo '### Type "make sdcard-squashfs" to write bootloader + squashed rootfs to uSD card'
-#	@echo '### Type "make live-iso" to create a live iso under /iso_images'
 	@echo '### Type "make prod-image" to create 16G emmc and boot images in /iso-images'
 	@echo '################################################################################# '
 	@echo '#### '
@@ -227,7 +217,7 @@ ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
 else
 	@echo '### Making $@'
-	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE)
+	sudo $(TI_HOME)/create-sdcardiGOS.sh $(BUILDTYPE)
 	@echo '### Making $@ COMPLETED'
 endif
 
@@ -237,27 +227,7 @@ ifeq ($(BUILDTARG),x86_64)
 	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
 else
 	@echo '### Making $@'
-	sudo ti-bdebstrap/create-sdcardiGOS.sh $(BUILDTYPE) squashfs
-	@echo '### Making $@ COMPLETED'
-endif
-
-# Create a live ISO from the iso_image/$(BUILDTYPE)/stage_iso/*
-live-iso: $(IMAGE_TARG)
-ifeq ($(BUILDTARG),x86_64)
-	@echo "### Skipping $@ because BUILDTARG=$(BUILDTARG)"
-else
-	@echo '### Making $@'
-	@command -v xorriso >/dev/null 2>&1 || { \
-		echo "Warning: xorriso is not installed...installing now"; \
-		sudo apt-get install -y -qq xorriso; \
-	}
-	# create an iso with the igos updates using the same iso attributes
-	sudo xorriso -as mkisofs -R -r -J -joliet-long -l -cache-inodes -iso-level 3 -A "iGOS" \
-  -p "live-build ${DATECODE}; https://salsa.debian.org/live-team/live-build" \
-  -publisher "psleng@perle.com" -V "iGOS" --modification-date="${DATECODE}" \
-  -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat -isohybrid-apm-hfsplus \
-  -o iso-images/$(BUILDTYPE)/"igos-live-${DATECODE}-arm64.iso" iso-images/$(BUILDTYPE)/stage_iso
-
+	sudo $(TI_HOME)/create-sdcardiGOS.sh $(BUILDTYPE) squashfs
 	@echo '### Making $@ COMPLETED'
 endif
 
@@ -303,7 +273,7 @@ clean: mostlyclean
 # Clean build artifacts only (but not built images).
 mostlyclean:
 	rm -f *.ERR .*.built $(DEFS)
-	sudo rm -rf vyos-build build debian-repos ti-bdebstrap drivers logs tools configs scripts builds.toml create-sdcardiGOS.sh
+	sudo rm -rf vyos-build build debian-repos drivers logs tools configs scripts builds.toml create-sdcardiGOS.sh
 
 # Clean the container image.  It rarely needs rebuilding.
 containerclean:

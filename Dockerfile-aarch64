@@ -116,6 +116,7 @@ RUN apt-get update && apt-get install -y \
       sbsigntool \
       dosfstools \
       kpartx \
+      cryptsetup-bin \
       npm \
       nodejs
 
