@@ -38,6 +38,8 @@ set -e
 
 echo "=== I: Starting daily iGOS build in `realpath .`..."
 make spotless
+sudo rm -rf ../nightly_isos
+mkdir -p ../nightly_isos
 date
 
 #TARGS='targ-ti-j7200 targ-ti-am64x targ-perle-iolan'
@@ -56,8 +58,7 @@ do
     # Stash the .ERR files for this build
     E=errorfiles/$T
     rm -rf $E; mkdir -p $E; cp -pf *.ERR $E
-    mkdir -p ../nightly_isos
-    cp -rL iso-images/* ../nightly_isos
+    sudo cp -rL iso-images/* ../nightly_isos
 done
 
 echo '=== I: Daily iGOS build completed! Please check *.ERR files for errors.'
