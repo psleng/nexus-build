@@ -50,6 +50,7 @@ for T in $TARGS
 do
     echo "=== I: Starting $T iGOS build at $(date)..."
     make mostlyclean
+    sudo rm -rf iso-images
     make $T
     msg=''
     make all || msg="status=$?"
@@ -58,7 +59,7 @@ do
     # Stash the .ERR files for this build
     E=errorfiles/$T
     rm -rf $E; mkdir -p $E; cp -pf *.ERR $E
-    sudo cp -rL iso-images/* ../nightly_isos
+    sudo cp -rLn iso-images/* ../nightly_isos
 done
 
 echo '=== I: Daily iGOS build completed! Please check *.ERR files for errors.'
