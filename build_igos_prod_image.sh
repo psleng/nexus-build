@@ -165,36 +165,34 @@ echo "==========================================================================
 echo "Production firmware image build complete: $IMG"
 echo "==========================================================================="
 
-shopt -s nullglob
-if [[ "$BUILDTYPE" == "bookworm-am64xx-evm" ]]; then
-    set -- "$IMAGEPATH"/ti*-boot-emmc.squashfs
-elif [[ "$BUILDTYPE" == "bookworm-j7200-evm" ]]; then
-    set -- "$IMAGEPATH"/ti*-boot-emmc.squashfs
-else
-    set -- "$IMAGEPATH"/ti*-boot.squashfs
+# --- flash u-boot: consume the copy vyos-build already staged on the ISO -------
+# vyos-build installs the per-flavor u-boot deb into the rootfs; hook
+# 27-igos-uboot.binary stages tiboot3.bin/tispl.bin/u-boot.img into the ISO at
+# /boot/u-boot/platform/. Whatever u-boot the ISO was built with IS the right one
+# for this platform, so there is ONE uniform source -- no per-platform branch, no
+# separate ti*-boot.squashfs. (Raw SoC ROM offsets are still set near the top.)
+UBOOT_SRC="$ISO_MNT/boot/u-boot/platform"
+
+if [[ ! -f "$UBOOT_SRC/tiboot3.bin" || ! -f "$UBOOT_SRC/tispl.bin" || ! -f "$UBOOT_SRC/u-boot.img" ]]; then
+    echo "Error: u-boot payload missing on the ISO at $UBOOT_SRC"
+    echo "       (vyos-build hook 27 did not stage it -- u-boot deb not installed?)"
+    exit 1
 fi
 
-if [[ ! -d "$IMAGEPATH" || $# -eq 0 ]]; then
-    echo "Warning: no boot squash image found in: $IMAGEPATH"
-else
-    echo "Unsquashing boot squash image $1 found in: $IMAGEPATH"
-    sudo unsquashfs -f -d "$UBOOTWORK" "$1"
+echo "Flashing u-boot from ISO: $UBOOT_SRC"
+sudo dd if=/dev/zero of=$BOOTIMG bs=1M count=$BOOTIMGSIZE_MB
 
-    sudo dd if=/dev/zero of=$BOOTIMG bs=1M count=$BOOTIMGSIZE_MB    
+# tiboot3.bin
+sudo dd if="$UBOOT_SRC/tiboot3.bin" of=$BOOTIMG bs=512 seek=$BOOT3OFFSET conv=notrunc
 
-    # tiboot3.bin
-    sudo dd if=$UBOOTWORK/tiboot3.bin of=$BOOTIMG bs=512 seek=$BOOT3OFFSET conv=notrunc
+# tispl.bin
+sudo dd if="$UBOOT_SRC/tispl.bin" of=$BOOTIMG bs=512 seek=$(($SPLOFFSET)) conv=notrunc
 
-    # tispl.bin
-    sudo dd if=$UBOOTWORK/tispl.bin of=$BOOTIMG bs=512 seek=$(($SPLOFFSET)) conv=notrunc
+# u-boot.img
+sudo dd if="$UBOOT_SRC/u-boot.img" of=$BOOTIMG bs=512 seek=$(($UBOOTOFFSET)) conv=notrunc
 
-    # u-boot.img
-    sudo dd if=$UBOOTWORK/u-boot.img of=$BOOTIMG bs=512 seek=$(($UBOOTOFFSET)) conv=notrunc
-
-    echo "==========================================================================="
-    echo "Production boot image build complete: $BOOTIMG"
-    echo "==========================================================================="
-fi
-shopt -u nullglob
+echo "==========================================================================="
+echo "Production boot image build complete: $BOOTIMG"
+echo "==========================================================================="
 
 
