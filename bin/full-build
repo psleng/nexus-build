@@ -22,6 +22,9 @@ if [ "`pwd`" = "$HOME" ]; then
 fi
 
 umask 002
+
+set -e
+
 sudo rm -rf nexus-build
 git clone -q https://github.com/psleng/nexus-build
 cd nexus-build
@@ -34,7 +37,7 @@ cd nexus-build
 # ls -l
 ## TODO HACK END
 
-set -e
+set +e
 
 echo "=== I: Starting daily iGOS build in `realpath .`..."
 make spotless
