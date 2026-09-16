@@ -36,8 +36,8 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-#    git clone -b psl-master --single-branch "$REPO_URL"
-    git clone -b vyos-build-jf --single-branch "$REPO_URL"
+    git clone -b psl-master --single-branch "$REPO_URL"
+#    git clone -b vyos-build-jf --single-branch "$REPO_URL"
 fi
 
 # package-build-iGOS/ is now committed natively in vyos-build (scripts/package-build-iGOS/,
@@ -124,6 +124,8 @@ if [ ! -f "$BLT" ]; then
             ;;
         *isc-kea-doc*)  # isc-kea insists on this
             ;;
+        *libwtmpdb-dev*)  # Needed for openssh 10.4
+            ;;
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;
@@ -137,6 +139,9 @@ if [ ! -f "$BLT" ]; then
             continue
             ;;
         */salt-api_*.deb|*/salt-syndic_*.deb|*/salt-dbg_*.deb|*/salt-master_*.deb|*/salt-cloud_*.deb|*/salt-ssh_*.deb)  # Unwanted salt components
+            continue
+            ;;
+	*/wtmpdb*.deb)  # Breaks linux-utils
             continue
             ;;
         esac
