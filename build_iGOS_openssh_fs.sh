@@ -34,8 +34,8 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b psl-master --single-branch "$REPO_URL"
-#    git clone -b vyos-build-jf --single-branch "$REPO_URL"
+    git clone -b psl-master "$REPO_URL"
+#    git clone -b vyos-build-jf "$REPO_URL"
 fi
 
 # Install build_flavor
