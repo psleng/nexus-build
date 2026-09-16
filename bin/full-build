@@ -22,6 +22,9 @@ if [ "`pwd`" = "$HOME" ]; then
 fi
 
 umask 002
+
+set -e
+
 sudo rm -rf nexus-build
 git clone -q https://github.com/psleng/nexus-build
 cd nexus-build
@@ -34,10 +37,12 @@ cd nexus-build
 # ls -l
 ## TODO HACK END
 
-set -e
+set +e
 
 echo "=== I: Starting daily iGOS build in `realpath .`..."
 make spotless
+sudo rm -rf ../nightly_isos
+mkdir -p ../nightly_isos
 date
 
 #TARGS='targ-ti-j7200 targ-ti-am64x targ-perle-iolan'
@@ -48,6 +53,7 @@ for T in $TARGS
 do
     echo "=== I: Starting $T iGOS build at $(date)..."
     make mostlyclean
+    sudo rm -rf iso-images
     make $T
     msg=''
     make all || msg="status=$?"
@@ -56,6 +62,7 @@ do
     # Stash the .ERR files for this build
     E=errorfiles/$T
     rm -rf $E; mkdir -p $E; cp -pf *.ERR $E
+    sudo cp -rLn iso-images/* ../nightly_isos
 done
 
 echo '=== I: Daily iGOS build completed! Please check *.ERR files for errors.'

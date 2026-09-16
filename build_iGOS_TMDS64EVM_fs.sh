@@ -105,9 +105,13 @@ BLT=.filesystem.$TSK.built
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: $TSK BEGIN"
 
+    # Search both possible TI artifact locations. Workspace-local is preferred
+    # for persistence across docker invocations; home path is kept as fallback.
+
     # Symlink everything to the vyos-build/packages directory
     for a in $(find $ROOTDIR/vyos-build/scripts -type f -name "*.deb")\
-             $ROOTDIR/ti-bdebstrap/*.deb
+             $ROOTDIR/ti-bdebstrap/*.deb \
+             $HOME/ti-bdebstrap/*.deb
     do
         test -s "$a" || continue  # Skip zero length junk
 
@@ -119,6 +123,8 @@ if [ ! -f "$BLT" ]; then
         *vpp-dev_*64.deb)  # Needed for vpp and vyos-1x
             ;;
         *isc-kea-doc*)  # isc-kea insists on this
+            ;;
+        *libwtmpdb-dev*)  # Needed for openssh 10.4
             ;;
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
@@ -133,6 +139,9 @@ if [ ! -f "$BLT" ]; then
             continue
             ;;
         */salt-api_*.deb|*/salt-syndic_*.deb|*/salt-dbg_*.deb|*/salt-master_*.deb|*/salt-cloud_*.deb|*/salt-ssh_*.deb)  # Unwanted salt components
+            continue
+            ;;
+	*/wtmpdb*.deb)  # Breaks linux-utils
             continue
             ;;
         esac
@@ -225,10 +234,45 @@ if [ ! -f "$BLT" ]; then
             *) echo "=== E: unknown BUILDTYPE: $BUILDTYPE" >&2; exit 1 ;;
         esac
     fi
+
+    # Secure-boot signing key material lives in a dedicated PRIVATE repo (Perle
+    # GPG keys), cloned FRESH on the build HOST and WIPED right after use (the
+    # private key + passphrase never linger on disk). build-vyos-image discovers
+    # the passphrase-protected private key + its passphrase there by glob
+    # (filenames containing 'privatekey' / 'passphrase') and stages them ONLY
+    # for flavors whose build-flavor TOML sets sign_boot = true -- so signing is
+    # driven by the flavor flag, not by this script. No fallback: a sign_boot
+    # flavor with missing/ambiguous key material FAILS the build (build-vyos-image
+    # errors) rather than shipping an unsigned image. Only igos flavors fetch the
+    # keys; generic/x86_64 builds do not need signing-repo access.
+    GPGKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/gpgkeys.git"
+    GPGKEYS_DIR="$ROOTDIR/gpgkeys"
+    SIGN_ARGS=""
+    case "$BUILDFLAVOUR" in
+        igos-*)
+            # Fetch the secret signing keys FRESH each build, and arm a
+            # fail-safe so the clone (private key + passphrase in the clear) is
+            # wiped even if the build below aborts (set -e). It is also wiped
+            # inline immediately after build-vyos-image consumes it (below).
+            trap 'rm -rf "$GPGKEYS_DIR"' EXIT
+            rm -rf "$GPGKEYS_DIR"
+            echo "=== I: $0: cloning secure-boot GPG keys from $GPGKEYS_REPO_URL"
+            git clone --depth=1 "$GPGKEYS_REPO_URL" "$GPGKEYS_DIR"
+            SIGN_ARGS="--gpg-signing-key-dir $GPGKEYS_DIR"
+            ;;
+        *)
+            echo "=== I: $0: $BUILDFLAVOUR is not a signing flavor -- skipping GPG key checkout"
+            ;;
+    esac
+
     export VYOS1X_REPO_URL=https://github.com/psleng/vyos-1x
     export VYOS1X_REPO_BRANCH=psl-master
     sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
-        ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com"
+        ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com" $SIGN_ARGS
+    # Wipe the secret key clone immediately after the build consumed it
+    # (build-vyos-image already removed its own staged copy under build/signing).
+    rm -rf "$GPGKEYS_DIR"
+    trap - EXIT
     cd -
     touch "$BLT" # build success
 else
@@ -308,17 +352,17 @@ if [ ! -f "$BLT" ]; then
     # single SKU (IOLAN-2A01), so boards without an EEPROM (e.g. the EVM)
     # misidentified. The build must not bake a fixed identity into the FS.
 
-    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
+#    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
         # Copy for early-gpio-init service
 #        sudo cp updates/perle_gpio_map.py $FS/usr/local/bin
 #        sudo cp updates/perle_gpioctl.py $FS/usr/local/bin
 #        sudo cp updates/early-gpio-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/early-gpio-init.service $FS/etc/systemd/system/sysinit.target.wants/early-gpio-init.service
 
-        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
+#        sudo cp updates/check-rtc-lsm.sh $FS/usr/local/bin
 #        sudo cp updates/rtc-init.service $FS/etc/systemd/system
 #        sudo ln -s /etc/systemd/system/rtc-init.service $FS/etc/systemd/system/sysinit.target.wants/rtc-init.service
-    fi
+#    fi
 
     # add EFI (FAT) mount point /mnt/efi to /dev/mmcblk0p2 so system can access uEnv.txt and product.env
     echo "/dev/mmcblk0p2  /mnt/efi  vfat  defaults,nofail  0  2" | sudo tee -a $FS/etc/fstab

@@ -1,5 +1,0 @@
-[[packages]]
-name = "live-boot"
-commit_id = "psl-master"
-scm_url = "https://github.com/psleng/live-boot"
-build_cmd = "dpkg-buildpackage -uc -us -tc -b"

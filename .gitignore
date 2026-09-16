@@ -10,6 +10,7 @@
 /create-sdcardiGOS.sh
 /debian-repos
 /drivers
+/gpgkeys
 /images
 /iso-images
 /logs

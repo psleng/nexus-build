@@ -1,5 +1,0 @@
-[[packages]]
-name = "psl-progs"
-commit_id = "psl-master"
-scm_url = "git@github.com:Perle-Systems-Limited/iGOS-PSL-progs.git"
-build_cmd = "make psl-progs"
