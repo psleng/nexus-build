@@ -49,7 +49,8 @@ TARGS='targ-perle-igos targ-ti-am64x'
 for T in $TARGS
 do
     echo "=== I: Starting $T iGOS build at $(date)..."
-    make mostlyclean
+    # make mostlyclean
+    make variantclean
     sudo rm -rf iso-images
     make $T
     msg=''
