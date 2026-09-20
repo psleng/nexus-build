@@ -23,9 +23,27 @@ fi
 
 umask 002
 
+set -e
+
+sudo rm -rf nexus-build
+git clone -q https://github.com/psleng/nexus-build
+cd nexus-build
+
+## TODO HACK BEGIN
+# echo "HACK stuffing in psl-progs and Makefile.hack to `pwd`"
+# cp -r $HOME/psl-progs package-build-iGOS
+# mv -f Makefile Makefile.dist
+# cp    $HOME/Makefile.hack Makefile
+# ls -l
+## TODO HACK END
+
 set +e
 
-cd nexus-build
+echo "=== I: Starting daily iGOS build in `realpath .`..."
+make spotless
+sudo rm -rf ../nightly_isos
+mkdir -p ../nightly_isos
+date
 
 #TARGS='targ-ti-j7200 targ-ti-am64x targ-perle-iolan'
 # 20260420: do not bother with 7200 for now and build am64x last since
