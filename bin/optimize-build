@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# This is called by iGOS-daily-build as builduser
+#
+
+# set -x
+if [ "$LOGNAME" != "builduser" ]; then
+    echo "$0: This must be run by builduser who has access to" >&2
+    echo "$0: https://github.com/Perle-Systems-Limited" >&2
+    exit 1
+fi
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 builddir" >&2
+    exit 1
+fi
+
+cd "$1"
+if [ "`pwd`" = "$HOME" ]; then
+    echo "$0: Refusing to run in home directory; unsafe!" >&2
+    exit 2
+fi
+
+umask 002
+
+set +e
+
+cd nexus-build
+
+#TARGS='targ-ti-j7200 targ-ti-am64x targ-perle-iolan'
+# 20260420: do not bother with 7200 for now and build am64x last since
+#           it is still the most in use.
+TARGS='targ-perle-igos targ-ti-am64x'
+for T in $TARGS
+do
+    echo "=== I: Starting $T iGOS build at $(date)..."
+    # make mostlyclean
+    make variantclean
+    sudo rm -rf iso-images
+    make $T
+    msg=''
+    make all || msg="status=$?"
+    echo "=== I: Finished $T iGOS build at $(date) $msg"
+    ls -l .*built
+    # Stash the .ERR files for this build
+    E=errorfiles/$T
+    rm -rf $E; mkdir -p $E; cp -pf *.ERR $E
+    sudo cp -rLn iso-images/* ../nightly_isos
+done
+
+echo '=== I: Daily iGOS build completed! Please check *.ERR files for errors.'
