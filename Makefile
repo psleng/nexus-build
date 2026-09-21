@@ -108,7 +108,7 @@ targ-x86:
 
 # Base repository to use for all container build recipes.
 REPO := https://github.com/psleng
-TI_HOME := $(HOME)/ti-bdebstrap
+TI_HOME := ti-bdebstrap
 
 ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 # Different image tag for docker vyos/vyos-build image
