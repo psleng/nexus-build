@@ -165,13 +165,19 @@ echo "==========================================================================
 echo "Production firmware image build complete: $IMG"
 echo "==========================================================================="
 
+if [[ "$BUILDTYPE" == "bookworm-am64xx-evm" ]]; then
+    UBOOT_SRC="$IMAGEPATH/uboot-evm-emmc"
+    UBOOT_SQUASHFS="$IMAGEPATH/tisdk-debian-bookworm-am64xx-evm-09.02.00.010-boot-emmc.squashfs"
+    sudo unsquashfs -d $UBOOT_SRC $UBOOT_SQUASHFS
+else
+    UBOOT_SRC="$ISO_MNT/boot/u-boot/platform"
+fi
 # --- flash u-boot: consume the copy vyos-build already staged on the ISO -------
 # vyos-build installs the per-flavor u-boot deb into the rootfs; hook
 # 27-igos-uboot.binary stages tiboot3.bin/tispl.bin/u-boot.img into the ISO at
 # /boot/u-boot/platform/. Whatever u-boot the ISO was built with IS the right one
 # for this platform, so there is ONE uniform source -- no per-platform branch, no
 # separate ti*-boot.squashfs. (Raw SoC ROM offsets are still set near the top.)
-UBOOT_SRC="$ISO_MNT/boot/u-boot/platform"
 
 if [[ ! -f "$UBOOT_SRC/tiboot3.bin" || ! -f "$UBOOT_SRC/tispl.bin" || ! -f "$UBOOT_SRC/u-boot.img" ]]; then
     echo "Error: u-boot payload missing on the ISO at $UBOOT_SRC"
@@ -191,8 +197,15 @@ sudo dd if="$UBOOT_SRC/tispl.bin" of=$BOOTIMG bs=512 seek=$(($SPLOFFSET)) conv=n
 # u-boot.img
 sudo dd if="$UBOOT_SRC/u-boot.img" of=$BOOTIMG bs=512 seek=$(($UBOOTOFFSET)) conv=notrunc
 
+if [[ "$BUILDTYPE" == "bookworm-am64xx-evm" ]]; then
+   echo "Copying DTBs from default-firmware/boot/dtb to directory /boot/dtb/ti"
+   sudo mkdir -p $MOUNT_P3/boot/dtb/ti
+   sudo cp $MOUNT_P3/boot/default-firmware/dtb/* $MOUNT_P3/boot/dtb/ti
+   echo "Removing UBOOT work directory: $UBOOT_SRC"
+   sudo rm -rf $UBOOT_SRC
+fi
+
 echo "==========================================================================="
 echo "Production boot image build complete: $BOOTIMG"
 echo "==========================================================================="
-
 
