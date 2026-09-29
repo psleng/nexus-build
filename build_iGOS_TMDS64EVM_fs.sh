@@ -247,6 +247,8 @@ if [ ! -f "$BLT" ]; then
     # keys; generic/x86_64 builds do not need signing-repo access.
     GPGKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/gpgkeys.git"
     GPGKEYS_DIR="$ROOTDIR/gpgkeys"
+    SBKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/sbkeys.git"
+    SBKEYS_DIR="${SBKEYS_DIR:-$ROOTDIR/sbkeys}"
     SIGN_ARGS=""
     case "$BUILDFLAVOUR" in
         igos-*)
@@ -254,11 +256,17 @@ if [ ! -f "$BLT" ]; then
             # fail-safe so the clone (private key + passphrase in the clear) is
             # wiped even if the build below aborts (set -e). It is also wiped
             # inline immediately after build-vyos-image consumes it (below).
-            trap 'rm -rf "$GPGKEYS_DIR"' EXIT
-            rm -rf "$GPGKEYS_DIR"
+            trap 'rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR"' EXIT
+            rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR"
             echo "=== I: $0: cloning secure-boot GPG keys from $GPGKEYS_REPO_URL"
             git clone --depth=1 "$GPGKEYS_REPO_URL" "$GPGKEYS_DIR"
             SIGN_ARGS="--gpg-signing-key-dir $GPGKEYS_DIR"
+            # U-Boot-verifies-GRUB: sbsign grubaa64.efi with the UEFI db key from
+            # sbkeys (db.key/db.crt). Cloned FRESH like gpgkeys and wiped after;
+            # sign_grub flavors fail closed in build-vyos-image if it is absent.
+            echo "=== I: $0: cloning U-Boot db signing keys from $SBKEYS_REPO_URL"
+            git clone --depth=1 "$SBKEYS_REPO_URL" "$SBKEYS_DIR"
+            SIGN_ARGS="$SIGN_ARGS --uboot-signing-key-dir $SBKEYS_DIR"
             ;;
         *)
             echo "=== I: $0: $BUILDFLAVOUR is not a signing flavor -- skipping GPG key checkout"
@@ -269,9 +277,9 @@ if [ ! -f "$BLT" ]; then
     export VYOS1X_REPO_BRANCH=psl-master
     sudo --preserve-env=VYOS1X_REPO_URL,VYOS1X_REPO_BRANCH \
         ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com" $SIGN_ARGS
-    # Wipe the secret key clone immediately after the build consumed it
+    # Wipe the secret key clones immediately after the build consumed them
     # (build-vyos-image already removed its own staged copy under build/signing).
-    rm -rf "$GPGKEYS_DIR"
+    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR"
     trap - EXIT
     cd -
     touch "$BLT" # build success
