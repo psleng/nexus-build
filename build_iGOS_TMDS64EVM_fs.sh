@@ -36,8 +36,8 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-    git clone -b psl-master --single-branch "$REPO_URL"
-#    git clone -b vyos-build-jf --single-branch "$REPO_URL"
+    git clone -b psl-master "$REPO_URL"
+#    git clone -b vyos-build-jf "$REPO_URL"
 fi
 
 # package-build-iGOS/ is now committed natively in vyos-build (scripts/package-build-iGOS/,
@@ -169,6 +169,7 @@ if [ ! -f "$BLT" ]; then
         sudo rm -rf debian-repos
 
         # TI repos are flaky, so retries are needed
+        set +e
         for i in 1 2 3
         do
             git clone -b psl-master $REPO_URL_TI_DEB && { i=''; break; }
@@ -177,6 +178,7 @@ if [ ! -f "$BLT" ]; then
             echo "warning: Clone $REPO_URL_TI_DEB failed (status $st); sleeping $sleeptime and retrying"
             sleep $sleeptime
         done
+        set -e
         test -z "$i" || { echo "fatal: Cannot clone $REPO_URL_TI_DEB, giving up"; exit 1; }
 
         cd debian-repos

@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# iGOS optimize build
+#
+# set -x
+D=$(dirname $(realpath -s $0))
+cd
+# Do optimize build as builduser
+cd build
+sudo su - builduser -c "$D/optimize-build $(pwd)" > optimize-build.out 2>&1
+
+# Update psleng.github.io with all the .deb files
+exec > iGOS-deb-repo.out 2>&1
+cd nexus-build
+echo 'Checking iGOS binary repository for changes and updating if different.'
+./check-update-apt-repo.sh --repo git@github.com:psleng --clean
+echo status=$?
