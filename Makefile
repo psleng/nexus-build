@@ -275,6 +275,15 @@ mostlyclean:
 	rm -f *.ERR .*.built $(DEFS)
 	sudo rm -rf vyos-build build debian-repos drivers logs tools configs scripts builds.toml create-sdcardiGOS.sh
 
+# Clean variant artifacts only (but not built images).
+variantclean:
+	cd vyos-build/scripts/package-build/linux-kernel ; rm -rf *; git restore .
+	rm -f filesystem.ERR image.ERR iso.ERR kernel.ERR uboot.ERR $(DEFS)
+	rm -f .kernel.built .uboot.built .filesystem.package-symlink-debs.built .filesystem.ti-linux-firmware.built \
+	 .filesystem.build-vyos-image.built .filesystem.ti-evm-fs-build.built .filesystem.built .image.built .iso.built
+	-rm -f vyos-build/packages/*
+	sudo rm -rf build 
+
 # Clean the container image.  It rarely needs rebuilding.
 containerclean:
 	docker image rm vyos/vyos-build:$(IMGTAG) || true
