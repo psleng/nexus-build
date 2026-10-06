@@ -268,7 +268,7 @@ spotless: clean containerclean
 
 # Clean everything.
 clean: mostlyclean
-	sudo rm -rf images dfu-images iso-images
+	sudo rm -rf images dfu-images iso-images ti-bdebstrap
 
 # Clean build artifacts only (but not built images).
 mostlyclean:
