@@ -126,6 +126,8 @@ if [ ! -f "$BLT" ]; then
             ;;
         *libwtmpdb-dev*)  # Needed for openssh 10.4
             ;;
+        *libssl-dev*)  # Needed for openssl 3.5
+            ;;
         *-dev_*|*-dbg_*|*-doc_*|*-dbgsym_*)  # Unwanted general patterns
             continue
             ;;
