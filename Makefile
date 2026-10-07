@@ -64,8 +64,8 @@ help:
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 
-#IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tpm2-openssl grub2'
-IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
+IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tacacs tpm2-openssl grub2'
+#IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            ipaddrcheck hvinfo libgpiod modemmanager uxfp-telit tfl-telit\
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
@@ -108,7 +108,7 @@ targ-x86:
 
 # Base repository to use for all container build recipes.
 REPO := https://github.com/psleng
-TI_HOME := ti-bdebstrap
+TI_HOME := $(HOME)/ti-bdebstrap
 
 ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 # Different image tag for docker vyos/vyos-build image
@@ -268,7 +268,7 @@ spotless: clean containerclean
 
 # Clean everything.
 clean: mostlyclean
-	sudo rm -rf images dfu-images iso-images
+	sudo rm -rf images dfu-images iso-images ti-bdebstrap
 
 # Clean build artifacts only (but not built images).
 mostlyclean:
