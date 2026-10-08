@@ -30,6 +30,12 @@ else
     SPLOFFSET=0x700
     UBOOTOFFSET=0x1000
     BOOTIMGSIZE_MB=4
+    # Secure iGOS U-Boot bakes bootcmd into the signed image and never sources
+    # uEnv.txt (ti-bdebstrap build_bsp.sh). Skip staging the now-inert file so a
+    # secure image carries no mutable boot script on the FAT ESP.
+    case "${IGOS_SECURE:-}" in
+        1|true|yes|on) SKIP_UENV=1 ;;
+    esac
 fi
 
 if [[ ! -e "$LIVE_IMAGE_ISO" ]]; then
@@ -129,8 +135,12 @@ sudo mkdir -p "$MOUNT_P2"
 sudo mount ${LOOP}p2 "$MOUNT_P2"
 
 # Copy any customized uEnv.txt file for uboot into vFAT EFI partition
-echo "Copying uEnv file ${UENVFILE} to uEnv.txt in the EFI partition"
-sudo cp $UENVFILE $MOUNT_P2/uEnv.txt
+if [ -n "${SKIP_UENV:-}" ]; then
+    echo "Secure build (IGOS_SECURE=${IGOS_SECURE}): skipping uEnv.txt; bootcmd is baked into the signed U-Boot"
+else
+    echo "Copying uEnv file ${UENVFILE} to uEnv.txt in the EFI partition"
+    sudo cp $UENVFILE $MOUNT_P2/uEnv.txt
+fi
 
 echo "Extracting root filesystem..."
   
