@@ -55,7 +55,12 @@ do
     # make mostlyclean
     make variantclean
     sudo rm -rf iso-images
-    make $T
+    if [ "$T" = "targ-perle-igos" ]; then
+       echo "Setting uboot secure build for igos target" >&2
+       IGOS_SECURE=1 && make $T
+    else
+       make $T
+    fi
     msg=''
     make all || msg="status=$?"
     echo "=== I: Finished $T iGOS build at $(date) $msg"
