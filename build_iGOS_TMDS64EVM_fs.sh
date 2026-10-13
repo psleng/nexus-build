@@ -44,9 +44,6 @@ fi
 # including its top-level build.py symlink), so it arrives with the clone above and no
 # longer needs to be copied in here.
 
-# Install build_flavor
-cp -f $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/
-
 #frr build fix need to be fixed up later on it the build process
 export EMAIL="psleng@perle.com"
 
