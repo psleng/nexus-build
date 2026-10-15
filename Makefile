@@ -73,7 +73,7 @@ IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            ipaddrcheck hvinfo libgpiod modemmanager uxfp-telit tfl-telit\
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
-           ssh-tpm-agent tacacs live-boot tpm2-openssl grub2'
+           ssh-tpm-agent tacacs live-boot tpm2-openssl grub2 python3-netfilterqueue'
 
 # Opt-in U-Boot UEFI Secure Boot, consumed by rundocker.sh/buildiGOSti.sh.
 # The targ-* rules persist it into $(DEFS) so it is chosen once (like BUILDTYPE)
