@@ -234,32 +234,49 @@ if [ ! -f "$BLT" ]; then
         esac
     fi
 
-    # Secure-boot signing key material lives in a dedicated PRIVATE repo (Perle
-    # GPG keys), cloned FRESH on the build HOST and WIPED right after use (the
-    # private key + passphrase never linger on disk). build-vyos-image discovers
-    # the passphrase-protected private key + its passphrase there by glob
-    # (filenames containing 'privatekey' / 'passphrase') and stages them ONLY
-    # for flavors whose build-flavor TOML sets sign_boot = true -- so signing is
-    # driven by the flavor flag, not by this script. No fallback: a sign_boot
-    # flavor with missing/ambiguous key material FAILS the build (build-vyos-image
-    # errors) rather than shipping an unsigned image. Only igos flavors fetch the
-    # keys; generic/x86_64 builds do not need signing-repo access.
+    # Signing key material lives in dedicated PRIVATE repos (Perle keys), cloned
+    # FRESH on the build HOST and WIPED right after use (secret key material
+    # never lingers on disk). build-vyos-image discovers the relevant key files
+    # there by glob and uses them:
+    #   - Secure-boot (GPG kernel/initrd + u-boot db): igos flavors only, driven
+    #     by the build-flavor TOML flags (sign_boot / sign_grub). No fallback: a
+    #     sign_boot flavor with missing/ambiguous key material FAILS the build
+    #     rather than shipping an unsigned image.
+    #   - ISO signing (minisign): ALL flavors (generic/x86_64 included), since
+    #     every distributable ISO must be verifiable at 'add system image' time.
+    #     Gated purely on --minisign-key-dir being passed below.
     GPGKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/gpgkeys.git"
     GPGKEYS_DIR="$ROOTDIR/gpgkeys"
     SBKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/sbkeys.git"
     SBKEYS_DIR="${SBKEYS_DIR:-$ROOTDIR/sbkeys}"
+    # minisign keys sign the FINAL ISO so a running unit can verify it at
+    # 'add system image' time. Unlike the GPG/u-boot secure-boot keys (igos
+    # flavors only), EVERY distributable ISO is signed -- so these are fetched
+    # for ALL flavors (generic/x86 included). build-vyos-image replaces the
+    # stock /usr/share/vyos/keys/*.minisign.pub with our public key and signs
+    # the ISO into <iso>.minisig; it fails closed if the key dir is unusable.
+    MINISIGNKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/minisign-keys.git"
+    MINISIGNKEYS_DIR="$ROOTDIR/minisign-keys"
     SIGN_ARGS=""
+
+    # Fetch the secret signing keys FRESH each build and arm a fail-safe so the
+    # clones (secret key material in the clear) are wiped even if the build
+    # below aborts (set -e). They are also wiped inline immediately after
+    # build-vyos-image consumes them (below).
+    trap 'rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR"' EXIT
+    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR"
+
+    # ISO signing (minisign): all flavors.
+    echo "=== I: $0: cloning minisign ISO signing keys from $MINISIGNKEYS_REPO_URL"
+    git clone --depth=1 "$MINISIGNKEYS_REPO_URL" "$MINISIGNKEYS_DIR"
+    SIGN_ARGS="--minisign-key-dir $MINISIGNKEYS_DIR"
+
+    # Secure-boot signing (GPG kernel/initrd + u-boot db): igos flavors only.
     case "$BUILDFLAVOUR" in
         igos-*)
-            # Fetch the secret signing keys FRESH each build, and arm a
-            # fail-safe so the clone (private key + passphrase in the clear) is
-            # wiped even if the build below aborts (set -e). It is also wiped
-            # inline immediately after build-vyos-image consumes it (below).
-            trap 'rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR"' EXIT
-            rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR"
             echo "=== I: $0: cloning secure-boot GPG keys from $GPGKEYS_REPO_URL"
             git clone --depth=1 "$GPGKEYS_REPO_URL" "$GPGKEYS_DIR"
-            SIGN_ARGS="--gpg-signing-key-dir $GPGKEYS_DIR"
+            SIGN_ARGS="$SIGN_ARGS --gpg-signing-key-dir $GPGKEYS_DIR"
             # U-Boot-verifies-GRUB: sbsign grubaa64.efi with the UEFI db key from
             # sbkeys (db.key/db.crt). Cloned FRESH like gpgkeys and wiped after;
             # sign_grub flavors fail closed in build-vyos-image if it is absent.
@@ -268,7 +285,7 @@ if [ ! -f "$BLT" ]; then
             SIGN_ARGS="$SIGN_ARGS --uboot-signing-key-dir $SBKEYS_DIR"
             ;;
         *)
-            echo "=== I: $0: $BUILDFLAVOUR is not a signing flavor -- skipping GPG key checkout"
+            echo "=== I: $0: $BUILDFLAVOUR is not a secure-boot flavor -- skipping GPG/u-boot key checkout"
             ;;
     esac
 
@@ -278,7 +295,7 @@ if [ ! -f "$BLT" ]; then
         ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com" $SIGN_ARGS
     # Wipe the secret key clones immediately after the build consumed them
     # (build-vyos-image already removed its own staged copy under build/signing).
-    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR"
+    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR"
     trap - EXIT
     cd -
     touch "$BLT" # build success
