@@ -60,4 +60,58 @@ fi
 "$TI_HOME"/PSL-mklinks $(pwd) || { exit $?; }
 
 #exec sudo "$TI_HOME"/buildiGOSti2.sh "$@"
-exec sudo KEEP_BSP_SOURCES=1 NEXUS_ROOT="$ROOTDIR" TI_BDEBSTRAP_HOME="$TI_HOME" "$TI_HOME"/buildiGOSti2.sh "$@"
+
+# Opt-in U-Boot UEFI Secure Boot. IGOS_SECURE=1 => clone the sbkeys preseed
+# store (FRESH, like gpgkeys; wiped after the build) and pass UBOOTEFI_VAR so
+# build_bsp.sh enables EFI_SECURE_BOOT + preseed. Unset => non-secure U-Boot.
+# Override the keys location/repo with SBKEYS_DIR / SBKEYS_REPO_URL.
+SBKEYS_REPO_URL="${SBKEYS_REPO_URL:-git@github.com:Perle-Systems-Limited/sbkeys.git}"
+SBKEYS_DIR="${SBKEYS_DIR:-$ROOTDIR/sbkeys}"
+# TI K3 MPK boot-signing key (custMpk). Override with MPKKEYS_DIR / MPKKEYS_REPO_URL.
+MPKKEYS_REPO_URL="${MPKKEYS_REPO_URL:-git@github.com:Perle-Systems-Limited/mpkkeys.git}"
+MPKKEYS_DIR="${MPKKEYS_DIR:-$ROOTDIR/mpkkeys}"
+UBOOT_SB_ENV=""
+MPK_SIGN_ENV=""
+SBKEYS_CLONED=""
+MPKKEYS_CLONED=""
+case "${IGOS_SECURE:-}" in
+    1|true|yes|on)
+        echo "I: IGOS_SECURE set -> cloning U-Boot secure-boot keys from $SBKEYS_REPO_URL"
+        rm -rf "$SBKEYS_DIR"
+        git clone --depth=1 "$SBKEYS_REPO_URL" "$SBKEYS_DIR" && SBKEYS_CLONED=1
+        if [ -f "$SBKEYS_DIR/ubootefi.var" ]; then
+            echo "I: U-Boot Secure Boot ON (preseed $SBKEYS_DIR/ubootefi.var)"
+            UBOOT_SB_ENV="UBOOTEFI_VAR=$SBKEYS_DIR/ubootefi.var"
+        else
+            echo "E: IGOS_SECURE set but $SBKEYS_DIR/ubootefi.var missing after clone -- refusing to build a non-enforcing 'secure' image"
+            [ -n "$SBKEYS_CLONED" ] && rm -rf "$SBKEYS_DIR"
+            exit 1
+        fi
+
+        # TI K3 MPK boot-signing key: clone mpkkeys FRESH (like sbkeys) and pass
+        # UBOOT_SIGN_KEY_DIR so build_bsp.sh signs tiboot3/tispl/u-boot.img with
+        # our custMpk instead of the committed TI dummy key. Wiped after the build.
+        echo "I: IGOS_SECURE set -> cloning U-Boot MPK signing keys from $MPKKEYS_REPO_URL"
+        rm -rf "$MPKKEYS_DIR"
+        git clone --depth=1 "$MPKKEYS_REPO_URL" "$MPKKEYS_DIR" && MPKKEYS_CLONED=1
+        if [ -f "$MPKKEYS_DIR/custMpk.pem" ]; then
+            echo "I: U-Boot MPK signing ON (key $MPKKEYS_DIR/custMpk.pem)"
+            MPK_SIGN_ENV="UBOOT_SIGN_KEY_DIR=$MPKKEYS_DIR"
+        else
+            echo "E: IGOS_SECURE set but $MPKKEYS_DIR/custMpk.pem missing after clone -- refusing to sign with the TI dummy key"
+            [ -n "$SBKEYS_CLONED" ] && rm -rf "$SBKEYS_DIR"
+            [ -n "$MPKKEYS_CLONED" ] && rm -rf "$MPKKEYS_DIR"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "I: IGOS_SECURE not set -> U-Boot non-secure build (default)"
+        ;;
+esac
+
+# Not exec'd: keep control so the sbkeys/mpkkeys clones are wiped after the build.
+sudo KEEP_BSP_SOURCES=1 NEXUS_ROOT="$ROOTDIR" TI_BDEBSTRAP_HOME="$TI_HOME" $UBOOT_SB_ENV $MPK_SIGN_ENV "$TI_HOME"/buildiGOSti2.sh "$@"
+rc=$?
+[ -n "$SBKEYS_CLONED" ] && rm -rf "$SBKEYS_DIR"
+[ -n "$MPKKEYS_CLONED" ] && rm -rf "$MPKKEYS_DIR"
+exit $rc
