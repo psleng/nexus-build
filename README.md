@@ -633,3 +633,78 @@ Perform the final configuration and switch the device to boot from the newly fla
 2. **Set eMMC Boot Mode:** Configure the target device's DIP switches to the eMMC boot mode setting: `1101 0010 0000 0000`.
 
 3. **Power Cycle:** Recycle the power to the board. The device should now boot from the eMMC using the newly flashed images.
+
+## Separate nightly cellular firmware build
+
+Use the existing build host's cron/Docker structure, independently of the ISO
+job. `bin/iGOS-firmware-build` clones or fast-forwards the private firmware
+repository, downloads Git LFS payloads, then runs its `docker-build.sh` to fetch
+signing inputs, test, build and sign. It never flashes a router or renews CA CRLs.
+
+The checkout is persistent: do not delete `dist/` between runs. This preserves
+incremental build state, timestamped archive names and historical signatures.
+Local checkout changes, a wrong branch or non-fast-forward history stop the job
+instead of overwriting local work. Commit and push firmware changes before
+running the nightly job. Git authentication must work without an interactive
+prompt for both the firmware and signing repositories.
+
+On the Linux build host, provision Python 3.11+, Git, Git LFS, Docker and private
+repository access for `builduser`. Give that user Docker access. Install this
+nexus-build checkout at a stable location outside the ISO job's disposable
+workspace (the examples use `/opt/nexus-build`).
+
+Create `/etc/igos-firmware-build.toml` with the following settings, adjusting
+the paths:
+
+```toml
+# Dedicated persistent checkout, separate from the ISO build workspace.
+pipeline = "/home/builduser/build/igos-modem-firmwares"
+repository = "https://github.com/Perle-Systems-Limited/igos-modem-firmwares.git"
+branch = "main"
+update_checkout = true
+logs = "/home/builduser/build/firmware-logs"
+base_url = "http://172.16.48.1/cellular-firmware"
+# Provision separately; never put the passphrase or private keys in this file.
+password_file = "/home/builduser/.signing-secrets/firmware-leaf.passphrase"
+# Successful snapshots and an atomically replaced latest symlink for transfer.
+nightly_output = "/home/builduser/build/nightly_firmwares"
+```
+
+ Provision the leaf passphrase separately at `password_file`,
+readable by `builduser` only (file mode 600, parent directory mode 700). The
+signing repository must contain the approved leaf key/certificate and a current
+root CRL. Do not put secrets into the TOML file or crontab.
+
+Run manually **as builduser** first:
+
+```sh
+/usr/bin/python3 /opt/nexus-build/bin/iGOS-firmware-build \
+    --config /etc/igos-firmware-build.toml
+```
+
+After a successful run, add this to **builduser's crontab**, adjusting the
+03:17 example schedule and paths:
+
+```cron
+# Install in builduser's crontab after a successful manual run.
+# Example: 03:17 daily, using the build host's local timezone.
+# Adjust the installed nexus-build script path for your host.
+17 3 * * * /usr/bin/python3 /opt/nexus-build/bin/iGOS-firmware-build --config /etc/igos-firmware-build.toml >> /home/builduser/build/firmware-cron.log 2>&1
+```
+
+ Cron uses the host's local timezone; archive
+filenames use the build container's local timezone, as with ISO filenames.
+The cron output directory must exist before the first scheduled run.
+
+Each run gets a log under `logs`; overlapping jobs exit with status 75. A
+successful run copies public artifacts to `nightly_output/<run-id>/` and
+atomically updates `nightly_output/latest`. Hidden build state and locks stay
+in the private persistent checkout. Build/test/signing failures leave the
+previous successful `latest` unchanged. Old snapshots are retained; arrange
+host-side retention according to available disk space.
+
+Publication remains a separate transfer job, as with the ISO flow. Transfer
+from the resolved successful `latest` snapshot, never directly from mutable
+`dist/`, and do not publish hidden files. The server-side transfer should stage
+and activate a complete release so catalog/signature pairs stay together. This
+change does not install a crontab or configure the storage server transfer.

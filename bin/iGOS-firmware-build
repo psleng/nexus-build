@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+# Copyright (C) 2026 Perle Systems Limited
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Independent cellular firmware job for the existing nightly build host."""
+#
+# Configure /etc/igos-firmware-build.toml using the example in README.md.
+# Run manually before scheduling. Example builduser crontab (host local time):
+#
+# 17 3 * * * /usr/bin/python3 /opt/nexus-build/bin/iGOS-firmware-build --config /etc/igos-firmware-build.toml
+#
+# The job user needs Docker access, private Git credentials, and the leaf-key
+# passphrase in the firmware checkout's .signing-secrets/leaf.passphrase.
+# Independent of iGOS-daily-build; publication is handled separately.
+import argparse
+import datetime
+import fcntl
+import os
+import shutil
+import tempfile
+import subprocess
+import sys
+from pathlib import Path
+
+import tomllib
+
+
+def update_checkout(pipeline, config, env, output):
+    """Fast-forward a persistent checkout without deleting dist or local secrets."""
+    branch = config.get('branch', 'main')
+    if not branch or branch.startswith('-') or any(char.isspace() for char in branch):
+        raise ValueError('Invalid firmware branch')
+
+    def git(*args, cwd=None, capture=False):
+        return subprocess.run(
+            ['git', *args], cwd=cwd, env=env, check=True,
+            stdout=subprocess.PIPE if capture else output,
+            stderr=output, text=True,
+        ).stdout
+
+    if not pipeline.exists():
+        pipeline.parent.mkdir(parents=True, exist_ok=True)
+        git('clone', '--branch', branch, '--single-branch', '--',
+            config.get('repository', 'https://github.com/Perle-Systems-Limited/igos-modem-firmwares.git'),
+            str(pipeline))
+    if not (pipeline/'.git').is_dir():
+        raise ValueError('Firmware pipeline must be a Git checkout')
+    if git('status', '--porcelain', cwd=pipeline, capture=True).strip():
+        raise ValueError('Firmware checkout has local changes; refusing nightly update')
+    if git('branch', '--show-current', cwd=pipeline, capture=True).strip() != branch:
+        raise ValueError('Firmware checkout is on the wrong branch')
+    git('fetch', 'origin', branch, cwd=pipeline)
+    git('merge', '--ff-only', 'FETCH_HEAD', cwd=pipeline)
+    git('lfs', 'pull', cwd=pipeline)
+    commit = git('rev-parse', 'HEAD', cwd=pipeline, capture=True).strip()
+    print(f'Firmware source commit: {commit}', file=output, flush=True)
+
+
+def snapshot_output(dist, destination, stamp):
+    """Expose only a successful public artifact snapshot to the transfer job."""
+    destination = Path(destination).expanduser()
+    if not destination.is_absolute():
+        raise ValueError('nightly_output must be an absolute path')
+    for suffix in ('', '.sig', '.pem', '.crl'):
+        if not (dist/('modem-firmware.json'+suffix)).is_file():
+            raise ValueError('Missing signed catalog; refusing to stage output')
+    destination.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.staging-', dir=destination) as temporary:
+        candidate = Path(temporary)/'artifacts'
+        shutil.copytree(dist, candidate, ignore=shutil.ignore_patterns('.*'))
+        candidate.rename(destination/stamp)
+        link = Path(temporary)/'latest'
+        link.symlink_to(stamp, target_is_directory=True)
+        link.replace(destination/'latest')
+
+
+def run(config, publish=False):
+    paths = {}
+    for key in ('pipeline', 'logs'):
+        paths[key] = Path(config[key]).expanduser()
+        if not paths[key].is_absolute():
+            raise ValueError(f'{key} must be an absolute path')
+    pipeline = paths['pipeline']
+    if publish:
+        raise ValueError('This job builds only; the web-server transfer job handles publication')
+    if 'signing' in config:
+        raise ValueError('Remove obsolete [signing] configuration; docker-build.sh fetches the keys')
+    logs = paths['logs']
+    logs.mkdir(parents=True, exist_ok=True)
+    with (logs/'firmware-job.lock').open('a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print('Another firmware job is running; skipped.', file=sys.stderr)
+            return 75
+        stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
+        logfile = logs/f'firmware-{stamp}.log'
+        with logfile.open('x') as output:
+            print(f'Firmware job log: {logfile}', flush=True)
+            print(f'Started {stamp}; publishing={publish}', file=output, flush=True)
+            # The Docker wrapper owns key fetching, tests, building, and signing.
+            # Preserve Git/Docker authentication and optional wrapper overrides.
+            env = dict(os.environ)
+            env['FIRMWARE_BASE_URL'] = config['base_url']
+            env['GIT_TERMINAL_PROMPT'] = '0'
+            if config.get('password_file'):
+                password = Path(config['password_file']).expanduser()
+                if not password.is_absolute():
+                    raise ValueError('password_file must be an absolute path')
+                env['FIRMWARE_SIGNING_PASSWORD_FILE'] = str(password)
+            if config.get('update_checkout', True):
+                update_checkout(pipeline, config, env, output)
+            wrapper = pipeline/'docker-build.sh'
+            if not wrapper.is_file() or not os.access(wrapper, os.X_OK):
+                raise ValueError('Missing or non-executable firmware docker-build.sh')
+            result = subprocess.run([str(wrapper)], cwd=pipeline, env=env,
+                                    stdout=output, stderr=subprocess.STDOUT, check=False)
+            if result.returncode:
+                print(f'FAILED: docker-build.sh exit={result.returncode}', file=output, flush=True)
+                print(f'Firmware job failed; see {logfile}', file=sys.stderr)
+                return result.returncode
+            if config.get('nightly_output'):
+                snapshot_output(pipeline/'dist', config['nightly_output'], stamp)
+            print('SUCCESS', file=output, flush=True)
+        print('Firmware job succeeded; publication is handled separately.')
+        return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config', type=Path, required=True)
+    parser.add_argument('--publish', action='store_true', help='Unsupported: publication is handled by the web-server transfer job')
+    args = parser.parse_args()
+    try:
+        config = tomllib.loads(args.config.read_text())
+        return run(config, publish=args.publish)
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        print(f'Firmware job configuration/error: {error}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
