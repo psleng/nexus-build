@@ -259,19 +259,26 @@ if [ ! -f "$BLT" ]; then
     # the ISO into <iso>.minisig; it fails closed if the key dir is unusable.
     MINISIGNKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/minisign-keys.git"
     MINISIGNKEYS_DIR="$ROOTDIR/minisign-keys"
+    FIRMWAREKEYS_REPO_URL="git@github.com:Perle-Systems-Limited/igos-firmware-keys.git"
+    FIRMWAREKEYS_DIR="$ROOTDIR/igos-firmware-keys"
     SIGN_ARGS=""
 
     # Fetch the secret signing keys FRESH each build and arm a fail-safe so the
     # clones (secret key material in the clear) are wiped even if the build
     # below aborts (set -e). They are also wiped inline immediately after
     # build-vyos-image consumes them (below).
-    trap 'rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR"' EXIT
-    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR"
+    trap 'rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR" "$FIRMWAREKEYS_DIR"' EXIT
+    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR" "$FIRMWAREKEYS_DIR"
 
     # ISO signing (minisign): all flavors.
     echo "=== I: $0: cloning minisign ISO signing keys from $MINISIGNKEYS_REPO_URL"
     git clone --depth=1 "$MINISIGNKEYS_REPO_URL" "$MINISIGNKEYS_DIR"
     SIGN_ARGS="--minisign-key-dir $MINISIGNKEYS_DIR"
+    # Firmware trust is separate from ISO/boot signing. Only public root CA
+    # certificates are staged into the image; the leaf private key is not used.
+    echo "=== I: $0: cloning firmware keys from $FIRMWAREKEYS_REPO_URL"
+    git clone --depth=1 "$FIRMWAREKEYS_REPO_URL" "$FIRMWAREKEYS_DIR"
+    SIGN_ARGS="$SIGN_ARGS --firmware-signing-key-dir $FIRMWAREKEYS_DIR"
 
     # Secure-boot signing (GPG kernel/initrd + u-boot db): igos flavors only.
     case "$BUILDFLAVOUR" in
@@ -297,7 +304,7 @@ if [ ! -f "$BLT" ]; then
         ./build-vyos-image $BUILDFLAVOUR --architecture $ARCH --build-by "psleng@perle.com" $SIGN_ARGS
     # Wipe the secret key clones immediately after the build consumed them
     # (build-vyos-image already removed its own staged copy under build/signing).
-    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR"
+    rm -rf "$GPGKEYS_DIR" "$SBKEYS_DIR" "$MINISIGNKEYS_DIR" "$FIRMWAREKEYS_DIR"
     trap - EXIT
     cd -
     touch "$BLT" # build success

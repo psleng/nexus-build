@@ -1,0 +1,78 @@
+#!/bin/bash
+# Copyright (C) 2026 Perle Systems Limited
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# iGOS modem firmware build. Started by psleng, builds as builduser.
+
+set -euo pipefail
+umask 002
+if [ "$#" != 1 ]; then
+    echo "Usage: $0 builddir" >&2
+    exit 2
+fi
+
+# Use builduser's Git credentials and Docker access without password prompts.
+if [ "$(id -un)" != "builduser" ]; then
+    exec sudo -n -iu builduser /bin/bash "$(realpath "$0")" "$(realpath "$1")"
+fi
+
+cd "$1"
+builddir=$(pwd -P)
+if [ "$builddir" = "$HOME" ] || [ "$builddir" = / ]; then
+    echo "$0: Refusing to use home or root as the build directory" >&2
+    exit 2
+fi
+
+# Firmware build settings. docker-build.sh fetches the private signing inputs.
+repository=git@github.com:Perle-Systems-Limited/igos-modem-firmwares.git
+branch=main
+pipeline="$builddir/igos-modem-firmwares"
+nightly_output="$builddir/nightly_firmwares"
+
+# Save output.
+log="$builddir/firmware-build.out"
+echo "Firmware build output: $log"
+exec >"$log" 2>&1
+export GIT_TERMINAL_PROMPT=0
+export FIRMWARE_SIGNING_REPO=git@github.com:Perle-Systems-Limited/igos-firmware-keys.git
+
+# Start with a fresh checkout.
+# Remove any checkout left by a failed run.
+rm -rf -- "$pipeline"
+git clone --branch "$branch" --single-branch -- "$repository" "$pipeline"
+cd "$pipeline"
+git lfs pull
+git rev-parse HEAD
+
+# Docker owns tests, archive generation, and signing.
+echo "=== I: Starting firmware build at $(date)..."
+./docker-build.sh
+
+# Expose a complete successful snapshot to the web-server transfer job.
+mkdir -p "$nightly_output"
+staging=$(mktemp -d "$nightly_output/.staging-XXXXXXXX")
+mkdir -p "$staging/artifacts/modem-firmware"
+cp -a dist/telit "$staging/artifacts/modem-firmware/"
+cp -p dist/modem-firmware.json{,.sig,.pem,.crl} "$staging/artifacts/modem-firmware/"
+# Move the previous directory (or legacy symlink) aside before replacement.
+if [ -e "$nightly_output/latest" ] || [ -L "$nightly_output/latest" ]; then
+    mv -- "$nightly_output/latest" "$staging/previous"
+fi
+if ! mv -- "$staging/artifacts" "$nightly_output/latest"; then
+    if [ -e "$staging/previous" ] || [ -L "$staging/previous" ]; then
+        mv -- "$staging/previous" "$nightly_output/latest"
+    fi
+    exit 1
+fi
+rm -rf -- "$staging"
+# Remove legacy timestamped snapshots after publishing the latest directory.
+for snapshot in "$nightly_output"/*; do
+    if [[ -d $snapshot && ! -L $snapshot &&
+          ${snapshot##*/} =~ ^[0-9]{8}T[0-9]{6}\.[0-9]+Z$ ]]; then
+        rm -rf -- "$snapshot"
+    fi
+done
+# Public artifacts are now independent of the checkout.
+cd "$builddir"
+rm -rf -- "$pipeline"
+echo 'SUCCESS: firmware built; publication is handled separately.'
