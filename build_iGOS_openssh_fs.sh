@@ -34,18 +34,15 @@ fi
 
 # Clone the repository if it doesn't exist or was cleaned
 if [ ! -d "$REPO_NAME" ]; then
-#    git clone -b psl-master "$REPO_URL"
-    git clone -b vyos-build-jf "$REPO_URL"
+    git clone -b psl-master "$REPO_URL"
+#    git clone -b vyos-build-jf "$REPO_URL"
 fi
 
-# Install build_flavor
-cp -f $ROOTDIR/updates/arm64fs.toml $ROOTDIR/vyos-build/data/build-flavors/
-
 ############## package-build-iGOS
-# This will build openssh-10.4 in ./vyos-build/scripts/package-build-iGOS/
+# This will build openssh in ./vyos-build/scripts/package-build-iGOS/
 TSK=package-build-openSSH
 BLT=.filesystem.$TSK.built
-OPENSSH="openssh-10.4"
+OPENSSH="openssh"
 if [ ! -f "$BLT" ]; then
     echo "=== I: $0: package-build.py $TSK BEGIN"
     ./package-build.py --dir package-build-iGOS --include $OPENSSH
