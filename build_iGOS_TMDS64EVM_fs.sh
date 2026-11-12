@@ -58,7 +58,7 @@ export EMAIL="psleng@perle.com"
 #        openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
 #        podman ddclient dropbear hostap kea keepalived netfilter \
 #        pmacct radvd isc-dhcp ndppd hsflowd pyhumps bash-completion \
-#        udp-broadcast-relay libhtp
+#        udp-broadcast-relay libhtp iproute2
 #    touch "$BLT" # build success
 #else
 #    echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
@@ -75,7 +75,7 @@ if [ ! -f "$BLT" ]; then
         openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
         podman ddclient dropbear hostap kea keepalived netfilter \
         pmacct radvd isc-dhcp ndppd hsflowd pyhumps bash-completion \
-        udp-broadcast-relay libhtp
+        udp-broadcast-relay libhtp iprout2
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
