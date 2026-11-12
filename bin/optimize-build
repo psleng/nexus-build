@@ -101,7 +101,6 @@ do
         COUNT=$(echo "$FILES" | wc -w)
         if [ "$COUNT" -eq 2 ]; then
             cp $FILES ../nightly_isos/"${NIGHTLY_SUBDIR}"
-            cp vyos-build/build/image-version.json ../nightly_isos/"${NIGHTLY_SUBDIR}"
         else
             echo "Could not determine the exact files to copy to latest iso folder, since we expect only .iso and .minisig and found this: ${FILES}" >&2
         fi
