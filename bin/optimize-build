@@ -68,7 +68,43 @@ do
     # Stash the .ERR files for this build
     E=errorfiles/$T
     rm -rf $E; mkdir -p $E; cp -pf *.ERR $E
-    sudo cp -rLn iso-images/* ../nightly_isos
+
+    NIGHTLY_SUBDIR=$(ls -t iso-images | head -n 1)
+    if [ -n "$NIGHTY_SUBDIR"]; then
+        mkdir -p ../nightly_isos/"${NIGHTLY_SUBDIR}"
+    else
+        echo "Could not find generated iso in 'iso-images' subdir, skipping"
+        continue
+    fi
+    # Everything outside of EVM build should have an image-version.json, which can be read to determine what iso to use/copy
+    # Otherwise for EVM builds, look for keyword 'evm' in the .iso name and copy those over
+    if [ "$T" != "targ-ti-am64x" ]; then
+        if [ -f "vyos-build/build/image-version.json" ]; then
+            IMAGE=$(jq -er ".[].image" vyos-build/build/image-version.json)
+            if [ -n "$IMAGE" ]; then
+                FILES=$(find vyos-build/build/ -maxdepth 1 -type f -name "${IMAGE}*")
+                COUNT=$(echo "$FILES" | wc -w)
+                if [ "$COUNT" -eq 2 ]; then
+                    cp $FILES ../nightly_isos/"${NIGHTLY_SUBDIR}"
+                    cp vyos-build/build/image-version.json ../nightly_isos/"${NIGHTLY_SUBDIR}"
+                else
+                    echo "Could not determine the exact files to copy to latest iso folder, since we expect only .iso and .minisig and found this: ${FILES}" >&2
+                fi
+            else
+                echo "Could not read .image to determine what files to transfer"
+            fi
+        else
+            echo "Could not find image-version.json, cannot upload latest" >&2
+        fi
+    else
+        FILES=$(find vyos-build/build/ -maxdepth 1 -type f -name "*evm-arm64.iso*")
+        COUNT=$(echo "$FILES" | wc -w)
+        if [ "$COUNT" -eq 2 ]; then
+            cp $FILES ../nightly_isos/"${NIGHTLY_SUBDIR}"
+        else
+            echo "Could not determine the exact files to copy to latest iso folder, since we expect only .iso and .minisig and found this: ${FILES}" >&2
+        fi
+    fi
 done
 
 echo '=== I: Daily iGOS build completed! Please check *.ERR files for errors.'
