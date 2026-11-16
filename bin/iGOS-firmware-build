@@ -31,7 +31,8 @@ repository=git@github.com:Perle-Systems-Limited/igos-modem-firmwares.git
 branch=main
 pipeline="$builddir/igos-modem-firmwares"
 builder="$builddir/firmware-vyos-build"
-nightly_output="$builddir/nightly_firmwares"
+# Keep published build output at the path used by GETIGOSFIRMWARE.
+nightly_output="/home/psleng/build/nightly_firmwares"
 
 export GIT_TERMINAL_PROMPT=0
 signing_repository=git@github.com:Perle-Systems-Limited/igos-firmware-keys.git
