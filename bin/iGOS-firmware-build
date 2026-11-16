@@ -69,16 +69,16 @@ mkdir -p "$pipeline/dist"
 run_args=(run --rm)
 if [[ -n "$platform" ]]; then run_args+=(--platform "$platform"); fi
 run_args+=(--user "$(id -u):$(id -g)"
-    --mount "type=bind,src=$builder/scripts/firmware-build,dst=/tools,readonly"
+    --mount "type=bind,src=$builder,dst=/vyos-build,readonly"
     --mount "type=bind,src=$pipeline,dst=/workspace,readonly"
     --mount "type=bind,src=$pipeline/dist,dst=/workspace/dist"
     --mount "type=bind,src=$signing/repo,dst=/signing,readonly"
     --mount "type=bind,src=$password_file,dst=/run/leaf.passphrase,readonly"
     --env FIRMWARE_SIGNING_DIR=/signing
     --env FIRMWARE_SIGNING_PASSWORD_FILE=/run/leaf.passphrase
-    --env FIRMWARE_REQUIRE_SIGNING=1 --workdir /tools)
+    --env FIRMWARE_REQUIRE_SIGNING=1 --workdir /vyos-build/scripts/firmware-build)
 docker "${run_args[@]}" "$image" python -m unittest discover -s tests -v
-docker "${run_args[@]}" "$image" python /tools/build.py --source /workspace --output /workspace/dist
+docker "${run_args[@]}" "$image" python /vyos-build/scripts/firmware-build/build.py --source /workspace --output /workspace/dist
 rm -rf -- "$signing"
 trap - EXIT
 
