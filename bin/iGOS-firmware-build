@@ -1,0 +1,112 @@
+#!/bin/bash
+# Copyright (C) 2026 Perle Systems Limited
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# iGOS modem firmware build. Started by psleng, builds as builduser.
+
+set -euo pipefail
+umask 002
+if [ "$#" != 1 ]; then
+    echo "Usage: $0 builddir" >&2
+    exit 2
+fi
+
+# Use builduser's Git credentials and Docker access without password prompts.
+if [ "$(id -un)" != "builduser" ]; then
+    exec sudo -n -iu builduser /bin/bash "$(realpath "$0")" "$(realpath "$1")"
+fi
+
+cd "$1"
+builddir=$(pwd -P)
+if [ "$builddir" = "$HOME" ] || [ "$builddir" = / ]; then
+    echo "$0: Refusing to use home or root as the build directory" >&2
+    exit 2
+fi
+
+log="$builddir/firmware-build.out"
+echo "Firmware build output: $log"
+exec >"$log" 2>&1
+# This orchestrator supplies signing inputs to the builder.
+repository=git@github.com:Perle-Systems-Limited/igos-modem-firmwares.git
+branch=main
+pipeline="$builddir/igos-modem-firmwares"
+builder="$builddir/firmware-vyos-build"
+nightly_output="$builddir/nightly_firmwares"
+
+export GIT_TERMINAL_PROMPT=0
+signing_repository=git@github.com:Perle-Systems-Limited/igos-firmware-keys.git
+for command in docker git; do
+    command -v "$command" >/dev/null || { echo "$command is required." >&2; exit 1; }
+done
+signing=$(mktemp -d "$builddir/.firmware-signing-XXXXXXXX")
+chmod 700 "$signing"
+trap 'rm -rf -- "$signing"' EXIT
+git clone --depth 1 -- "$signing_repository" "$signing/repo"
+password_file="$signing/repo/igos-firmware-leaf.passphrase"
+[[ -s "$password_file" ]] || { echo 'Missing leaf-key passphrase file.' >&2; exit 1; }
+chmod 600 "$signing/repo/igos-firmware-leaf.key" "$password_file"
+
+# Start with a fresh checkout.
+# Remove any checkout left by a failed run.
+rm -rf -- "$pipeline"
+git clone --branch "$branch" --single-branch -- "$repository" "$pipeline"
+cd "$pipeline"
+git lfs pull
+git rev-parse HEAD
+
+# Fetch tools independently of licensed firmware sources.
+rm -rf -- "$builder"
+git clone --depth 1 --branch psl-master --single-branch -- https://github.com/psleng/vyos-build.git "$builder"
+git -C "$builder" rev-parse HEAD
+# vyos-build owns build/signing tools; nexus owns Docker and keys.
+echo "=== I: Starting firmware build at $(date)..."
+image="${DOCKER_BUILD_IMAGE:-igos-modem-firmware-build:python3.11}"
+platform="${DOCKER_BUILD_PLATFORM:-}"
+build_args=(build -t "$image")
+if [[ -n "$platform" ]]; then build_args+=(--platform "$platform"); fi
+docker "${build_args[@]}" "$builder/docker/firmware"
+mkdir -p "$pipeline/dist"
+run_args=(run --rm)
+if [[ -n "$platform" ]]; then run_args+=(--platform "$platform"); fi
+run_args+=(--user "$(id -u):$(id -g)"
+    --mount "type=bind,src=$builder/scripts/firmware-build,dst=/tools,readonly"
+    --mount "type=bind,src=$pipeline,dst=/workspace,readonly"
+    --mount "type=bind,src=$pipeline/dist,dst=/workspace/dist"
+    --mount "type=bind,src=$signing/repo,dst=/signing,readonly"
+    --mount "type=bind,src=$password_file,dst=/run/leaf.passphrase,readonly"
+    --env FIRMWARE_SIGNING_DIR=/signing
+    --env FIRMWARE_SIGNING_PASSWORD_FILE=/run/leaf.passphrase
+    --env FIRMWARE_REQUIRE_SIGNING=1 --workdir /tools)
+docker "${run_args[@]}" "$image" python -m unittest discover -s tests -v
+docker "${run_args[@]}" "$image" python /tools/build.py --source /workspace --output /workspace/dist
+rm -rf -- "$signing"
+trap - EXIT
+
+# Expose a complete successful snapshot to the web-server transfer job.
+mkdir -p "$nightly_output"
+staging=$(mktemp -d "$nightly_output/.staging-XXXXXXXX")
+mkdir -p "$staging/artifacts/modem-firmware"
+cp -a dist/telit "$staging/artifacts/modem-firmware/"
+cp -p dist/modem-firmware.json{,.sig,.pem,.crl} "$staging/artifacts/modem-firmware/"
+# Move the previous directory (or legacy symlink) aside before replacement.
+if [ -e "$nightly_output/latest" ] || [ -L "$nightly_output/latest" ]; then
+    mv -- "$nightly_output/latest" "$staging/previous"
+fi
+if ! mv -- "$staging/artifacts" "$nightly_output/latest"; then
+    if [ -e "$staging/previous" ] || [ -L "$staging/previous" ]; then
+        mv -- "$staging/previous" "$nightly_output/latest"
+    fi
+    exit 1
+fi
+rm -rf -- "$staging"
+# Remove legacy timestamped snapshots after publishing the latest directory.
+for snapshot in "$nightly_output"/*; do
+    if [[ -d $snapshot && ! -L $snapshot &&
+          ${snapshot##*/} =~ ^[0-9]{8}T[0-9]{6}\.[0-9]+Z$ ]]; then
+        rm -rf -- "$snapshot"
+    fi
+done
+# Public artifacts are now independent of the checkout.
+cd "$builddir"
+rm -rf -- "$pipeline" "$builder"
+echo 'SUCCESS: firmware built; publication is handled separately.'
