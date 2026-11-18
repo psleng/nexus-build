@@ -134,6 +134,9 @@ if [ ! -f "$BLT" ]; then
         */accel-ppp_*.deb)  # Obsolete accel-ppp (replaced by accel-ppp-ng)
             continue
             ;;
+        */openssl-provider-fips_*.deb)  # Unvalidated OpenSSL 3.5 FIPS module from openssl-3.5; conflicts with igos-openssl-fips-provider (validated 3.1.2)
+            continue
+            ;;
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
             continue
             ;;
