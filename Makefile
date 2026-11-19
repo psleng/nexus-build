@@ -163,7 +163,7 @@ $(CONT_TARG):
 $(KERNEL_TARG): $(CONT_TARG)
 	@$(call DOCKRUN,kernel,./build_iGOS_TMDS64EVM_kernel.sh)
 
-# Build u-boot (vyos-build/packages/u-boot_*.deb)
+# Build u-boot (vyos-build/packages/u-boot-<machine>_*.deb)
 $(UBOOT_TARG): $(KERNEL_TARG)
 	#
 ifeq ($(BUILDTARG),x86_64)

@@ -31,11 +31,10 @@ else
     UBOOTOFFSET=0x1000
     BOOTIMGSIZE_MB=4
     # Secure iGOS U-Boot bakes bootcmd into the signed image and never sources
-    # uEnv.txt (ti-bdebstrap build_bsp.sh). Skip staging the now-inert file so a
-    # secure image carries no mutable boot script on the FAT ESP.
-    case "${IGOS_SECURE:-}" in
-        1|true|yes|on) SKIP_UENV=1 ;;
-    esac
+    # uEnv.txt (ti-bdebstrap build_bsp.sh). Whether THIS image's u-boot is the
+    # secure build is read from the ISO below (/boot/u-boot/secure_boot), not
+    # from IGOS_SECURE, so the decision follows the u-boot actually shipped.
+    IGOS_BOARD=1
 fi
 
 if [[ ! -e "$LIVE_IMAGE_ISO" ]]; then
@@ -134,14 +133,6 @@ sudo mkdir -p "$MOUNT_P2"
 # Mount EFI (p2)
 sudo mount ${LOOP}p2 "$MOUNT_P2"
 
-# Copy any customized uEnv.txt file for uboot into vFAT EFI partition
-if [ -n "${SKIP_UENV:-}" ]; then
-    echo "Secure build (IGOS_SECURE=${IGOS_SECURE}): skipping uEnv.txt; bootcmd is baked into the signed U-Boot"
-else
-    echo "Copying uEnv file ${UENVFILE} to uEnv.txt in the EFI partition"
-    sudo cp $UENVFILE $MOUNT_P2/uEnv.txt
-fi
-
 echo "Extracting root filesystem..."
   
 if [[ ! -d "$ROOTFS" ]]; then
@@ -156,6 +147,26 @@ ISO_LOOP=$(sudo losetup --show -f "$LIVE_IMAGE_ISO")
 sudo mount -o ro "$ISO_LOOP" "$ISO_MNT"
 
 sudo unsquashfs -f -d "$ROOTFS" "$ISO_MNT/live/filesystem.squashfs"
+
+# Copy any customized uEnv.txt file for uboot into vFAT EFI partition, unless
+# the ISO carries the secure iGOS u-boot (u-boot-<machine>-secure ships the
+# secure_boot marker, staged to /boot/u-boot/ by vyos-build hook 27), which
+# never reads it.
+UBOOT_SECURE_MARKER="$ISO_MNT/boot/u-boot/secure_boot"
+case "${IGOS_SECURE:-}" in
+    1|true|yes|on)
+        if [ ! -f "$UBOOT_SECURE_MARKER" ]; then
+            echo "Error: IGOS_SECURE=${IGOS_SECURE} but the ISO's u-boot is not a Secure Boot build ($UBOOT_SECURE_MARKER missing)"
+            exit 1
+        fi
+        ;;
+esac
+if [ -n "${IGOS_BOARD:-}" ] && [ -f "$UBOOT_SECURE_MARKER" ]; then
+    echo "Secure u-boot on the ISO ($(cat "$UBOOT_SECURE_MARKER" | cut -d' ' -f1)): skipping uEnv.txt; bootcmd is baked into the signed U-Boot"
+else
+    echo "Copying uEnv file ${UENVFILE} to uEnv.txt in the EFI partition"
+    sudo cp $UENVFILE $MOUNT_P2/uEnv.txt
+fi
 
 echo "Preparing to chroot..."
 
