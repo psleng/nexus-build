@@ -68,7 +68,7 @@ help:
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 
-#IGOS_PKGS='vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tacacs tpm2-openssl grub2 python3-netfilterqueue openssl-fips-provider'
+#IGOS_PKGS='igos-cloud-proxy vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tacacs tpm2-openssl grub2 python3-netfilterqueue openssl-3.5 openssl-fips-provider'
 IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            ipaddrcheck hvinfo libgpiod modemmanager uxfp-telit tfl-telit\
@@ -163,7 +163,7 @@ $(CONT_TARG):
 $(KERNEL_TARG): $(CONT_TARG)
 	@$(call DOCKRUN,kernel,./build_iGOS_TMDS64EVM_kernel.sh)
 
-# Build u-boot (vyos-build/packages/u-boot_*.deb)
+# Build u-boot (vyos-build/packages/u-boot-<machine>_*.deb)
 $(UBOOT_TARG): $(KERNEL_TARG)
 	#
 ifeq ($(BUILDTARG),x86_64)

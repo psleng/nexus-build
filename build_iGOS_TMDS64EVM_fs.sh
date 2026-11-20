@@ -75,7 +75,7 @@ if [ ! -f "$BLT" ]; then
         openvpn-otp aws-gwlbtun node_exporter blackbox_exporter \
         podman ddclient dropbear hostap kea keepalived netfilter \
         pmacct radvd isc-dhcp ndppd hsflowd pyhumps bash-completion \
-        udp-broadcast-relay libhtp
+        udp-broadcast-relay libhtp iproute2
     touch "$BLT" # build success
 else
     echo "=== I: $0: SKIP package-build.py $TSK ($BLT exists)"
@@ -132,6 +132,12 @@ if [ ! -f "$BLT" ]; then
             continue
             ;;
         */accel-ppp_*.deb)  # Obsolete accel-ppp (replaced by accel-ppp-ng)
+            continue
+            ;;
+        */u-boot_*.deb)  # Legacy board-agnostic u-boot name; packages are now u-boot-<machine> and Conflict with it
+            continue
+            ;;
+        */openssl-provider-fips_*.deb)  # Unvalidated OpenSSL 3.5 FIPS module from openssl-3.5; conflicts with igos-openssl-fips-provider (validated 3.1.2)
             continue
             ;;
         */hsflowd.deb|*/sflowovsd.deb)  # Not actually .deb
