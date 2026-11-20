@@ -68,12 +68,12 @@ help:
 # List of iGOS packages to build.
 # This is used in build_iGOS_TMDS64EVM_fs.sh and others.
 
-IGOS_PKGS='igos-cloud-proxy vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tacacs tpm2-openssl grub2 python3-netfilterqueue openssl-3.5 openssl-fips-provider'
-#IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
+#IGOS_PKGS='igos-cloud-proxy vyos-1x modemmanager libgpiod uxfp-telit tfl-telit ssh-tpm-agent tacacs tpm2-openssl grub2 python3-netfilterqueue openssl-3.5 openssl-fips-provider'
+IGOS_PKGS='igos-cloud-proxy flask-react-web apnscripts psl-progs saml-sso iolan_apps vyos-1x vyatta-bash vyos-user-utils \
            vyatta-biosdevname vyatta-cfg vyos-http-api-tools \
            ipaddrcheck hvinfo libgpiod modemmanager uxfp-telit tfl-telit\
            libmnl libpam-radius-auth initramfs-tools libnss-mapuser \
-           ssh-tpm-agent tacacs live-boot tpm2-openssl grub2 python3-netfilterqueue openssl-3.5'
+           ssh-tpm-agent tacacs live-boot tpm2-openssl grub2 python3-netfilterqueue openssl-3.5 openssl-fips-provider'
 
 # Opt-in U-Boot UEFI Secure Boot, consumed by rundocker.sh/buildiGOSti.sh.
 # The targ-* rules persist it into $(DEFS) so it is chosen once (like BUILDTYPE)
