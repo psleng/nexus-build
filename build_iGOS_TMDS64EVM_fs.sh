@@ -149,6 +149,9 @@ if [ ! -f "$BLT" ]; then
 	*/wtmpdb*.deb)  # Breaks linux-utils
             continue
             ;;
+	*/strongswan-charon*.deb) # Not needed, and triggers conflict with other strongswan components
+	    continue
+	    ;;
         esac
 
         test -f "$a" || continue
